@@ -12,7 +12,12 @@
 --  much as hosting none.
 -- ===========================================================================
 
-create extension if not exists "pgcrypto";
+-- No `create extension` here, on purpose. Everything below needs only
+-- gen_random_uuid(), which has been core Postgres since 13. And CREATE
+-- EXTENSION is one of the few statements a read-only or otherwise restricted
+-- SQL session refuses outright -- `if not exists` included, because the
+-- read-only check runs before the does-it-already-exist check -- so a
+-- pointless one would be the first thing to fail on a paste-and-run.
 
 -- Registrant accounts are just Supabase auth users in this project. A person
 -- needs one only to CREATE or MANAGE a department. Members of a department
