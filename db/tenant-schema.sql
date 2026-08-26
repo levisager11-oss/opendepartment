@@ -191,6 +191,25 @@ create table if not exists public.reports (
 );
 create index if not exists reports_status_idx on public.reports (status, created_at desc);
 
+-- One report per person per file. The report dialog has always had a "you
+-- already sent this" branch and a string to go with it; there was simply
+-- nothing that could ever raise it, so the same person could file the same
+-- complaint until the admin queue was useless. Older reports are collapsed
+-- first, keeping the earliest of each pair, because a department re-running
+-- this file may already have duplicates and the index would refuse to build
+-- over them. Partial, because a comment report carries no file_id.
+delete from public.reports r
+ where r.file_id is not null
+   and exists (
+     select 1 from public.reports keep
+      where keep.file_id     = r.file_id
+        and keep.reporter_id = r.reporter_id
+        and (keep.created_at, keep.id) < (r.created_at, r.id)
+   );
+
+create unique index if not exists reports_one_per_file_idx
+  on public.reports (file_id, reporter_id) where file_id is not null;
+
 -- 9. AUDIT LOG -- every deletion and moderation action is recorded.
 create table if not exists public.audit_log (
   id          bigserial primary key,
@@ -534,6 +553,21 @@ drop policy if exists profiles_admin_all on public.profiles;
 create policy profiles_admin_all on public.profiles
   for all to authenticated using (public.is_admin()) with check (public.is_admin());
 
+-- Row level security is exactly that: ROW level. A policy that says "your own
+-- row" says nothing about WHICH COLUMNS of it, and Supabase grants the
+-- `authenticated` role update on every column of every table in `public` by
+-- default -- so profiles_update_self above, on its own, let any member run
+--
+--     update profiles set is_admin = true where id = auth.uid()
+--
+-- and promote themselves, or clear their own is_banned and walk back in.
+-- Column privileges are the part of the grant system that is column-level, so
+-- the flags are taken away here and only the cover name is handed back.
+-- admin_set_flag() and claim_username() are `security definer` and run as the
+-- owner, so both keep working untouched.
+revoke update on public.profiles from anon, authenticated;
+grant  update (username) on public.profiles to authenticated;
+
 -- USER_EMAILS: yourself, or an admin. Nobody else, ever.
 drop policy if exists emails_read_own on public.user_emails;
 create policy emails_read_own on public.user_emails
@@ -568,6 +602,14 @@ create policy files_update_own on public.files
 drop policy if exists files_delete_own_or_admin on public.files;
 create policy files_delete_own_or_admin on public.files
   for delete to authenticated using (owner_id = auth.uid() or public.is_admin());
+
+-- Same column-level reasoning as `profiles` above. Everything on this table
+-- past the three descriptive fields is a counter maintained by a trigger, and
+-- "you may update your own row" would otherwise mean "you may set your own
+-- score to 9999". The counter triggers and increment_view() are
+-- `security definer`, so they still write whatever they like.
+revoke update on public.files from anon, authenticated;
+grant  update (title, description, category) on public.files to authenticated;
 
 -- FILE_SUBJECTS
 drop policy if exists fs_read on public.file_subjects;

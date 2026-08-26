@@ -32,7 +32,6 @@ export function VaultBrowser({
 }: {
   subjects: Subject[];
   currentUserId: string;
-  isAdmin: boolean;
   initialSubjectId?: string;
 }) {
   const { t, plural } = useI18n();
@@ -63,8 +62,18 @@ export function VaultBrowser({
   const filtersKey = `${debounced}|${sort}|${subjectId}|${category}|${kind}|${mineOnly}`;
   const previousFilters = useRef(filtersKey);
 
+  // Changing two filters quickly leaves two queries in flight, and they do not
+  // have to come back in the order they were sent. Every load claims a ticket
+  // and drops its own result if a later one has already been issued -- without
+  // this, the slower, older query wins and the grid disagrees with the
+  // controls above it.
+  const latestRequest = useRef(0);
+
   const load = useCallback(
     async (pageIndex: number, replace: boolean) => {
+      const ticket = ++latestRequest.current;
+      const stale = () => ticket !== latestRequest.current;
+
       setLoading(true);
       setError(false);
 
@@ -76,6 +85,7 @@ export function VaultBrowser({
             .from("file_subjects")
             .select("file_id")
             .eq("subject_id", subjectId);
+          if (stale()) return;
           restrictTo = (data ?? []).map((row) => row.file_id as string);
           if (restrictTo.length === 0) {
             setFiles([]);
@@ -106,6 +116,7 @@ export function VaultBrowser({
 
         const { data, count, error } = await query;
         if (error) throw error;
+        if (stale()) return;
 
         const rows = (data ?? []) as CaseFile[];
 
@@ -136,7 +147,7 @@ export function VaultBrowser({
           const { data: signed } = await supabase.storage
             .from(STORAGE_BUCKET)
             .createSignedUrls(imagePaths, 3600);
-          if (signed) {
+          if (signed && !stale()) {
             setThumbs((prev) => {
               const next = { ...prev };
               signed.forEach((entry) => {
@@ -147,9 +158,9 @@ export function VaultBrowser({
           }
         }
       } catch {
-        setError(true);
+        if (!stale()) setError(true);
       } finally {
-        setLoading(false);
+        if (!stale()) setLoading(false);
       }
     },
     [supabase, debounced, sort, subjectId, category, kind, mineOnly, currentUserId]

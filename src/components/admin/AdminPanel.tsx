@@ -10,11 +10,13 @@ import { AdminUsers } from "./AdminUsers";
 import { AdminInvites } from "./AdminInvites";
 import { AdminSubjects } from "./AdminSubjects";
 import { AdminAudit } from "./AdminAudit";
+import { AdminSettings } from "./AdminSettings";
 import type {
   AdminFile,
   AdminReport,
   AdminSubject,
   AdminUser,
+  DepartmentSettings,
   InviteEntry,
   AuditEntry,
 } from "./types";
@@ -25,6 +27,7 @@ type Tab =
   | "users"
   | "invites"
   | "subjects"
+  | "settings"
   | "audit";
 
 const TABS: Array<{ id: Tab; key: TranslationKey }> = [
@@ -33,6 +36,7 @@ const TABS: Array<{ id: Tab; key: TranslationKey }> = [
   { id: "users", key: "admin.tab.users" },
   { id: "invites", key: "admin.tab.invites" },
   { id: "subjects", key: "admin.tab.subjects" },
+  { id: "settings", key: "admin.tab.settings" },
   { id: "audit", key: "admin.tab.audit" },
 ];
 
@@ -46,6 +50,7 @@ export function AdminPanel({
   users,
   invites,
   subjects,
+  settings,
   audit,
   totalBytes,
 }: {
@@ -55,6 +60,7 @@ export function AdminPanel({
   users: AdminUser[];
   invites: InviteEntry[];
   subjects: AdminSubject[];
+  settings: DepartmentSettings | null;
   audit: AuditEntry[];
   totalBytes: number;
 }) {
@@ -68,7 +74,7 @@ export function AdminPanel({
   const stripRef = useRef<HTMLDivElement>(null);
 
   /**
-   * Six tabs do not fit across a phone, so the strip scrolls -- and the tab
+   * Seven tabs do not fit across a phone, so the strip scrolls -- and the tab
    * you just selected could sit entirely outside the visible part of it,
    * leaving the panel below with nothing on screen saying which one it is.
    *
@@ -78,7 +84,7 @@ export function AdminPanel({
    * whole document sideways along with the strip, so selecting a tab shunted
    * the masthead and the heading off the left edge. This can only ever move
    * this one element, and only when the tab really is out of view -- which at
-   * a width that fits all six is never.
+   * a width that fits them all is never.
    */
   useEffect(() => {
     const strip = stripRef.current;
@@ -182,8 +188,8 @@ export function AdminPanel({
                 aria-selected={active}
                 aria-controls={`admin-panel-${entry.id}`}
                 // Roving tabindex: one Tab press enters the strip, then the
-                // arrow keys move between tabs. Six separate tab stops would
-                // be six presses to get past the toolbar.
+                // arrow keys move between tabs. A separate tab stop per tab
+                // would be seven presses to get past the toolbar.
                 tabIndex={active ? 0 : -1}
                 ref={(node) => {
                   tabRefs.current[entry.id] = node;
@@ -220,6 +226,17 @@ export function AdminPanel({
         )}
         {tab === "invites" && <AdminInvites invites={invites} />}
         {tab === "subjects" && <AdminSubjects subjects={subjects} />}
+        {/* settings is a single row that every department has; null only ever
+            means the read was refused, and an empty form would invite an
+            administrator to overwrite the real values with blanks. */}
+        {tab === "settings" &&
+          (settings ? (
+            <AdminSettings settings={settings} />
+          ) : (
+            <p className="paper px-6 py-14 text-center text-sm text-ink-500">
+              {t("common.error")}
+            </p>
+          ))}
         {tab === "audit" && <AdminAudit entries={audit} />}
       </div>
     </div>

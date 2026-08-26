@@ -127,11 +127,44 @@ drop policy if exists operators_self on public.operators;
 create policy operators_self on public.operators
   for all to authenticated using (id = auth.uid()) with check (id = auth.uid());
 
--- An operator sees and edits only their own departments.
+-- An operator sees and edits only their own departments -- but "edits" has to
+-- be spelled out, because a single `for all` policy here handed away three
+-- things the platform is supposed to keep:
+--
+--   INSERT  register_department() enforces the per-account cap and the
+--           reserved-slug list. A blanket insert policy let a script skip the
+--           function and write rows straight into the directory, so the cap
+--           was advice rather than a rule. There is no insert policy below:
+--           the function is `security definer` and owns the table, so it is
+--           now the only way in.
+--   UPDATE  `status` lives on this row. An operator whose department had just
+--           been suspended could set it back to 'active' -- and could rename
+--           the slug past the reserved list while they were there. RLS is
+--           row-level, so the columns are fenced off with column privileges
+--           instead; what is left is presentation and their own project's
+--           coordinates, which are theirs to change.
+--   DELETE  delisting a suspended department and registering the slug afresh
+--           walked straight back out of a suspension, so that one case is
+--           excluded.
 drop policy if exists departments_own on public.departments;
-create policy departments_own on public.departments
-  for all to authenticated
+
+drop policy if exists departments_read_own on public.departments;
+create policy departments_read_own on public.departments
+  for select to authenticated using (operator_id = auth.uid());
+
+drop policy if exists departments_update_own on public.departments;
+create policy departments_update_own on public.departments
+  for update to authenticated
   using (operator_id = auth.uid()) with check (operator_id = auth.uid());
+
+drop policy if exists departments_delete_own on public.departments;
+create policy departments_delete_own on public.departments
+  for delete to authenticated
+  using (operator_id = auth.uid() and status <> 'suspended');
+
+revoke insert, update on public.departments from anon, authenticated;
+grant  update (display_name, tagline, visibility, supabase_url, anon_key)
+  on public.departments to authenticated;
 
 -- Anyone may file an abuse report; nobody may read them back.
 drop policy if exists abuse_insert on public.abuse_reports;

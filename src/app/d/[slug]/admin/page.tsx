@@ -1,6 +1,7 @@
 import { requireDeptAdmin } from "@/lib/tenant/auth";
 import { createTenantClient } from "@/lib/tenant/server";
 import { AdminPanel } from "@/components/admin/AdminPanel";
+import type { DepartmentSettings } from "@/components/admin/types";
 import { privatePage } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
@@ -41,6 +42,7 @@ export default async function AdminPage({
     { data: invites },
     { data: subjects },
     { data: fileSubjects },
+    { data: settings },
     { data: audit },
   ] = await Promise.all([
     supabase
@@ -65,6 +67,13 @@ export default async function AdminPage({
       .select("id, name, description, created_at")
       .order("name"),
     supabase.from("file_subjects").select("subject_id"),
+    supabase
+      .from("settings")
+      .select(
+        "department_name, tagline, subject_label, docket_prefix, seal_top, seal_bottom, accent, categories, max_upload_mb, operator_name, operator_contact"
+      )
+      .eq("id", true)
+      .maybeSingle(),
     supabase
       .from("audit_log")
       .select("id, actor_id, action, target, detail, created_at")
@@ -121,6 +130,7 @@ export default async function AdminPage({
         file_count: Number(m.file_count ?? 0),
       }))}
       invites={invites ?? []}
+      settings={(settings as DepartmentSettings | null) ?? null}
       subjects={(subjects ?? []).map((s) => ({
         ...s,
         file_count: fileCountBySubject.get(s.id as string) ?? 0,

@@ -59,9 +59,14 @@ export function DeptLoginForm({
   const router = useRouter();
   const params = useSearchParams();
 
+  // Same rule as the auth callback: inside this department, or nowhere. A
+  // bare prefix test would also let /d/<slug>-other through.
   const nextParam = params.get("next");
   const next =
-    nextParam && nextParam.startsWith(`/d/${slug}`) ? nextParam : href("vault");
+    nextParam &&
+    (nextParam === `/d/${slug}` || nextParam.startsWith(`/d/${slug}/`))
+      ? nextParam
+      : href("vault");
 
   const [mode, setMode] = useState<Mode>(initialMode);
   const [email, setEmail] = useState("");
