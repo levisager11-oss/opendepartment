@@ -21,6 +21,10 @@ const REASONS: Array<{ value: string; key: TranslationKey }> = [
  */
 export function ReportButton({ fileId }: { fileId: string }) {
   const { t } = useI18n();
+  // Top level, not inside submit(): a hook called from an event handler runs
+  // with no React dispatcher and throws, which took the whole report dialog
+  // down the moment anybody pressed Send.
+  const supabase = useTenantClient();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState(REASONS[0].value);
@@ -41,7 +45,6 @@ export function ReportButton({ fileId }: { fileId: string }) {
     setBusy(true);
     setError(null);
 
-    const supabase = useTenantClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();

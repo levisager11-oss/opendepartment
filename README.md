@@ -70,6 +70,27 @@ honest answer when someone asks who can see their files.
 The setup endpoint decodes the pasted key and **refuses a `service_role` JWT**
 outright rather than trusting the instruction not to paste one.
 
+### Row level security is row level
+
+RLS answers "which rows", never "which columns", and Supabase hands the
+`authenticated` role UPDATE on every column of every table in `public`. So
+"you may edit your own profile row" also meant *you may set `is_admin` on it*,
+and "you may edit your own file row" meant *you may set your own score to
+9999*. The same shape in the control plane let an operator flip their own
+department's `status` back from `suspended`, rename its slug past the reserved
+list, or INSERT a row straight into the directory and skip
+`register_department` along with its per-account cap.
+
+Column privileges are the half of the grant system that *is* column-level, so
+both schemas now revoke the blanket UPDATE and hand back only the columns that
+are genuinely the caller's: `username` on a profile, title/description/category
+on a file, name/tagline/visibility/project-coordinates on a directory row.
+Every privileged path still works, because every one of them is a
+`security definer` function running as the owner. The control plane also splits
+its single `for all` policy into select/update/delete, with no INSERT policy at
+all and DELETE refused on a suspended row -- delisting and re-registering was a
+way back out of a suspension.
+
 ### Session isolation
 
 Each department gets its own auth cookie, named `od-<slug>` and scoped to path
@@ -180,13 +201,18 @@ e-mail address.
 
 - **3 departments per account**, enforced inside `register_department` rather
   than in the UI. Without a cap one script reserves every good slug overnight.
+  There is no INSERT policy on `departments`, so the function is the only door
+  in and the cap is not something a hand-rolled API call can step around.
 - **30 reserved slugs**, covering app routes and names worth impersonating.
 - **Unlisted by default.** A department appears in `/directory` only if its
   owner opts in.
 - **Terms accepted at signup**, with the responsibility spelled out rather
   than buried: the person who creates an archive answers for what is in it.
 - **Suspension** — setting a department's `status` to `suspended` stops its
-  slug resolving, without touching a byte of the owner's own data.
+  slug resolving, without touching a byte of the owner's own data. `status` is
+  not in the operator's UPDATE grant and a suspended row cannot be deleted, so
+  a suspension is not something its subject can lift or delist their way out
+  of.
 
 ## Status
 
@@ -217,6 +243,19 @@ Not built yet:
 - Per-department legal pages (`/d/<slug>/legal/*`) driven by the tenant's own
   `operator_name` / `operator_contact` settings
 - A settings screen, so rebranding after setup means an UPDATE on `settings`
+
+## Upgrading a deployment that already exists
+
+Both `.sql` files are idempotent and re-running them is the supported way to
+pick up a change. The privilege fixes described under *Row level security is
+row level* live in those files, so:
+
+- **The platform operator** re-runs [`db/control-plane.sql`](db/control-plane.sql)
+  in the control-plane project once.
+- **Every department owner** re-runs [`db/tenant-schema.sql`](db/tenant-schema.sql)
+  in their own project. Until they do, their members can still promote
+  themselves. The wizard hands out the current file, so departments created
+  from here on are fine.
 
 ## Notes for whoever runs this
 

@@ -13,10 +13,6 @@ export const dictionary = {
     "gov.parody": "PARODY",
     "gov.disclaimer":
       "This is a satirical student project. It is not affiliated with any government agency.",
-    "site.department": "Department of Justice",
-    "site.office": "Office of Records",
-    "site.name": "{name}",
-    "site.tagline": "Declassified Document Repository",
 
     // --- nav ------------------------------------------------------------
     "nav.vault": "The Vault",
@@ -90,14 +86,12 @@ export const dictionary = {
       "Reminder: if you skipped the e-mail step, your members cannot confirm their address or reset a password.",
 
     // --- support --------------------------------------------------------
-    "od.support": "Support OpenDepartment",
     "od.supportBody":
       "OpenDepartment is free and stores nothing of yours. If it is useful to you, you can buy me a coffee.",
 
     // --- department chrome (OpenDepartment additions) -------------------
     "dept.hostedNotice":
       "{name} is created and run by its own administrators, who are responsible for everything in it. It is hosted on",
-    "dept.reportThis": "Report this department",
     "dept.frontDoor": "Restricted archive",
     "dept.frontDoorOpen": "Open archive",
     "dept.needInvite": "You need an invite code to join this archive.",
@@ -202,8 +196,6 @@ export const dictionary = {
     "setup.claimed":
       "That project already has an administrator. Connect a fresh Supabase project instead.",
     "setup.done": "Your department is live",
-    "setup.doneBody":
-      "Open it and create the first account -- the first person to sign up becomes the administrator, so make sure it is you.",
     "setup.openDept": "Open your department",
     "setup.visibility": "Listing",
     "setup.unlisted": "Unlisted -- reachable only with the link",
@@ -221,18 +213,14 @@ export const dictionary = {
     "account.signIn": "Sign in to OpenDepartment",
     "account.signInBody":
       "This account only manages your department listings. It is separate from your membership inside any department.",
-    "account.manage": "Manage",
     "account.visit": "Visit",
     "account.delist": "Remove listing",
     "account.delistConfirm":
       "Remove this department from OpenDepartment? Its address stops working. The data stays in your own Supabase project and is not touched.",
 
     // --- landing --------------------------------------------------------
-    "landing.title": "{name}",
     "landing.subtitle":
       "Access to this repository is restricted to authorised personnel.",
-    "landing.body":
-      "Documents held in this repository have been submitted by cleared members. Access requires a valid invite code.",
     "landing.cta": "Request access",
     "landing.stat.files": "Documents on file",
     "landing.stat.subjects": "Subjects indexed",
@@ -241,8 +229,6 @@ export const dictionary = {
     // --- auth -----------------------------------------------------------
     "auth.title": "Personnel Authentication",
     "auth.subtitle": "Restricted system. Authorised access only.",
-    "auth.google": "Continue with Google",
-    "auth.or": "or",
     "auth.email": "E-mail address",
     "auth.password": "Password",
     "auth.signin": "Sign in",
@@ -255,8 +241,6 @@ export const dictionary = {
       "If that address belongs to a member, a reset link is on its way.",
     "auth.checkEmail":
       "Check your inbox and confirm your e-mail address to finish registration.",
-    "auth.notAllowed":
-      "This e-mail address is not on the access list. Contact the administrator to be added.",
     "auth.invalidCredentials": "E-mail address or password is incorrect.",
     "auth.passwordTooShort": "Password must be at least 8 characters.",
     "auth.genericError": "Authentication failed. Please try again.",
@@ -307,15 +291,12 @@ export const dictionary = {
     "file.subjects": "Subjects",
     "file.category": "Classification",
     "file.download": "Download",
-    "file.open": "Open document",
     "file.delete": "Delete",
     "file.report": "Report",
     "file.back": "Back to repository",
-    "file.notFound": "Document not found or already destroyed.",
     "file.uploaderEmail": "Uploader e-mail (admin only)",
     "file.deleteConfirm":
       "Permanently destroy this document? This cannot be undone.",
-    "file.deleted": "Document destroyed.",
     "file.unsupported":
       "This format cannot be previewed in the browser. Use the download button.",
     "file.loadingPreview": "Loading document...",
@@ -352,7 +333,6 @@ export const dictionary = {
       "No subjects have been defined yet. Ask the administrator to add some.",
     "upload.submit": "Submit to repository",
     "upload.submitting": "Transmitting...",
-    "upload.success": "Document filed successfully.",
     "upload.errorSize": "File exceeds the {mb} MB limit.",
     "upload.errorType": "That file type is not accepted.",
     "upload.errorTitle": "A document title is required.",
@@ -391,14 +371,12 @@ export const dictionary = {
     "admin.tab.files": "Documents",
     "admin.tab.reports": "Reports",
     "admin.tab.users": "Personnel",
-    "admin.tab.allowlist": "Access list",
     "admin.tab.subjects": "Subjects",
     "admin.tab.audit": "Audit log",
     "admin.storage": "Storage used",
     "admin.storageOf": "of {total}",
     "admin.files.uploader": "Uploader",
     "admin.files.email": "E-mail",
-    "admin.reports.open": "Open reports",
     "admin.reports.none": "No open reports.",
     "admin.reports.resolve": "Mark resolved",
     "admin.reports.dismiss": "Dismiss",
@@ -413,13 +391,6 @@ export const dictionary = {
     "admin.users.unban": "Reinstate",
     "admin.users.makeAdmin": "Grant admin",
     "admin.users.revokeAdmin": "Revoke admin",
-    "admin.allowlist.add": "Add address",
-    "admin.allowlist.placeholder": "name@example.com",
-    "admin.allowlist.note": "Note (optional)",
-    "admin.allowlist.remove": "Remove",
-    "admin.allowlist.empty": "No addresses on the access list yet.",
-    "admin.allowlist.bulk": "Paste several addresses, one per line",
-    "admin.allowlist.added": "{n} address(es) added.",
     "admin.subjects.add": "Add subject",
     "admin.subjects.name": "Subject name",
     "admin.subjects.description": "Description (optional)",
@@ -430,23 +401,17 @@ export const dictionary = {
     "admin.audit.action": "Action",
     "admin.audit.actor": "By",
     "admin.audit.when": "When",
-    "admin.notAdmin": "You do not have administrator clearance.",
 
     // --- legal ----------------------------------------------------------
     "legal.terms": "Terms of use",
     "legal.privacy": "Privacy notice",
     "legal.imprint": "Legal notice",
-    "legal.takedown": "Report content",
-    "legal.contact": "Contact",
 
     // --- misc -----------------------------------------------------------
     "common.cancel": "Cancel",
     "common.confirm": "Confirm",
-    "common.save": "Save",
     "common.saving": "Saving...",
     "common.close": "Close",
-    "common.yes": "Yes",
-    "common.no": "No",
     "common.error": "Something went wrong.",
     "common.retry": "Try again",
     "common.loading": "Loading...",
@@ -477,10 +442,6 @@ export const dictionary = {
     "gov.parody": "PARODIE",
     "gov.disclaimer":
       "Dies ist ein satirisches Schulprojekt. Es steht in keiner Verbindung zu einer Behörde.",
-    "site.department": "Justizdepartement",
-    "site.office": "Amt für Aktenführung",
-    "site.name": "{name}",
-    "site.tagline": "Archiv freigegebener Dokumente",
 
     // --- nav ------------------------------------------------------------
     "nav.vault": "Das Archiv",
@@ -556,14 +517,12 @@ export const dictionary = {
       "Hinweis: Wenn Sie den E-Mail-Schritt übersprungen haben, können Ihre Mitglieder ihre Adresse nicht bestätigen und kein Passwort zurücksetzen.",
 
     // --- Unterstützung -------------------------------------------------
-    "od.support": "OpenDepartment unterstützen",
     "od.supportBody":
       "OpenDepartment ist kostenlos und speichert nichts von Ihnen. Wenn es Ihnen nützt, können Sie mir einen Kaffee ausgeben.",
 
     // --- department chrome (OpenDepartment additions) -------------------
     "dept.hostedNotice":
       "{name} wird von der eigenen Administration erstellt und betrieben, die für sämtliche Inhalte verantwortlich ist. Gehostet auf",
-    "dept.reportThis": "Dieses Departement melden",
     "dept.frontDoor": "Geschütztes Archiv",
     "dept.frontDoorOpen": "Offenes Archiv",
     "dept.needInvite": "Für dieses Archiv wird ein Einladungscode benötigt.",
@@ -668,8 +627,6 @@ export const dictionary = {
     "setup.claimed":
       "Dieses Projekt hat bereits eine Administration. Verbinden Sie stattdessen ein neues Supabase-Projekt.",
     "setup.done": "Ihr Departement ist online",
-    "setup.doneBody":
-      "Öffnen Sie es und erstellen Sie das erste Konto -- die erste Person, die sich registriert, wird zur Administration. Stellen Sie sicher, dass Sie das sind.",
     "setup.openDept": "Departement öffnen",
     "setup.visibility": "Listung",
     "setup.unlisted": "Nicht gelistet -- nur mit dem Link erreichbar",
@@ -687,18 +644,14 @@ export const dictionary = {
     "account.signIn": "Bei OpenDepartment anmelden",
     "account.signInBody":
       "Dieses Konto verwaltet nur Ihre Departements-Einträge. Es ist von Ihrer Mitgliedschaft innerhalb eines Departements getrennt.",
-    "account.manage": "Verwalten",
     "account.visit": "Öffnen",
     "account.delist": "Eintrag entfernen",
     "account.delistConfirm":
       "Dieses Departement von OpenDepartment entfernen? Die Adresse funktioniert dann nicht mehr. Die Daten bleiben in Ihrem eigenen Supabase-Projekt unangetastet.",
 
     // --- landing --------------------------------------------------------
-    "landing.title": "{name}",
     "landing.subtitle":
       "Der Zugang zu diesem Archiv ist auf befugtes Personal beschränkt.",
-    "landing.body":
-      "Die hier abgelegten Dokumente wurden von freigegebenen Mitgliedern eingereicht. Für den Zugang wird ein gültiger Einladungscode benötigt.",
     "landing.cta": "Zugang beantragen",
     "landing.stat.files": "Erfasste Dokumente",
     "landing.stat.subjects": "Erfasste Betreffe",
@@ -707,8 +660,6 @@ export const dictionary = {
     // --- auth -----------------------------------------------------------
     "auth.title": "Personalauthentifizierung",
     "auth.subtitle": "Geschütztes System. Nur für befugten Zugriff.",
-    "auth.google": "Weiter mit Google",
-    "auth.or": "oder",
     "auth.email": "E-Mail-Adresse",
     "auth.password": "Passwort",
     "auth.signin": "Anmelden",
@@ -721,8 +672,6 @@ export const dictionary = {
       "Falls diese Adresse zu einem Mitglied gehört, ist ein Link unterwegs.",
     "auth.checkEmail":
       "Prüfen Sie Ihren Posteingang und bestätigen Sie Ihre E-Mail-Adresse, um die Registrierung abzuschliessen.",
-    "auth.notAllowed":
-      "Diese E-Mail-Adresse steht nicht auf der Zugangsliste. Wenden Sie sich an die Administration.",
     "auth.invalidCredentials": "E-Mail-Adresse oder Passwort ist falsch.",
     "auth.passwordTooShort": "Das Passwort muss mindestens 8 Zeichen haben.",
     "auth.genericError":
@@ -775,15 +724,12 @@ export const dictionary = {
     "file.subjects": "Betreffe",
     "file.category": "Einstufung",
     "file.download": "Herunterladen",
-    "file.open": "Dokument öffnen",
     "file.delete": "Löschen",
     "file.report": "Melden",
     "file.back": "Zurück zum Archiv",
-    "file.notFound": "Dokument nicht gefunden oder bereits vernichtet.",
     "file.uploaderEmail": "E-Mail der einreichenden Person (nur Administration)",
     "file.deleteConfirm":
       "Dieses Dokument endgültig vernichten? Das kann nicht rückgängig gemacht werden.",
-    "file.deleted": "Dokument vernichtet.",
     "file.unsupported":
       "Dieses Format kann im Browser nicht angezeigt werden. Bitte herunterladen.",
     "file.loadingPreview": "Dokument wird geladen...",
@@ -821,7 +767,6 @@ export const dictionary = {
       "Es wurden noch keine Betreffe definiert. Bitten Sie die Administration, welche anzulegen.",
     "upload.submit": "An das Archiv übermitteln",
     "upload.submitting": "Wird übermittelt...",
-    "upload.success": "Dokument erfolgreich abgelegt.",
     "upload.errorSize": "Die Datei überschreitet das Limit von {mb} MB.",
     "upload.errorType": "Dieser Dateityp wird nicht akzeptiert.",
     "upload.errorTitle": "Ein Dokumenttitel ist erforderlich.",
@@ -861,14 +806,12 @@ export const dictionary = {
     "admin.tab.files": "Dokumente",
     "admin.tab.reports": "Meldungen",
     "admin.tab.users": "Personal",
-    "admin.tab.allowlist": "Zugangsliste",
     "admin.tab.subjects": "Betreffe",
     "admin.tab.audit": "Protokoll",
     "admin.storage": "Belegter Speicher",
     "admin.storageOf": "von {total}",
     "admin.files.uploader": "Eingereicht von",
     "admin.files.email": "E-Mail",
-    "admin.reports.open": "Offene Meldungen",
     "admin.reports.none": "Keine offenen Meldungen.",
     "admin.reports.resolve": "Als erledigt markieren",
     "admin.reports.dismiss": "Verwerfen",
@@ -883,13 +826,6 @@ export const dictionary = {
     "admin.users.unban": "Entsperren",
     "admin.users.makeAdmin": "Adminrechte erteilen",
     "admin.users.revokeAdmin": "Adminrechte entziehen",
-    "admin.allowlist.add": "Adresse hinzufügen",
-    "admin.allowlist.placeholder": "name@example.com",
-    "admin.allowlist.note": "Notiz (optional)",
-    "admin.allowlist.remove": "Entfernen",
-    "admin.allowlist.empty": "Noch keine Adressen auf der Zugangsliste.",
-    "admin.allowlist.bulk": "Mehrere Adressen einfügen, eine pro Zeile",
-    "admin.allowlist.added": "{n} Adresse(n) hinzugefügt.",
     "admin.subjects.add": "Betreff hinzufügen",
     "admin.subjects.name": "Bezeichnung",
     "admin.subjects.description": "Beschreibung (optional)",
@@ -900,23 +836,17 @@ export const dictionary = {
     "admin.audit.action": "Aktion",
     "admin.audit.actor": "Durch",
     "admin.audit.when": "Zeitpunkt",
-    "admin.notAdmin": "Sie haben keine Administrationsberechtigung.",
 
     // --- legal ----------------------------------------------------------
     "legal.terms": "Nutzungsbedingungen",
     "legal.privacy": "Datenschutzerklärung",
     "legal.imprint": "Impressum",
-    "legal.takedown": "Inhalt melden",
-    "legal.contact": "Kontakt",
 
     // --- misc -----------------------------------------------------------
     "common.cancel": "Abbrechen",
     "common.confirm": "Bestätigen",
-    "common.save": "Speichern",
     "common.saving": "Wird gespeichert...",
     "common.close": "Schliessen",
-    "common.yes": "Ja",
-    "common.no": "Nein",
     "common.error": "Etwas ist schiefgelaufen.",
     "common.retry": "Erneut versuchen",
     "common.loading": "Wird geladen...",

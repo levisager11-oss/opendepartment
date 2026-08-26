@@ -534,6 +534,21 @@ drop policy if exists profiles_admin_all on public.profiles;
 create policy profiles_admin_all on public.profiles
   for all to authenticated using (public.is_admin()) with check (public.is_admin());
 
+-- Row level security is exactly that: ROW level. A policy that says "your own
+-- row" says nothing about WHICH COLUMNS of it, and Supabase grants the
+-- `authenticated` role update on every column of every table in `public` by
+-- default -- so profiles_update_self above, on its own, let any member run
+--
+--     update profiles set is_admin = true where id = auth.uid()
+--
+-- and promote themselves, or clear their own is_banned and walk back in.
+-- Column privileges are the part of the grant system that is column-level, so
+-- the flags are taken away here and only the cover name is handed back.
+-- admin_set_flag() and claim_username() are `security definer` and run as the
+-- owner, so both keep working untouched.
+revoke update on public.profiles from anon, authenticated;
+grant  update (username) on public.profiles to authenticated;
+
 -- USER_EMAILS: yourself, or an admin. Nobody else, ever.
 drop policy if exists emails_read_own on public.user_emails;
 create policy emails_read_own on public.user_emails
@@ -568,6 +583,14 @@ create policy files_update_own on public.files
 drop policy if exists files_delete_own_or_admin on public.files;
 create policy files_delete_own_or_admin on public.files
   for delete to authenticated using (owner_id = auth.uid() or public.is_admin());
+
+-- Same column-level reasoning as `profiles` above. Everything on this table
+-- past the three descriptive fields is a counter maintained by a trigger, and
+-- "you may update your own row" would otherwise mean "you may set your own
+-- score to 9999". The counter triggers and increment_view() are
+-- `security definer`, so they still write whatever they like.
+revoke update on public.files from anon, authenticated;
+grant  update (title, description, category) on public.files to authenticated;
 
 -- FILE_SUBJECTS
 drop policy if exists fs_read on public.file_subjects;

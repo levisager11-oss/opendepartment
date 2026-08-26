@@ -33,7 +33,6 @@ export default async function VaultPage({
     <VaultBrowser
       subjects={(subjects ?? []) as Subject[]}
       currentUserId={member.userId}
-      isAdmin={member.profile.is_admin}
       initialSubjectId={subject ?? ""}
     />
   );

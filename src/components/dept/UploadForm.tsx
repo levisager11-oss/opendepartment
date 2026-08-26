@@ -76,6 +76,19 @@ export function UploadForm({
     );
   }
 
+  /**
+   * Clearing has to reach the <input> as well as the state. Leaving the
+   * element's value in place means picking the very same file again fires no
+   * change event at all, and the dropzone just sits there looking broken.
+   */
+  function clearFile() {
+    setFile(null);
+    if (preview) URL.revokeObjectURL(preview);
+    setPreview(null);
+    setError(null);
+    if (inputRef.current) inputRef.current.value = "";
+  }
+
   function toggleSubject(id: string) {
     setPicked((prev) => {
       const next = new Set(prev);
@@ -207,8 +220,7 @@ export function UploadForm({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setFile(null);
-                  setPreview(null);
+                  clearFile();
                 }}
                 className="mt-2 cursor-pointer text-xs text-stamp-red underline"
               >

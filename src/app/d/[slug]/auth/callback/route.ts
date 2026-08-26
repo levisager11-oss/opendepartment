@@ -29,11 +29,14 @@ export async function GET(
 
   const home = `${base}/d/${slug}`;
 
-  // Only ever bounce to somewhere inside this department.
+  // Only ever bounce to somewhere inside THIS department. The trailing slash
+  // matters: a bare prefix test also accepts /d/<slug>-other, which is a
+  // different department's front door.
   const requested = searchParams.get("next") ?? `/d/${slug}/vault`;
-  const safeNext = requested.startsWith(`/d/${slug}`)
-    ? requested
-    : `/d/${slug}/vault`;
+  const safeNext =
+    requested === `/d/${slug}` || requested.startsWith(`/d/${slug}/`)
+      ? requested
+      : `/d/${slug}/vault`;
 
   if (errorDescription) {
     return NextResponse.redirect(`${home}/access-denied`);
