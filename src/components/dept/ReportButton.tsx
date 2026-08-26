@@ -63,8 +63,11 @@ export function ReportButton({ fileId }: { fileId: string }) {
     });
 
     if (insertError) {
+      // 23505 is the unique violation from reports_one_per_file_idx. Matched
+      // on the code rather than the message text, which is localised by the
+      // server and changes between Postgres versions.
       setError(
-        /duplicate/i.test(insertError.message)
+        insertError.code === "23505"
           ? t("report.alreadySent")
           : t("common.error")
       );

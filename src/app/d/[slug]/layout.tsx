@@ -18,9 +18,18 @@ export async function generateMetadata({
   const dept = await resolveDepartment(slug);
   if (!dept) return { title: "Not found", robots: { index: false, follow: false } };
 
+  // The tenant's own settings row wins over the directory's cached copy, the
+  // same way it does everywhere else -- otherwise renaming a department under
+  // Administration changes every page except the browser tab and the share
+  // card. Both calls are per-request memoised and the layout below makes them
+  // anyway, so this costs no extra round trip.
+  const branding = await getBranding(dept);
+  const name = branding.departmentName || dept.display_name;
+
   const description =
+    branding.tagline ??
     dept.tagline ??
-    `${dept.display_name} -- a parody document archive on ${SITE_NAME}.`;
+    `${name} -- a parody document archive on ${SITE_NAME}.`;
 
   return {
     // Share cards are worth having either way: an unlisted department is
@@ -29,7 +38,7 @@ export async function generateMetadata({
     // sub-route, so a department has one address in the index, not one per
     // page.
     ...pageMetadata({
-      title: dept.display_name,
+      title: name,
       description,
       path: `/d/${slug}`,
     }),
@@ -38,8 +47,8 @@ export async function generateMetadata({
     // root layout's template and render "The Vault -- OpenDepartment",
     // dropping the one word that says which archive you are looking at.
     title: {
-      default: dept.display_name,
-      template: `%s -- ${dept.display_name}`,
+      default: name,
+      template: `%s -- ${name}`,
     },
     // Unlisted departments stay out of search results. A department that opted
     // into the public directory is fair game.

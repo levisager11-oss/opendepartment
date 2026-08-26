@@ -64,3 +64,18 @@ export type InviteEntry = {
   expires_at: string | null;
   created_at: string;
 };
+
+/** The department's own `settings` row, as the settings screen edits it. */
+export type DepartmentSettings = {
+  department_name: string;
+  tagline: string | null;
+  subject_label: string;
+  docket_prefix: string;
+  seal_top: string;
+  seal_bottom: string;
+  accent: string;
+  categories: string[];
+  max_upload_mb: number;
+  operator_name: string | null;
+  operator_contact: string | null;
+};

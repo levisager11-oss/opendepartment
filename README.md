@@ -235,6 +235,15 @@ the create-a-department flow run end to end on the live deployment).
 - Invite management: generate a code, cap its uses, expire it, copy the join
   link, revoke it. Redemption verified end to end — a missing code, a wrong
   code and a valid code each produce the right outcome
+- A settings screen under Administration: name, tagline, the noun the files
+  are about, docket prefix, seal text, accent, categories, upload cap and the
+  operator's own name and contact. An ordinary admin-gated UPDATE on the
+  tenant's `settings` row, with the row selected back so a policy refusal
+  reads as an error rather than as a form that changed nothing
+- Password reset end to end. The link lands on `auth/callback`, which
+  forwards to `auth/update-password` — without that screen a reset link
+  signed somebody in and left the old password in place, which is a magic
+  link wearing the wrong label
 - Pinned departments (`STATIC_DEPARTMENTS`) and `db/seed-demo.sql`
 - Ko-fi button on the platform pages only, never inside a department
 
@@ -242,7 +251,14 @@ Not built yet:
 
 - Per-department legal pages (`/d/<slug>/legal/*`) driven by the tenant's own
   `operator_name` / `operator_contact` settings
-- A settings screen, so rebranding after setup means an UPDATE on `settings`
+- Renaming a department in the **directory**. The settings screen changes the
+  name everywhere inside the department, including the browser tab and the
+  share card, because those read the tenant's own row. `/directory` lists the
+  control plane's cached copy, and nothing updates it yet
+- Keeping the storage bucket's `file_size_limit` in step with
+  `settings.max_upload_mb`. The bucket is fixed at 25 MB, so the settings
+  screen caps the field there rather than offering a number storage would
+  refuse
 
 ## Upgrading a deployment that already exists
 

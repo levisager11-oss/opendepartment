@@ -41,6 +41,42 @@ export const dictionary = {
     "account.acceptRequired":
       "Please accept the terms and the privacy notice to create an account.",
     "admin.tab.invites": "Invites",
+    "admin.tab.settings": "Settings",
+
+    // --- the settings screen --------------------------------------------
+    "settings.intro":
+      "Everything on this page is a row in your own database. Nothing about this department is compiled into OpenDepartment, which is why you can rename it into something else entirely and the app will not notice.",
+    "settings.identity": "Identity",
+    "settings.name": "Department name",
+    "settings.tagline": "Tagline",
+    "settings.directoryNote":
+      "The name changes here immediately. The public directory shows the name you registered with OpenDepartment, which is a separate list and keeps its own copy.",
+    "settings.vocabulary": "Vocabulary",
+    "settings.subjectLabel": "What the files are about",
+    "settings.subjectLabelHint":
+      "The noun for one entry in the archive. \"Case\" gives you a case file index.",
+    "settings.docket": "Docket prefix",
+    "settings.docketHint": "Documents are numbered {example}.",
+    "settings.seal": "The seal",
+    "settings.sealTop": "Around the top",
+    "settings.sealBottom": "Around the bottom",
+    "settings.accent": "Accent colour",
+    "settings.accentInvalid": "Use a six-digit hex colour, like #b8860b.",
+    "settings.categories": "Categories",
+    "settings.categoriesHint":
+      "One per line, in the order they should appear. Existing documents keep the category they were filed under even if you remove it here.",
+    "settings.categoriesEmpty": "Keep at least one category.",
+    "settings.upload": "Largest upload",
+    "settings.uploadHint":
+      "Megabytes. Your storage bucket refuses anything over {cap} MB whatever this says, so it is capped to match.",
+    "settings.operator": "Who runs this department",
+    "settings.operatorHint":
+      "Shown in the footer. The person named here is the one answerable for what is in the archive, which is the point of naming them.",
+    "settings.operatorName": "Name",
+    "settings.operatorContact": "Contact",
+    "settings.nameRequired": "A department needs a name.",
+    "settings.saved": "Saved.",
+    "common.save": "Save",
     "invite.maxUses": "Maximum uses",
     "invite.expiresDays": "Expires in (days)",
     "invite.note": "Note",
@@ -245,6 +281,20 @@ export const dictionary = {
     "auth.passwordTooShort": "Password must be at least 8 characters.",
     "auth.genericError": "Authentication failed. Please try again.",
     "auth.working": "Verifying...",
+
+    // --- setting a new password after a reset link ----------------------
+    "auth.updateTitle": "Choose a new password",
+    "auth.updateBody":
+      "You arrived here from a reset link, so you are signed in for the moment. Pick a new password before you go any further.",
+    "auth.newPassword": "New password",
+    "auth.repeatPassword": "Repeat it",
+    "auth.passwordMismatch": "Those two do not match.",
+    "auth.updateSubmit": "Set the password",
+    "auth.updateDone":
+      "Your password has been changed. You are signed in.",
+    "auth.linkExpired": "This link has expired",
+    "auth.linkExpiredBody":
+      "Reset links are good for one use and a short while. Ask for a fresh one and it will work.",
 
     // --- onboarding -----------------------------------------------------
     "onboarding.title": "Assign Your Cover Name",
@@ -470,6 +520,43 @@ export const dictionary = {
     "account.acceptRequired":
       "Bitte akzeptieren Sie die Nutzungsbedingungen und die Datenschutzerklärung, um ein Konto zu erstellen.",
     "admin.tab.invites": "Einladungen",
+    "admin.tab.settings": "Einstellungen",
+
+    // --- die Einstellungsseite ------------------------------------------
+    "settings.intro":
+      "Alles auf dieser Seite ist eine Zeile in Ihrer eigenen Datenbank. Nichts an diesem Departement steckt fest in OpenDepartment -- deshalb können Sie es in etwas völlig anderes umbenennen, ohne dass die App davon Notiz nimmt.",
+    "settings.identity": "Identität",
+    "settings.name": "Name des Departements",
+    "settings.tagline": "Untertitel",
+    "settings.directoryNote":
+      "Der Name ändert sich hier sofort. Das öffentliche Verzeichnis zeigt den Namen, den Sie bei OpenDepartment registriert haben; das ist eine eigene Liste mit einer eigenen Kopie.",
+    "settings.vocabulary": "Wortwahl",
+    "settings.subjectLabel": "Worum es in den Akten geht",
+    "settings.subjectLabelHint":
+      "Das Wort für einen einzelnen Eintrag im Archiv. «Fall» ergibt ein Fallakten-Verzeichnis.",
+    "settings.docket": "Aktenkürzel",
+    "settings.docketHint": "Dokumente werden {example} nummeriert.",
+    "settings.seal": "Das Siegel",
+    "settings.sealTop": "Oben herum",
+    "settings.sealBottom": "Unten herum",
+    "settings.accent": "Akzentfarbe",
+    "settings.accentInvalid":
+      "Verwenden Sie eine sechsstellige Hex-Farbe, etwa #b8860b.",
+    "settings.categories": "Kategorien",
+    "settings.categoriesHint":
+      "Eine pro Zeile, in der gewünschten Reihenfolge. Bestehende Dokumente behalten ihre Kategorie, auch wenn Sie sie hier entfernen.",
+    "settings.categoriesEmpty": "Behalten Sie mindestens eine Kategorie.",
+    "settings.upload": "Grösster Upload",
+    "settings.uploadHint":
+      "Megabyte. Ihr Storage-Bucket weist alles über {cap} MB ohnehin ab, deshalb ist der Wert entsprechend begrenzt.",
+    "settings.operator": "Wer dieses Departement betreibt",
+    "settings.operatorHint":
+      "Erscheint im Fussbereich. Die hier genannte Person verantwortet den Inhalt des Archivs -- genau darum wird sie genannt.",
+    "settings.operatorName": "Name",
+    "settings.operatorContact": "Kontakt",
+    "settings.nameRequired": "Ein Departement braucht einen Namen.",
+    "settings.saved": "Gespeichert.",
+    "common.save": "Speichern",
     "invite.maxUses": "Maximale Verwendungen",
     "invite.expiresDays": "Läuft ab in (Tagen)",
     "invite.note": "Notiz",
@@ -677,6 +764,20 @@ export const dictionary = {
     "auth.genericError":
       "Die Authentifizierung ist fehlgeschlagen. Bitte erneut versuchen.",
     "auth.working": "Wird geprüft...",
+
+    // --- neues Passwort nach einem Reset-Link ---------------------------
+    "auth.updateTitle": "Neues Passwort wählen",
+    "auth.updateBody":
+      "Sie sind über einen Link zum Zurücksetzen hierhergekommen und deshalb vorläufig angemeldet. Wählen Sie zuerst ein neues Passwort.",
+    "auth.newPassword": "Neues Passwort",
+    "auth.repeatPassword": "Wiederholen",
+    "auth.passwordMismatch": "Die beiden stimmen nicht überein.",
+    "auth.updateSubmit": "Passwort setzen",
+    "auth.updateDone":
+      "Ihr Passwort wurde geändert. Sie sind angemeldet.",
+    "auth.linkExpired": "Dieser Link ist abgelaufen",
+    "auth.linkExpiredBody":
+      "Links zum Zurücksetzen gelten einmal und nur kurz. Fordern Sie einen neuen an, dann klappt es.",
 
     // --- onboarding -----------------------------------------------------
     "onboarding.title": "Decknamen festlegen",

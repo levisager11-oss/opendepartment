@@ -191,6 +191,25 @@ create table if not exists public.reports (
 );
 create index if not exists reports_status_idx on public.reports (status, created_at desc);
 
+-- One report per person per file. The report dialog has always had a "you
+-- already sent this" branch and a string to go with it; there was simply
+-- nothing that could ever raise it, so the same person could file the same
+-- complaint until the admin queue was useless. Older reports are collapsed
+-- first, keeping the earliest of each pair, because a department re-running
+-- this file may already have duplicates and the index would refuse to build
+-- over them. Partial, because a comment report carries no file_id.
+delete from public.reports r
+ where r.file_id is not null
+   and exists (
+     select 1 from public.reports keep
+      where keep.file_id     = r.file_id
+        and keep.reporter_id = r.reporter_id
+        and (keep.created_at, keep.id) < (r.created_at, r.id)
+   );
+
+create unique index if not exists reports_one_per_file_idx
+  on public.reports (file_id, reporter_id) where file_id is not null;
+
 -- 9. AUDIT LOG -- every deletion and moderation action is recorded.
 create table if not exists public.audit_log (
   id          bigserial primary key,
