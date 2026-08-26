@@ -59,10 +59,14 @@ export function DepartmentRow({ dept }: { dept: Dept }) {
         </p>
       </div>
 
+      {/* Directory listing only. The control plane cannot reach into a
+          department's own database, so who may join is decided in there --
+          say so rather than letting "Public" imply an open door. */}
       <button
         type="button"
         onClick={toggleVisibility}
         disabled={busy}
+        title={t("account.listingOnly")}
         className="btn btn-sm btn-ghost"
       >
         {t(visibility === "public" ? "setup.public" : "setup.unlisted")}

@@ -22,6 +22,8 @@ export type Branding = {
   categories: string[];
   maxUploadMb: number;
   claimed: boolean;
+  /** Public department: anybody may sign up, no invite code needed. */
+  openJoin: boolean;
 };
 
 export const FALLBACK_BRANDING: Branding = {
@@ -35,6 +37,7 @@ export const FALLBACK_BRANDING: Branding = {
   categories: [...DEFAULT_CATEGORIES],
   maxUploadMb: 25,
   claimed: false,
+  openJoin: false,
 };
 
 /**
@@ -72,6 +75,10 @@ export const getBranding = cache(
           : [...DEFAULT_CATEGORIES],
       maxUploadMb: row.max_upload_mb ?? 25,
       claimed: Boolean(row.claimed),
+      // Absent on a department that has not re-run the schema since open_join
+      // was added, and absent reads as false -- which is the safe way round:
+      // the door stays shut until its owner opens it on purpose.
+      openJoin: Boolean(row.open_join),
     };
   }
 );

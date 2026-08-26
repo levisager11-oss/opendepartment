@@ -22,9 +22,13 @@ function randomCode(): string {
 
 export function AdminInvites({ invites }: { invites: InviteEntry[] }) {
   const { t, formatDate } = useI18n();
-  const { slug } = useTenant();
+  const { slug, branding } = useTenant();
   const supabase = useTenantClient();
   const router = useRouter();
+
+  const [openJoin, setOpenJoin] = useState(branding.openJoin);
+  const [doorBusy, setDoorBusy] = useState(false);
+  const [doorError, setDoorError] = useState<string | null>(null);
 
   const [code, setCode] = useState(randomCode());
   const [note, setNote] = useState("");
@@ -79,6 +83,39 @@ export function AdminInvites({ invites }: { invites: InviteEntry[] }) {
     router.refresh();
   }
 
+  /**
+   * The door itself. `settings` is admin-writable under the tenant's own RLS,
+   * so this is an ordinary update running as the signed-in administrator --
+   * no elevated key, and a non-admin who forged the request would simply
+   * update nothing.
+   */
+  async function setDoor(next: boolean) {
+    if (next === openJoin) return;
+    setDoorBusy(true);
+    setDoorError(null);
+
+    // Selecting the row back is what turns "RLS refused this" into an error:
+    // an update the policy blocks touches no rows and reports no failure, so
+    // without the returned row a non-admin would watch the radio move.
+    const { data, error: updateError } = await supabase
+      .from("settings")
+      .update({ open_join: next })
+      .eq("id", true)
+      .select("open_join");
+
+    setDoorBusy(false);
+    if (updateError || !data || data.length === 0) {
+      setDoorError(t("common.error"));
+      return;
+    }
+
+    setOpenJoin(next);
+    // The flag rides down through branding, which the layout reads per
+    // request -- so the sign-up form only stops asking for a code once the
+    // server has re-rendered.
+    router.refresh();
+  }
+
   async function revoke(target: string) {
     if (!confirm(t("invite.revokeConfirm"))) return;
     setBusy(true);
@@ -107,6 +144,45 @@ export function AdminInvites({ invites }: { invites: InviteEntry[] }) {
 
   return (
     <div className="flex flex-col gap-5">
+      <div className="paper p-4">
+        <p className="mb-1 text-sm font-semibold text-ink-900">
+          {t("access.title")}
+        </p>
+        <p className="mb-3 text-xs text-ink-500">{t("access.help")}</p>
+
+        <div className="flex flex-col gap-2">
+          {([false, true] as const).map((value) => (
+            <label
+              key={String(value)}
+              className="flex cursor-pointer items-start gap-2 text-sm"
+            >
+              <input
+                type="radio"
+                name="open-join"
+                className="mt-1 accent-gov-800"
+                checked={openJoin === value}
+                disabled={doorBusy}
+                onChange={() => setDoor(value)}
+              />
+              <span>
+                <span className="font-semibold text-ink-900">
+                  {t(value ? "access.open" : "access.closed")}
+                </span>
+                <span className="mt-0.5 block text-xs text-ink-500">
+                  {t(value ? "access.openHelp" : "access.closedHelp")}
+                </span>
+              </span>
+            </label>
+          ))}
+        </div>
+
+        {doorError && (
+          <p role="alert" className="mt-3 text-sm text-stamp-red">
+            {doorError}
+          </p>
+        )}
+      </div>
+
       <form onSubmit={create} className="paper p-4">
         <p className="mb-3 text-sm font-semibold text-ink-900">
           {t("invite.create")}

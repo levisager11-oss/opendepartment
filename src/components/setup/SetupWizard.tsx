@@ -29,7 +29,12 @@ function q(value: string): string {
  */
 function personalize(
   schema: string,
-  opts: { name: string; subjectLabel: string; docket: string }
+  opts: {
+    name: string;
+    subjectLabel: string;
+    docket: string;
+    openJoin: boolean;
+  }
 ): string {
   const name = opts.name.trim() || "The Department";
   const subject = opts.subjectLabel.trim() || "Case";
@@ -38,13 +43,20 @@ function personalize(
   return `${schema}
 -- ---------------------------------------------------------------------------
 --  Your choices from the OpenDepartment setup wizard.
+--
+--  open_join is the door: ${
+    opts.openJoin
+      ? "you chose a public department, so anybody may\n--  create an account. Invite codes still work -- they are how somebody\n--  arrives as an administrator."
+      : "you chose an unlisted department, so an invite\n--  code is required to sign up. Change it here or under Administration."
+  }
 -- ---------------------------------------------------------------------------
 update public.settings set
   department_name = ${q(name)},
   subject_label   = ${q(subject)},
   docket_prefix   = ${q(docket)},
   seal_top        = ${q(name.toUpperCase())},
-  seal_bottom     = ${q("OFFICIAL USE ONLY")}
+  seal_bottom     = ${q("OFFICIAL USE ONLY")},
+  open_join       = ${opts.openJoin}
 where id;
 `;
 }
@@ -126,6 +138,7 @@ export function SetupWizard({
     name,
     subjectLabel,
     docket,
+    openJoin: visibility === "public",
   });
 
   const copySql = useCallback(async () => {
@@ -281,20 +294,34 @@ export function SetupWizard({
             />
           </div>
 
+          {/* One question, two answers, and each answer settles both the
+              listing and the door -- because "public" that still demands an
+              invite code is not what anybody means by public. Either half can
+              be changed afterwards: the listing under Your departments, the
+              door under Administration. */}
           <fieldset>
             <legend className="mb-2 text-sm font-semibold text-ink-900">
               {t("setup.visibility")}
             </legend>
             {(["unlisted", "public"] as const).map((v) => (
-              <label key={v} className="mb-1 flex items-start gap-2 text-sm">
+              <label key={v} className="mb-2 flex items-start gap-2 text-sm">
                 <input
                   type="radio"
                   checked={visibility === v}
                   onChange={() => setVisibility(v)}
                   className="mt-1"
                 />
-                <span className="text-ink-700">
-                  {t(v === "unlisted" ? "setup.unlisted" : "setup.public")}
+                <span>
+                  <span className="text-ink-700">
+                    {t(v === "unlisted" ? "setup.unlisted" : "setup.public")}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-ink-500">
+                    {t(
+                      v === "unlisted"
+                        ? "setup.unlistedHelp"
+                        : "setup.publicHelp"
+                    )}
+                  </span>
                 </span>
               </label>
             ))}
@@ -504,11 +531,15 @@ export function SetupWizard({
             </li>
             <li className="flex gap-3">
               <span className="typewriter shrink-0 font-bold text-ink-900">2.</span>
-              <span>{t("setup.next2")}</span>
+              <span>
+                {t(visibility === "public" ? "setup.next2Open" : "setup.next2")}
+              </span>
             </li>
             <li className="flex gap-3">
               <span className="typewriter shrink-0 font-bold text-ink-900">3.</span>
-              <span>{t("setup.next3")}</span>
+              <span>
+                {t(visibility === "public" ? "setup.next3Open" : "setup.next3")}
+              </span>
             </li>
           </ol>
 

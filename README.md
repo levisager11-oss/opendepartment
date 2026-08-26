@@ -149,14 +149,30 @@ file to edit and no support ticket to file.
 
 ### Getting in
 
-Invite codes are the only door. There is deliberately no e-mail allowlist:
-maintaining one means collecting and typing in thirty addresses before anyone
-can join, when a code pasted into a group chat does the same job in one
-message. Admins create codes under Administration → Invites, with an optional
-usage cap and expiry, and hand out `/d/<slug>/join?code=XYZ`.
+A department has one of two doors, chosen by its administrator under
+Administration → Invites and stored as `settings.open_join` in the
+department's own database:
 
-A code can be marked as granting administrator rights. The UI warns about that
-in red, because redeeming one means seeing every member's e-mail address.
+- **Invite code required** (the default, and how every new department
+  starts). There is deliberately no e-mail allowlist: maintaining one means
+  collecting and typing in thirty addresses before anyone can join, when a
+  code pasted into a group chat does the same job in one message. Admins
+  create codes with an optional usage cap and expiry, and hand out
+  `/d/<slug>/join?code=XYZ`.
+- **Anyone can join.** A department that is public has no code to knock with
+  — the archive is listed in the directory, so demanding a code to read it
+  would be theatre. The setup wizard sets this for you when you pick
+  "Public"; either half can be changed afterwards, the listing under Your
+  departments and the door inside the department.
+
+Either way the decision is enforced by the `handle_new_user()` trigger on
+`auth.users` inside the tenant's project, not by the sign-up form, so a
+hand-rolled API call gets exactly as far as the UI would let it.
+
+A code still counts in a public department: it can be marked as granting
+administrator rights, which is the one thing an open door cannot do. The UI
+warns about that in red, because redeeming one means seeing every member's
+e-mail address.
 
 ---
 

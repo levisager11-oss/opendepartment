@@ -35,6 +35,10 @@ export const dictionary = {
       "Go to Administration, then Invites, and create a code. That is how everybody else gets in.",
     "setup.next3":
       "Share the invite link. Nobody can join without a code, and you can revoke one at any time.",
+    "setup.next2Open":
+      "Your department is public, so anybody can create an account. Go to Administration, then Invites, if you want to close that door or hand somebody administrator rights.",
+    "setup.next3Open":
+      "Share the address. Anybody who opens it can sign up, and you can require an invite code again at any time.",
     "account.acceptPre": "I accept the",
     "account.acceptPost":
       ", and I understand that I am responsible for everything in the departments I create.",
@@ -54,6 +58,15 @@ export const dictionary = {
       "Revoke this invite code? Anyone who has not used it yet will be turned away. People who already joined with it keep their accounts.",
     "invite.grantsAdminWarning":
       "Anyone who redeems this code becomes an administrator: they can see every member e-mail address, delete any document and ban anyone. Use a low usage limit.",
+    "access.title": "Who can join",
+    "access.help":
+      "Enforced inside your own database, not by this page -- so it holds even against somebody calling the API by hand.",
+    "access.closed": "Invite code required",
+    "access.closedHelp":
+      "Nobody can create an account without a code you handed out. This is how a new department starts.",
+    "access.open": "Anyone can join",
+    "access.openHelp":
+      "Visitors can sign up without a code. Codes still work, and are still the only way to hand out administrator rights.",
     "admin.users.notSelf": "You cannot change your own administrator or ban status.",
     "setup.noControlPlane": "This deployment has no directory configured",
     "setup.noControlPlaneBody":
@@ -86,8 +99,12 @@ export const dictionary = {
       "{name} is created and run by its own administrators, who are responsible for everything in it. It is hosted on",
     "dept.reportThis": "Report this department",
     "dept.frontDoor": "Restricted archive",
+    "dept.frontDoorOpen": "Open archive",
     "dept.needInvite": "You need an invite code to join this archive.",
     "dept.haveInvite": "I have an invite code",
+    "dept.openJoinNote":
+      "This archive is open, so a code is optional -- use one only if somebody sent you one.",
+    "dept.joinOpen": "Create an account",
     "dept.notSetUp": "This department has not finished its setup yet.",
     "dept.notSetUpBody":
       "The owner still needs to install the schema in their Supabase project. If this is your department, open the setup guide to finish it.",
@@ -95,6 +112,7 @@ export const dictionary = {
     // --- invites --------------------------------------------------------
     "invite.title": "Join {name}",
     "invite.code": "Invite code",
+    "invite.codeOptional": "Invite code (optional)",
     "invite.codePlaceholder": "e.g. FIELD-AGENT-7",
     "invite.invalid": "That invite code is not valid.",
     "invite.expired": "That invite code has expired.",
@@ -189,7 +207,13 @@ export const dictionary = {
     "setup.openDept": "Open your department",
     "setup.visibility": "Listing",
     "setup.unlisted": "Unlisted -- reachable only with the link",
+    "setup.unlistedHelp":
+      "Nobody finds it by browsing, and nobody joins without an invite code you hand out.",
     "setup.public": "Public -- listed in the directory",
+    "setup.publicHelp":
+      "Listed in the directory, and anybody who opens it can create an account without a code.",
+    "account.listingOnly":
+      "Changes the directory listing only. Who may join is set inside the department, under Administration.",
 
     // --- OpenDepartment account -----------------------------------------
     "account.title": "Your departments",
@@ -475,6 +499,10 @@ export const dictionary = {
       "Gehen Sie zu Verwaltung, dann Einladungen, und erstellen Sie einen Code. So kommen alle anderen hinein.",
     "setup.next3":
       "Teilen Sie den Einladungslink. Ohne Code kommt niemand hinein, und Sie können ihn jederzeit widerrufen.",
+    "setup.next2Open":
+      "Ihr Departement ist öffentlich, alle können also ein Konto erstellen. Gehen Sie zu Verwaltung, dann Einladungen, wenn Sie diese Tür schliessen oder jemandem Administrationsrechte geben möchten.",
+    "setup.next3Open":
+      "Teilen Sie die Adresse. Wer sie öffnet, kann sich registrieren, und Sie können jederzeit wieder einen Einladungscode verlangen.",
     "account.acceptPre": "Ich akzeptiere die",
     "account.acceptPost":
       " und verstehe, dass ich für alle Inhalte der von mir erstellten Departemente verantwortlich bin.",
@@ -495,6 +523,15 @@ export const dictionary = {
       "Diesen Einladungscode widerrufen? Wer ihn noch nicht verwendet hat, wird abgewiesen. Bereits beigetretene Personen behalten ihr Konto.",
     "invite.grantsAdminWarning":
       "Wer diesen Code einlöst, wird zur Administration: sieht alle E-Mail-Adressen der Mitglieder, kann jedes Dokument löschen und jede Person sperren. Verwenden Sie ein niedriges Verwendungslimit.",
+    "access.title": "Wer beitreten kann",
+    "access.help":
+      "Wird in Ihrer eigenen Datenbank durchgesetzt, nicht auf dieser Seite — gilt also auch gegenüber einem von Hand abgesetzten API-Aufruf.",
+    "access.closed": "Einladungscode erforderlich",
+    "access.closedHelp":
+      "Ohne einen von Ihnen verteilten Code kann niemand ein Konto erstellen. So beginnt jedes neue Departement.",
+    "access.open": "Alle können beitreten",
+    "access.openHelp":
+      "Besucherinnen und Besucher können sich ohne Code registrieren. Codes funktionieren weiterhin und bleiben der einzige Weg, Administrationsrechte zu vergeben.",
     "admin.users.notSelf": "Sie können Ihren eigenen Administrations- oder Sperrstatus nicht ändern.",
     "setup.noControlPlane": "Für diese Installation ist kein Verzeichnis konfiguriert",
     "setup.noControlPlaneBody":
@@ -528,8 +565,12 @@ export const dictionary = {
       "{name} wird von der eigenen Administration erstellt und betrieben, die für sämtliche Inhalte verantwortlich ist. Gehostet auf",
     "dept.reportThis": "Dieses Departement melden",
     "dept.frontDoor": "Geschütztes Archiv",
+    "dept.frontDoorOpen": "Offenes Archiv",
     "dept.needInvite": "Für dieses Archiv wird ein Einladungscode benötigt.",
     "dept.haveInvite": "Ich habe einen Einladungscode",
+    "dept.openJoinNote":
+      "Dieses Archiv ist offen, ein Code ist also freiwillig — verwenden Sie einen nur, wenn Ihnen jemand einen geschickt hat.",
+    "dept.joinOpen": "Konto erstellen",
     "dept.notSetUp": "Dieses Departement wurde noch nicht fertig eingerichtet.",
     "dept.notSetUpBody":
       "Die Administration muss das Schema noch im eigenen Supabase-Projekt installieren. Falls dies Ihr Departement ist, öffnen Sie die Einrichtung.",
@@ -537,6 +578,7 @@ export const dictionary = {
     // --- invites --------------------------------------------------------
     "invite.title": "{name} beitreten",
     "invite.code": "Einladungscode",
+    "invite.codeOptional": "Einladungscode (optional)",
     "invite.codePlaceholder": "z. B. FIELD-AGENT-7",
     "invite.invalid": "Dieser Einladungscode ist ungültig.",
     "invite.expired": "Dieser Einladungscode ist abgelaufen.",
@@ -631,7 +673,13 @@ export const dictionary = {
     "setup.openDept": "Departement öffnen",
     "setup.visibility": "Listung",
     "setup.unlisted": "Nicht gelistet -- nur mit dem Link erreichbar",
+    "setup.unlistedHelp":
+      "Niemand findet es beim Stöbern, und niemand tritt ohne einen von Ihnen verteilten Einladungscode bei.",
     "setup.public": "Öffentlich -- im Verzeichnis gelistet",
+    "setup.publicHelp":
+      "Im Verzeichnis gelistet, und wer es öffnet, kann ohne Code ein Konto erstellen.",
+    "account.listingOnly":
+      "Ändert nur die Listung im Verzeichnis. Wer beitreten darf, wird im Departement selbst unter Verwaltung festgelegt.",
 
     // --- OpenDepartment-Konto -------------------------------------------
     "account.title": "Ihre Departemente",

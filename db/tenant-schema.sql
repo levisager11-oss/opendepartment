@@ -43,13 +43,29 @@ create table if not exists public.settings (
   operator_name    text,
   operator_contact text,
   claimed          boolean not null default false,
+  -- The door. false: an invite code is required to sign up. true: the
+  -- department is public and anybody may create an account. Enforced by
+  -- handle_new_user() below rather than by the app, so a hand-rolled API
+  -- call cannot get in where the sign-up form would have refused.
+  open_join        boolean not null default false,
   created_at       timestamptz not null default now()
 );
 
 insert into public.settings (id) values (true) on conflict (id) do nothing;
 
+-- A department created before open_join existed has a settings table without
+-- it, and the `if not exists` above leaves such a table alone. Re-running this
+-- file is the supported way to pick up a schema change, so add the column
+-- here too. The default keeps an existing department invite-only until its
+-- administrator decides otherwise.
+alter table public.settings
+  add column if not exists open_join boolean not null default false;
+
 -- ---------------------------------------------------------------------------
--- 1. INVITES -- the only door into a department.
+-- 1. INVITES -- the door into a department that has not opened itself up.
+--    A public department (settings.open_join) lets anybody sign up without
+--    one; codes still work there, because only a code can hand out
+--    administrator rights.
 --
 -- There is deliberately no e-mail allowlist. Maintaining one means the
 -- administrator has to collect and type in everybody's address before they can
@@ -204,20 +220,28 @@ $fn$;
 -- New-user hook. Runs for e-mail/password AND OAuth signups, because both
 -- INSERT into auth.users. Rejecting here cannot be bypassed from the client.
 --
--- Two ways in:
+-- Three ways in:
 --   1. Nobody has claimed the department yet -> this user founds it as admin.
---   2. They presented a valid invite code.
+--   2. The department is public (settings.open_join) -> no code needed.
+--   3. They presented a valid invite code.
+--
+-- A code still counts in a public department: granting administrator rights
+-- is the one thing no open door can do, so a presented code is redeemed --
+-- and checked -- whether the door is open or shut.
 -- ---------------------------------------------------------------------------
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path = public as $fn$
 declare
   clean_email text := lower(trim(new.email));
   unclaimed   boolean;
+  open_door   boolean;
   want_code   text;
   inv         public.invites%rowtype;
   make_admin  boolean := false;
 begin
-  select not s.claimed into unclaimed from public.settings s where s.id;
+  select not s.claimed, s.open_join
+    into unclaimed, open_door
+    from public.settings s where s.id;
 
   if unclaimed then
     -- The first account through the door founds the department.
@@ -228,27 +252,35 @@ begin
     -- Named want_code, not code: `code` is also a column on public.invites,
     -- and plpgsql refuses an ambiguous reference inside the lookup below.
     want_code := upper(trim(coalesce(new.raw_user_meta_data ->> 'invite_code', '')));
+
     if want_code = '' then
-      raise exception 'DEPT_NO_INVITE'
-        using hint = 'An invite code is required to join this department.';
-    end if;
+      -- Nothing to check when the department is public. When it is not, this
+      -- is where a stranger is turned away. Written against coalesce so that
+      -- a settings row that somehow went missing fails shut: `not null` is
+      -- null, which would have waved everybody through.
+      if not coalesce(open_door, false) then
+        raise exception 'DEPT_NO_INVITE'
+          using hint = 'An invite code is required to join this department.';
+      end if;
 
-    -- FOR UPDATE so two people redeeming the last use of a code cannot both
-    -- pass the check.
-    select * into inv from public.invites i where i.code = want_code for update;
+    else
+      -- FOR UPDATE so two people redeeming the last use of a code cannot both
+      -- pass the check.
+      select * into inv from public.invites i where i.code = want_code for update;
 
-    if inv.code is null then
-      raise exception 'DEPT_BAD_INVITE' using hint = 'That invite code is not valid.';
-    end if;
-    if inv.expires_at is not null and inv.expires_at < now() then
-      raise exception 'DEPT_INVITE_EXPIRED' using hint = 'That invite code has expired.';
-    end if;
-    if inv.max_uses is not null and inv.uses >= inv.max_uses then
-      raise exception 'DEPT_INVITE_USED' using hint = 'That invite code has been used up.';
-    end if;
+      if inv.code is null then
+        raise exception 'DEPT_BAD_INVITE' using hint = 'That invite code is not valid.';
+      end if;
+      if inv.expires_at is not null and inv.expires_at < now() then
+        raise exception 'DEPT_INVITE_EXPIRED' using hint = 'That invite code has expired.';
+      end if;
+      if inv.max_uses is not null and inv.uses >= inv.max_uses then
+        raise exception 'DEPT_INVITE_USED' using hint = 'That invite code has been used up.';
+      end if;
 
-    update public.invites i set uses = i.uses + 1 where i.code = inv.code;
-    make_admin := inv.grants_admin;
+      update public.invites i set uses = i.uses + 1 where i.code = inv.code;
+      make_admin := inv.grants_admin;
+    end if;
   end if;
 
   insert into public.profiles (id, is_admin) values (new.id, make_admin)
@@ -439,15 +471,20 @@ $fn$;
 
 -- The one thing the hosted app reads without any session: how to render the
 -- department's front door. Nothing here is private.
+-- Dropped first because the column list grew: `create or replace` refuses to
+-- change a set-returning function's result type, so without this a re-run
+-- would fail on a department that installed an earlier version of this file.
+-- The grant below re-applies what the drop takes away.
+drop function if exists public.department_identity();
 create or replace function public.department_identity()
 returns table (department_name text, tagline text, subject_label text,
                docket_prefix text, seal_top text, seal_bottom text,
                accent text, categories text[],
-               max_upload_mb integer, claimed boolean)
+               max_upload_mb integer, claimed boolean, open_join boolean)
 language sql security definer set search_path = public as $fn$
   select s.department_name, s.tagline, s.subject_label, s.docket_prefix,
          s.seal_top, s.seal_bottom, s.accent, s.categories,
-         s.max_upload_mb, s.claimed
+         s.max_upload_mb, s.claimed, s.open_join
     from public.settings s where s.id;
 $fn$;
 

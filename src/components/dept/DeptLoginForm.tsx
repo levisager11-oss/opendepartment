@@ -10,10 +10,11 @@ import type { TranslationKey } from "@/lib/i18n/dictionary";
 type Mode = "signin" | "signup" | "reset";
 
 /**
- * Joining is invite-code only, enforced by a trigger on auth.users inside the
- * tenant's database, so a bad code fails at sign-up time as a generic Postgres
- * error. We translate it here rather than exposing an endpoint that would let
- * anyone probe which codes are valid.
+ * Who may join is decided by a trigger on auth.users inside the tenant's own
+ * database -- a public department admits anybody, a closed one wants a code --
+ * so a refusal arrives at sign-up time as a generic Postgres error. We
+ * translate it here rather than exposing an endpoint that would let anyone
+ * probe which codes are valid.
  *
  * Note there is no "Continue with Google" button. OAuth is per-project
  * configuration: every department owner would have to register their own
@@ -22,7 +23,8 @@ type Mode = "signin" | "signup" | "reset";
  */
 function mapAuthError(
   message: string,
-  t: (k: TranslationKey) => string
+  t: (k: TranslationKey) => string,
+  sentCode: boolean
 ): string {
   const m = message.toLowerCase();
 
@@ -32,9 +34,12 @@ function mapAuthError(
   if (m.includes("dept_invite_used")) return t("invite.used");
 
   // Supabase collapses a trigger exception into this when it cannot see the
-  // detail. A bad invite code is by far the likeliest cause, so say that
-  // rather than showing a raw database error.
-  if (m.includes("database error")) return t("invite.invalid");
+  // detail. A bad code is by far the likeliest cause when one was typed --
+  // but blaming the code when the form did not send one just sends people
+  // hunting for a code they were never asked for.
+  if (m.includes("database error")) {
+    return sentCode ? t("invite.invalid") : t("auth.genericError");
+  }
 
   if (m.includes("invalid login credentials")) return t("auth.invalidCredentials");
   if (m.includes("password should be at least")) return t("auth.passwordTooShort");
@@ -49,7 +54,7 @@ export function DeptLoginForm({
   presetInvite?: string;
 }) {
   const { t } = useI18n();
-  const { href, slug } = useTenant();
+  const { href, slug, branding } = useTenant();
   const supabase = useTenantClient();
   const router = useRouter();
   const params = useSearchParams();
@@ -62,6 +67,11 @@ export function DeptLoginForm({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [invite, setInvite] = useState(presetInvite ?? "");
+  // Shown up front unless the department is public: there, it is one line of
+  // reassurance for the person who does have a code, not a barrier.
+  const [showInvite, setShowInvite] = useState(
+    Boolean(presetInvite) || !branding.openJoin
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -122,7 +132,7 @@ export function DeptLoginForm({
       router.refresh();
     } catch (err) {
       const message = err instanceof Error ? err.message : t("auth.genericError");
-      setError(mapAuthError(message, t));
+      setError(mapAuthError(message, t, Boolean(invite.trim())));
     } finally {
       setBusy(false);
     }
@@ -166,10 +176,24 @@ export function DeptLoginForm({
           </div>
         )}
 
-        {mode === "signup" && (
+        {/* A public department asks for nothing but an address and a
+            password. The code field is still reachable, because a code is the
+            only way to arrive as an administrator -- it just stops being the
+            first thing a newcomer is confronted with. */}
+        {mode === "signup" && !showInvite && (
+          <button
+            type="button"
+            onClick={() => setShowInvite(true)}
+            className="cursor-pointer self-start text-xs text-gov-800 underline underline-offset-2 hover:text-gov-600"
+          >
+            {t("dept.haveInvite")}
+          </button>
+        )}
+
+        {mode === "signup" && showInvite && (
           <div>
             <label className="label" htmlFor="invite">
-              {t("invite.code")}
+              {t(branding.openJoin ? "invite.codeOptional" : "invite.code")}
             </label>
             <input
               id="invite"
@@ -180,7 +204,9 @@ export function DeptLoginForm({
               autoComplete="off"
               spellCheck={false}
             />
-            <p className="mt-2 text-xs text-ink-400">{t("dept.needInvite")}</p>
+            <p className="mt-2 text-xs text-ink-400">
+              {t(branding.openJoin ? "dept.openJoinNote" : "dept.needInvite")}
+            </p>
           </div>
         )}
 

@@ -71,7 +71,7 @@ export default async function DepartmentFrontDoor({
       />
 
       <p className="docket mb-3 text-2xs text-ink-500">
-        <T k="dept.frontDoor" />
+        <T k={branding.openJoin ? "dept.frontDoorOpen" : "dept.frontDoor"} />
       </p>
 
       <h1 className="mb-4 font-serif text-4xl font-black text-ink-900">
@@ -105,11 +105,14 @@ export default async function DepartmentFrontDoor({
         >
           <T k="landing.cta" />
         </Link>
+        {/* A public archive says so on the door. Sending someone who needs no
+            code to a link that reads "I have an invite code" is how a public
+            department ends up looking shut. */}
         <Link
           href={`/d/${slug}/join`}
           className="text-sm text-ink-700 underline underline-offset-4 hover:text-ink-900"
         >
-          <T k="dept.haveInvite" />
+          <T k={branding.openJoin ? "dept.joinOpen" : "dept.haveInvite"} />
         </Link>
       </div>
     </div>
