@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n/provider";
-import { useTenant, useTenantClient } from "@/lib/tenant/context";
+import { useTenantClient } from "@/lib/tenant/context";
 import type { AdminSubject } from "./types";
 
 export function AdminSubjects({ subjects }: { subjects: AdminSubject[] }) {

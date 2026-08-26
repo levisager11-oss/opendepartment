@@ -44,6 +44,7 @@ export default async function AdminPage({
     { data: fileSubjects },
     { data: settings },
     { data: audit },
+    { data: storageUsed },
   ] = await Promise.all([
     supabase
       .from("files")
@@ -79,6 +80,9 @@ export default async function AdminPage({
       .select("id, actor_id, action, target, detail, created_at")
       .order("created_at", { ascending: false })
       .limit(100),
+    // Not summed from `files` above: that read is capped at 500 rows, so a
+    // department past it would see a quota meter reading low.
+    supabase.rpc("admin_storage_used"),
   ]);
 
   type MemberRow = {
@@ -139,10 +143,7 @@ export default async function AdminPage({
         ...a,
         actor_username: a.actor_id ? (usernameById.get(a.actor_id) ?? null) : null,
       }))}
-      totalBytes={(files ?? []).reduce(
-        (sum, f) => sum + Number(f.size_bytes ?? 0),
-        0
-      )}
+      totalBytes={Number(storageUsed ?? 0)}
     />
   );
 }

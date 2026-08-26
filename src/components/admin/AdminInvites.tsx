@@ -56,12 +56,20 @@ export function AdminInvites({ invites }: { invites: InviteEntry[] }) {
           ).toISOString()
         : null;
 
+    // created_by exists on the table and had never been written, so every
+    // code was anonymous -- including the ones that hand out administrator
+    // rights, which are the ones an audit would want traced to somebody.
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
     const { error: insertError } = await supabase.from("invites").insert({
       code: clean,
       note: note.trim() || null,
       max_uses: maxUses.trim() ? Number(maxUses) : null,
       grants_admin: grantsAdmin,
       expires_at: expires,
+      created_by: user?.id ?? null,
     });
 
     setBusy(false);
