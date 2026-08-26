@@ -25,26 +25,36 @@ const SORTS: Record<SortKey, { column: string; ascending: boolean }> = {
 
 const KINDS: FileKind[] = ["image", "pdf", "video", "audio"];
 
+/** The filter state, as it travels in the query string. */
+export type VaultFilters = {
+  q: string;
+  sort: SortKey;
+  subject: string;
+  category: string;
+  kind: string;
+  mine: boolean;
+};
+
 export function VaultBrowser({
   subjects,
   currentUserId,
-  initialSubjectId = "",
+  initialFilters,
 }: {
   subjects: Subject[];
   currentUserId: string;
-  initialSubjectId?: string;
+  initialFilters: VaultFilters;
 }) {
   const { t, plural } = useI18n();
   const { branding, href } = useTenant();
   const supabase = useTenantClient();
 
-  const [search, setSearch] = useState("");
-  const [debounced, setDebounced] = useState("");
-  const [sort, setSort] = useState<SortKey>("top");
-  const [subjectId, setSubjectId] = useState(initialSubjectId);
-  const [category, setCategory] = useState("");
-  const [kind, setKind] = useState("");
-  const [mineOnly, setMineOnly] = useState(false);
+  const [search, setSearch] = useState(initialFilters.q);
+  const [debounced, setDebounced] = useState(initialFilters.q);
+  const [sort, setSort] = useState<SortKey>(initialFilters.sort);
+  const [subjectId, setSubjectId] = useState(initialFilters.subject);
+  const [category, setCategory] = useState(initialFilters.category);
+  const [kind, setKind] = useState(initialFilters.kind);
+  const [mineOnly, setMineOnly] = useState(initialFilters.mine);
 
   const [files, setFiles] = useState<CaseFile[]>([]);
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
@@ -61,6 +71,34 @@ export function VaultBrowser({
 
   const filtersKey = `${debounced}|${sort}|${subjectId}|${category}|${kind}|${mineOnly}`;
   const previousFilters = useRef(filtersKey);
+
+  /**
+   * Mirror the filters into the address bar, so a filtered view is something
+   * you can send to somebody or reload without losing.
+   *
+   * history.replaceState rather than router.replace: this page is
+   * force-dynamic, so a router navigation would re-run the whole server
+   * component for every settled keystroke, to produce markup the client is
+   * about to replace anyway. Replacing rather than pushing is deliberate too
+   * -- a debounced search box that pushed would bury the previous page under
+   * one history entry per pause in typing.
+   */
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (debounced) params.set("q", debounced);
+    if (sort !== "top") params.set("sort", sort);
+    if (subjectId) params.set("subject", subjectId);
+    if (category) params.set("category", category);
+    if (kind) params.set("kind", kind);
+    if (mineOnly) params.set("mine", "1");
+
+    const query = params.toString();
+    window.history.replaceState(
+      null,
+      "",
+      query ? `${window.location.pathname}?${query}` : window.location.pathname
+    );
+  }, [debounced, sort, subjectId, category, kind, mineOnly]);
 
   // Changing two filters quickly leaves two queries in flight, and they do not
   // have to come back in the order they were sent. Every load claims a ticket
@@ -169,8 +207,17 @@ export function VaultBrowser({
   useEffect(() => {
     const changed = previousFilters.current !== filtersKey;
     previousFilters.current = filtersKey;
-    if (changed) setPage(0);
-    load(changed ? 0 : page, changed || page === 0);
+
+    // Changing a filter while paged past the first page has to reset the page
+    // -- and that reset re-runs this effect. Loading here as well sent the
+    // same three round trips twice for one keystroke; the second only ever
+    // overwrote the first. Hand the load to the re-run instead.
+    if (changed && page !== 0) {
+      setPage(0);
+      return;
+    }
+
+    load(page, changed || page === 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtersKey, page]);
 
