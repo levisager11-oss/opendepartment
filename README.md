@@ -91,6 +91,24 @@ its single `for all` policy into select/update/delete, with no INSERT policy at
 all and DELETE refused on a suspended row -- delisting and re-registering was a
 way back out of a suspension.
 
+The same shape had one more corner. `cast_vote()` and `claim_username()` check
+`is_active_member()`, but a function is not what a hand-rolled request meets:
+`insert into votes` with the department's own anon key skips the function
+entirely, and the counter trigger is `security definer`, so a **suspended**
+member could go on moving scores, renaming themselves and retitling their
+files. The WITH CHECK halves of `votes`, `files` and `file_subjects` now carry
+`is_active_member()` too, and `claim_username()` checks it before anything
+else. The USING halves stay on identity alone -- a suspension should not also
+hide someone's own rows from them.
+
+`increment_view()` was the reverse case: `security definer`, no check inside
+it, and EXECUTE granted to PUBLIC the moment it was created. A department's
+anon key is printed into every page it serves -- that is the design -- so
+anyone who opened a front door could drive any document's view count wherever
+they liked without ever holding an account. It now checks membership in the
+statement itself and is revoked from `anon`, and the four trigger bodies are
+revoked from the API roles the way the control plane already revoked its own.
+
 ### Session isolation
 
 Each department gets its own auth cookie, named `od-<slug>` and scoped to path
@@ -246,15 +264,21 @@ the create-a-department flow run end to end on the live deployment).
   link wearing the wrong label
 - Pinned departments (`STATIC_DEPARTMENTS`) and `db/seed-demo.sql`
 - Ko-fi button on the platform pages only, never inside a department
+- Per-department legal pages at `/d/<slug>/legal/{terms,privacy,imprint}`,
+  generated from the tenant's own `department_name`, `subject_label`,
+  `operator_name` and `operator_contact`. Reachable **signed out**, on
+  purpose: the person who most needs to know who runs an archive is the one
+  who was written about in it, and they are not a member. The footer names
+  the operator on every page for the same reason, and links to the imprint
+  when nobody has been named
+- Bringing a renamed department's name back to the **directory**. Renaming
+  under Administration writes to the tenant, and the directory is a different
+  database, so the listing used to keep advertising the old name. Your
+  departments now reads what each project actually calls itself and offers to
+  copy it across — an ordinary update on your own row, no new privilege
 
 Not built yet:
 
-- Per-department legal pages (`/d/<slug>/legal/*`) driven by the tenant's own
-  `operator_name` / `operator_contact` settings
-- Renaming a department in the **directory**. The settings screen changes the
-  name everywhere inside the department, including the browser tab and the
-  share card, because those read the tenant's own row. `/directory` lists the
-  control plane's cached copy, and nothing updates it yet
 - Keeping the storage bucket's `file_size_limit` in step with
   `settings.max_upload_mb`. The bucket is fixed at 25 MB, so the settings
   screen caps the field there rather than offering a number storage would
@@ -270,8 +294,11 @@ row level* live in those files, so:
   in the control-plane project once.
 - **Every department owner** re-runs [`db/tenant-schema.sql`](db/tenant-schema.sql)
   in their own project. Until they do, their members can still promote
-  themselves. The wizard hands out the current file, so departments created
-  from here on are fine.
+  themselves, a suspended member can still vote, anyone at all can inflate a
+  view count, and the department's own legal pages will not know who its
+  operator is -- `department_identity()` only started returning
+  `operator_name` / `operator_contact` in this revision. The wizard hands out
+  the current file, so departments created from here on are fine.
 
 ## Notes for whoever runs this
 

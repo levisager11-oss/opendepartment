@@ -16,11 +16,12 @@ touching Supabase keys.
 npm run dev         # regenerates schema-sql.generated.ts, then next dev
 npm run build        # regenerates schema-sql.generated.ts, then next build
 npm run typecheck    # regenerates schema-sql.generated.ts, then tsc --noEmit
+npm run lint         # eslint, flat config in eslint.config.mjs
 npm run build:schema  # just the codegen step (see below)
 ```
 
-There is no test suite and no lint script configured. There is no
-single-test-file runner because there are no tests.
+`npm run typecheck && npm run lint` is the whole check suite. There is no test
+suite, and therefore no single-test-file runner.
 
 ## The two-database architecture (read this before touching auth/session code)
 
@@ -100,7 +101,8 @@ overwritten otherwise.
 
 - `src/app/d/[slug]/*` — everything inside one department (front door,
   `login`, `join` invite redemption, `auth/callback`, `onboarding`,
-  `access-denied`, `vault`, `upload`, `file/[id]`, `admin`). Every page
+  `access-denied`, `vault`, `upload`, `file/[id]`, `admin`,
+  `legal/[doc]`). Every page
   under here should start from `requireDepartment` /
   `requireMember` / `requireDeptAdmin` /
   `getMember` in [src/lib/tenant/auth.ts](src/lib/tenant/auth.ts) rather
@@ -127,7 +129,17 @@ convention consumed by `plural(base, n)`.
 ## Branding
 
 Nothing about any specific department (name, seal text, accent color,
-docket prefix, categories, upload cap) is hardcoded — it's all read at
-request time from the tenant's own `settings` row via
+docket prefix, categories, upload cap, operator) is hardcoded — it's all
+read at request time from the tenant's own `settings` row via
 [src/lib/tenant/branding.ts](src/lib/tenant/branding.ts). Don't add
 copy or defaults that assume a particular department's content.
+
+The same rule covers the department's own legal pages
+([src/lib/tenant/legal.ts](src/lib/tenant/legal.ts), rendered at
+`/d/<slug>/legal/[doc]`): the text is generated from the tenant's
+`department_name`, `subject_label`, `operator_name` and `operator_contact`.
+Those last two are published deliberately — they are the answer to "who is
+answerable for this archive", which is the whole reason the field exists —
+so `department_identity()` returns them and the page is reachable signed
+out. Don't gate it behind `requireMember`: the person who needs it most is
+the one who was written about, and they are not a member.
