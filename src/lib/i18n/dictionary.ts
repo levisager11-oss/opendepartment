@@ -38,6 +38,8 @@ export const dictionary = {
     "account.acceptPre": "I accept the",
     "account.acceptPost":
       ", and I understand that I am responsible for everything in the departments I create.",
+    "account.acceptRequired":
+      "Please accept the terms and the privacy notice to create an account.",
     "admin.tab.invites": "Invites",
     "invite.maxUses": "Maximum uses",
     "invite.expiresDays": "Expires in (days)",
@@ -476,6 +478,8 @@ export const dictionary = {
     "account.acceptPre": "Ich akzeptiere die",
     "account.acceptPost":
       " und verstehe, dass ich für alle Inhalte der von mir erstellten Departemente verantwortlich bin.",
+    "account.acceptRequired":
+      "Bitte akzeptieren Sie die Nutzungsbedingungen und die Datenschutzerklärung, um ein Konto zu erstellen.",
     "admin.tab.invites": "Einladungen",
     "invite.maxUses": "Maximale Verwendungen",
     "invite.expiresDays": "Läuft ab in (Tagen)",

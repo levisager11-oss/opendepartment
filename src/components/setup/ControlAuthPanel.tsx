@@ -11,10 +11,21 @@ import { createControlBrowserClient } from "@/lib/control/browser";
  * Registering a slug needs an owner to attach it to, but nothing before that
  * point does -- so the account is asked for here rather than at the front
  * door, and the wizard's state survives because the page never navigates away.
+ *
+ * The same panel backs /account/login, where the visitor already has an
+ * account -- hence initialMode. Defaulting it to "signup" there would greet a
+ * returning owner with a registration form whose submit button is held
+ * disabled by a terms box they have already accepted once.
  */
-export function ControlAuthPanel({ onSignedIn }: { onSignedIn: () => void }) {
+export function ControlAuthPanel({
+  onSignedIn,
+  initialMode = "signup",
+}: {
+  onSignedIn: () => void;
+  initialMode?: "signin" | "signup";
+}) {
   const { t } = useI18n();
-  const [mode, setMode] = useState<"signin" | "signup">("signup");
+  const [mode, setMode] = useState<"signin" | "signup">(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -24,7 +35,12 @@ export function ControlAuthPanel({ onSignedIn }: { onSignedIn: () => void }) {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (mode === "signup" && !accepted) return;
+    // Say why nothing is happening. A silently inert submit button is
+    // indistinguishable from a broken one.
+    if (mode === "signup" && !accepted) {
+      setError(t("account.acceptRequired"));
+      return;
+    }
     setBusy(true);
     setError(null);
 
@@ -131,7 +147,7 @@ export function ControlAuthPanel({ onSignedIn }: { onSignedIn: () => void }) {
       <div className="flex items-center gap-3">
         <button
           type="submit"
-          disabled={busy || (mode === "signup" && !accepted)}
+          disabled={busy}
           className="btn btn-primary"
         >
           {mode === "signup" ? t("auth.signup") : t("auth.signin")}

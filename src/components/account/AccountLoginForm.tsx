@@ -13,6 +13,7 @@ export function AccountLoginForm({ target }: { target: string }) {
 
   return (
     <ControlAuthPanel
+      initialMode="signin"
       onSignedIn={() => {
         router.push(target);
         router.refresh();
