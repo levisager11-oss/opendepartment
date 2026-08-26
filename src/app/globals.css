@@ -1,0 +1,356 @@
+@import "tailwindcss";
+
+/* ===========================================================================
+   OPENDEPARTMENT -- design tokens
+
+   Two visual registers deliberately sit next to each other:
+     * "gov"   -- the official chrome. Navy, gold, serif, straight edges.
+     * "paper" -- the dossier interior. Manila card stock, typewriter, stamps.
+
+   One token is NOT fixed here: --accent. Each department stores its own accent
+   colour in its database, and the department layout sets the variable inline
+   on the wrapper. Anything that should recolour per department must read
+   var(--accent) rather than a --color-gold-* literal.
+   =========================================================================== */
+@theme {
+  /* --- official chrome --- */
+  --color-gov-950: #0b1c33;
+  --color-gov-900: #112e51;
+  --color-gov-800: #1a4480;
+  --color-gov-700: #205493;
+  --color-gov-600: #2b6cb0;
+  --color-gov-100: #dfe8f3;
+  --color-gold-500: #c9a227;
+  --color-gold-400: #d4b23a;
+  --color-gold-300: #e8cf7a;
+
+  /* --- dossier paper --- */
+  --color-paper-50: #faf5e9;
+  --color-paper-100: #f3ead6;
+  --color-paper-200: #e9dcc0;
+  --color-paper-300: #dbc9a5;
+  --color-paper-400: #c4ad84;
+  --color-paper-500: #a8916b;
+
+  /* --- ink --- */
+  --color-ink-900: #1c1a17;
+  --color-ink-700: #3a3630;
+  --color-ink-500: #5f594f;
+  --color-ink-400: #837c70;
+
+  /* --- accents --- */
+  --color-stamp-red: #a32020;
+  --color-stamp-blue: #1c3f94;
+  --color-stamp-green: #2f6b3a;
+  --color-redact: #16130f;
+
+  /* --- type --- */
+  --font-serif: var(--font-merriweather), Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-source-sans), system-ui, -apple-system, sans-serif;
+  --font-type: var(--font-special-elite), "Courier New", Courier, monospace;
+  --font-mono: "Courier New", Courier, monospace;
+
+  --radius-card: 2px;
+}
+
+/* ===========================================================================
+   BASE
+   =========================================================================== */
+:root {
+  color-scheme: light;
+  /* Overridden per department by the /d/[slug] layout. The value here is only
+     what the marketing pages and an unconfigured department fall back to. */
+  --accent: #c9a227;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-paper-100);
+  color: var(--color-ink-900);
+  font-family: var(--font-sans);
+  /* Very subtle paper fibre: two offset gradients, no image request. */
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      rgba(120, 100, 70, 0.025) 0px,
+      rgba(120, 100, 70, 0.025) 1px,
+      transparent 1px,
+      transparent 3px
+    ),
+    radial-gradient(
+      ellipse at 20% 0%,
+      rgba(168, 145, 107, 0.18),
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse at 85% 100%,
+      rgba(168, 145, 107, 0.14),
+      transparent 50%
+    );
+  background-attachment: fixed;
+  min-height: 100dvh;
+}
+
+::selection {
+  background: var(--color-gov-800);
+  color: #fff;
+}
+
+/* Focus ring that stays visible on both registers. */
+:focus-visible {
+  outline: 2px solid var(--color-gov-700);
+  outline-offset: 2px;
+}
+
+/* ===========================================================================
+   OFFICIAL CHROME
+   =========================================================================== */
+@utility gov-banner {
+  background: var(--color-gov-950);
+  color: var(--color-gov-100);
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+}
+
+@utility gov-rule {
+  /* The gold hairline that separates official sections. */
+  border-bottom: 3px solid var(--color-gold-500);
+}
+
+@utility masthead {
+  background: linear-gradient(
+    180deg,
+    var(--color-gov-900) 0%,
+    var(--color-gov-950) 100%
+  );
+  color: #fff;
+}
+
+/* ===========================================================================
+   DOSSIER PAPER
+   =========================================================================== */
+@utility paper {
+  background-color: var(--color-paper-50);
+  border: 1px solid var(--color-paper-400);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.7) inset,
+    0 2px 6px rgba(28, 26, 23, 0.12);
+}
+
+@utility paper-tab {
+  /* Manila folder tab that sits on top of a card. */
+  background: var(--color-paper-300);
+  border: 1px solid var(--color-paper-400);
+  border-bottom: none;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 100%, 0 100%);
+}
+
+@utility typewriter {
+  font-family: var(--font-type);
+  letter-spacing: 0.02em;
+}
+
+@utility docket {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-ink-500);
+}
+
+/* --- rubber stamps ------------------------------------------------------- */
+@utility stamp {
+  font-family: var(--font-type);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  border: 3px double currentColor;
+  padding: 0.15rem 0.55rem;
+  display: inline-block;
+  opacity: 0.82;
+  /* Slight ink bleed. */
+  text-shadow: 0 0 1px currentColor;
+}
+
+@utility stamp-red {
+  color: var(--color-stamp-red);
+  transform: rotate(-6deg);
+}
+
+@utility stamp-blue {
+  color: var(--color-stamp-blue);
+  transform: rotate(3deg);
+}
+
+@utility stamp-green {
+  color: var(--color-stamp-green);
+  transform: rotate(-2deg);
+}
+
+/* --- redaction bar ------------------------------------------------------- */
+/* Used decoratively only: it hides nothing that matters, it is a joke. */
+@utility redact {
+  background: var(--color-redact);
+  color: transparent;
+  border-radius: 1px;
+  transition: background 180ms ease, color 180ms ease;
+  cursor: help;
+  user-select: none;
+}
+
+@utility redact-reveal {
+  &:hover,
+  &:focus-visible {
+    background: transparent;
+    color: var(--color-ink-900);
+    user-select: text;
+  }
+}
+
+/* --- perforated edge ----------------------------------------------------- */
+@utility perforated {
+  background-image: radial-gradient(
+    circle at 3px 50%,
+    var(--color-paper-100) 2.5px,
+    transparent 3px
+  );
+  background-size: 12px 100%;
+}
+
+/* ===========================================================================
+   CONTROLS
+   =========================================================================== */
+@utility btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  border-radius: var(--radius-card);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease,
+    transform 60ms ease;
+  &:active {
+    transform: translateY(1px);
+  }
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+}
+
+@utility btn-primary {
+  background: var(--color-gov-800);
+  color: #fff;
+  border-color: var(--color-gov-900);
+  &:hover:not(:disabled) {
+    background: var(--color-gov-700);
+  }
+}
+
+@utility btn-ghost {
+  background: transparent;
+  color: var(--color-gov-800);
+  border-color: var(--color-paper-400);
+  &:hover:not(:disabled) {
+    background: var(--color-paper-200);
+  }
+}
+
+@utility btn-danger {
+  background: var(--color-stamp-red);
+  color: #fff;
+  border-color: #7d1818;
+  &:hover:not(:disabled) {
+    background: #8d1c1c;
+  }
+}
+
+@utility field {
+  width: 100%;
+  background: var(--color-paper-50);
+  border: 1px solid var(--color-paper-400);
+  border-radius: var(--radius-card);
+  padding: 0.55rem 0.75rem;
+  font-size: 0.9375rem;
+  color: var(--color-ink-900);
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+  &::placeholder {
+    color: var(--color-ink-400);
+  }
+  &:focus {
+    outline: none;
+    border-color: var(--color-gov-700);
+    box-shadow: 0 0 0 3px rgba(32, 84, 147, 0.15);
+  }
+}
+
+@utility label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-ink-500);
+  margin-bottom: 0.35rem;
+}
+
+/* ===========================================================================
+   MOTION
+   =========================================================================== */
+@keyframes stamp-in {
+  0% {
+    opacity: 0;
+    transform: scale(1.6) rotate(-14deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.94) rotate(-5deg);
+  }
+  100% {
+    opacity: 0.82;
+    transform: scale(1) rotate(-6deg);
+  }
+}
+
+@utility animate-stamp {
+  animation: stamp-in 420ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@utility animate-fade-up {
+  animation: fade-up 260ms ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Wide content never pushes the page sideways. */
+.scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}

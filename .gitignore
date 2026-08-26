@@ -1,0 +1,9 @@
+node_modules
+.next
+.vercel
+tsconfig.tsbuildinfo
+src/lib/tenant/schema-sql.generated.ts
+.claude/settings.local.json
+
+.env*
+!.env.example

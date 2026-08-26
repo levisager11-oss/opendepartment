@@ -1,0 +1,30 @@
+{
+  "name": "opendepartment",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build:schema": "node scripts/build-schema.mjs",
+    "predev": "npm run build:schema",
+    "dev": "next dev",
+    "prebuild": "npm run build:schema",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "npm run build:schema && tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.5.2",
+    "@supabase/supabase-js": "^2.48.1",
+    "@vercel/analytics": "^2.0.1",
+    "next": "^15.1.6",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.0",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.7.3"
+  }
+}
