@@ -18,8 +18,16 @@ type CookieBundle = { name: string; value: string; options?: CookieOptions };
  * you are here.
  */
 
-/** Paths inside /d/<slug>/ that a signed-out visitor may reach. */
-const TENANT_PUBLIC = ["", "login", "join", "auth", "access-denied", "setup"];
+/**
+ * Paths inside /d/<slug>/ that a signed-out visitor may reach.
+ *
+ * `legal` is on the list deliberately. A department's terms, privacy notice
+ * and legal notice exist so that somebody written about in the archive can
+ * find out who is answerable for it -- and that person is, by definition, not
+ * a member. Putting "who runs this" behind the archive's own login would
+ * defeat the whole point of naming an operator.
+ */
+const TENANT_PUBLIC = ["", "login", "join", "auth", "access-denied", "legal"];
 
 /**
  * Control-plane paths that require an OpenDepartment account.

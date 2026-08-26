@@ -456,6 +456,12 @@ export const dictionary = {
     "legal.terms": "Terms of use",
     "legal.privacy": "Privacy notice",
     "legal.imprint": "Legal notice",
+    "legal.platformPointer":
+      "This page covers this department only. OpenDepartment, the platform hosting it, has its own:",
+    "account.renamed": "This department now calls itself {name}.",
+    "account.syncName": "Update the listing",
+    "dept.operator": "Operated by",
+    "dept.operatorMissing": "No operator named",
 
     // --- misc -----------------------------------------------------------
     "common.cancel": "Cancel",
@@ -942,6 +948,12 @@ export const dictionary = {
     "legal.terms": "Nutzungsbedingungen",
     "legal.privacy": "Datenschutzerklärung",
     "legal.imprint": "Impressum",
+    "legal.platformPointer":
+      "Diese Seite betrifft nur diese Stelle. OpenDepartment als Plattform hat eigene:",
+    "account.renamed": "Diese Stelle nennt sich inzwischen {name}.",
+    "account.syncName": "Eintrag aktualisieren",
+    "dept.operator": "Betrieben von",
+    "dept.operatorMissing": "Keine verantwortliche Person angegeben",
 
     // --- misc -----------------------------------------------------------
     "common.cancel": "Abbrechen",

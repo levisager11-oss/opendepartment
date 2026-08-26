@@ -24,6 +24,14 @@ export type Branding = {
   claimed: boolean;
   /** Public department: anybody may sign up, no invite code needed. */
   openJoin: boolean;
+  /**
+   * Who answers for this archive. Published on purpose -- the footer and the
+   * department's own legal pages name them, including to a signed-out
+   * visitor who needs somebody to write to. Null when the operator has not
+   * filled either field in yet.
+   */
+  operatorName: string | null;
+  operatorContact: string | null;
 };
 
 export const FALLBACK_BRANDING: Branding = {
@@ -38,6 +46,8 @@ export const FALLBACK_BRANDING: Branding = {
   maxUploadMb: 25,
   claimed: false,
   openJoin: false,
+  operatorName: null,
+  operatorContact: null,
 };
 
 /**
@@ -79,6 +89,11 @@ export const getBranding = cache(
       // was added, and absent reads as false -- which is the safe way round:
       // the door stays shut until its owner opens it on purpose.
       openJoin: Boolean(row.open_join),
+      // Absent on a department that installed department_identity() before it
+      // returned these, in which case the legal pages say so plainly rather
+      // than naming nobody.
+      operatorName: row.operator_name ?? null,
+      operatorContact: row.operator_contact ?? null,
     };
   }
 );

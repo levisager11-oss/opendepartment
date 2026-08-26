@@ -9,6 +9,11 @@ export function DeptFooter() {
   const { t } = useI18n();
   const { branding, href, slug } = useTenant();
 
+  const operator = [branding.operatorName, branding.operatorContact]
+    .map((part) => part?.trim())
+    .filter(Boolean)
+    .join(" — ");
+
   return (
     <footer className="mt-16 gov-rule-top bg-gov-950 text-gov-100">
       <div className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-4 py-8 sm:gap-8 sm:py-10 md:grid-cols-[auto_1fr_auto]">
@@ -40,6 +45,23 @@ export function DeptFooter() {
               OpenDepartment
             </Link>
             .
+          </p>
+          {/* Who answers for this archive, said out loud on every page. The
+              settings screen has always collected these two fields; until now
+              nothing rendered them, so the accountability the project claims
+              existed only in the database. */}
+          <p className="max-w-prose">
+            {t("dept.operator")}:{" "}
+            {operator ? (
+              <span className="text-gov-100/90">{operator}</span>
+            ) : (
+              <Link
+                href={href("legal/imprint")}
+                className="underline underline-offset-2 hover:text-white"
+              >
+                {t("dept.operatorMissing")}
+              </Link>
+            )}
           </p>
         </div>
 
