@@ -39,7 +39,10 @@ create table if not exists public.settings (
                     'EXHIBIT','WITNESS STATEMENT','SURVEILLANCE',
                     'MEMORANDUM','TRANSCRIPT','CORRESPONDENCE','MISCELLANEOUS'],
   max_upload_mb   integer not null default 25,
-  -- Operator identity. Whoever runs this department is responsible for it.
+  -- Operator identity. Whoever runs this department is responsible for it,
+  -- and both values are published: they are what the footer and the
+  -- department's own legal pages name, including to a signed-out visitor who
+  -- needs somebody to write to. Do not put anything private in them.
   operator_name    text,
   operator_contact text,
   claimed          boolean not null default false,
@@ -365,14 +368,31 @@ drop trigger if exists reports_changed on public.reports;
 create trigger reports_changed after insert or update or delete on public.reports
   for each row execute function public.refresh_file_reports();
 
+-- Trigger bodies, not an API. Postgres refuses to call one directly anyway,
+-- but a function is EXECUTE-able by PUBLIC the moment it is created, so
+-- without this they are all listed on /rest/v1/rpc as though they were
+-- something a caller was meant to reach for.
+revoke execute on function public.handle_new_user()       from anon, authenticated, public;
+revoke execute on function public.refresh_file_votes()    from anon, authenticated, public;
+revoke execute on function public.refresh_file_comments() from anon, authenticated, public;
+revoke execute on function public.refresh_file_reports()  from anon, authenticated, public;
+
 -- ===========================================================================
 --  MEMBER RPCs
 -- ===========================================================================
 
+-- security definer, so the check has to be written into the statement. A
+-- department's anon key is printed into every page it serves -- that is the
+-- design -- so without this anybody who opened the front door could drive any
+-- document's view count wherever they liked without ever holding an account.
 create or replace function public.increment_view(target uuid)
 returns void language sql security definer set search_path = public as $fn$
-  update public.files set view_count = view_count + 1 where id = target;
+  update public.files set view_count = view_count + 1
+   where id = target and public.is_active_member();
 $fn$;
+
+revoke execute on function public.increment_view(uuid) from anon, public;
+grant  execute on function public.increment_view(uuid) to authenticated;
 
 create or replace function public.cast_vote(target uuid, new_value smallint)
 returns table (upvotes int, downvotes int, score int, my_vote int)
@@ -400,6 +420,7 @@ create or replace function public.claim_username(desired text)
 returns text language plpgsql security definer set search_path = public as $fn$
 declare clean text := trim(desired);
 begin
+  if not public.is_active_member() then raise exception 'NOT_A_MEMBER'; end if;
   if clean !~ '^[A-Za-z0-9_-]{3,20}$' then raise exception 'USERNAME_INVALID'; end if;
   if exists (select 1 from public.profiles p
               where lower(p.username) = lower(clean) and p.id <> auth.uid()) then
@@ -478,6 +499,19 @@ begin
   values (auth.uid(), 'member.' || flag, target::text, jsonb_build_object('value', value));
 end; $fn$;
 
+-- Bytes held in the bucket, for the quota meter on the administration screen.
+--
+-- A function rather than a client-side sum: the admin page reads at most 500
+-- files, and PostgREST would cap an unbounded select at 1000 anyway, so any
+-- department past that was quietly shown a number lower than the truth --
+-- exactly the departments for which a quota meter matters.
+create or replace function public.admin_storage_used()
+returns bigint language plpgsql security definer set search_path = public as $fn$
+begin
+  if not public.is_admin() then raise exception 'NOT_ADMIN'; end if;
+  return coalesce((select sum(f.size_bytes) from public.files f), 0);
+end; $fn$;
+
 -- Counters for the department's front door. Returns only totals -- never
 -- titles, never names.
 create or replace function public.department_stats()
@@ -499,11 +533,13 @@ create or replace function public.department_identity()
 returns table (department_name text, tagline text, subject_label text,
                docket_prefix text, seal_top text, seal_bottom text,
                accent text, categories text[],
-               max_upload_mb integer, claimed boolean, open_join boolean)
+               max_upload_mb integer, claimed boolean, open_join boolean,
+               operator_name text, operator_contact text)
 language sql security definer set search_path = public as $fn$
   select s.department_name, s.tagline, s.subject_label, s.docket_prefix,
          s.seal_top, s.seal_bottom, s.accent, s.categories,
-         s.max_upload_mb, s.claimed, s.open_join
+         s.max_upload_mb, s.claimed, s.open_join,
+         s.operator_name, s.operator_contact
     from public.settings s where s.id;
 $fn$;
 
@@ -597,7 +633,9 @@ create policy files_insert_own on public.files
 
 drop policy if exists files_update_own on public.files;
 create policy files_update_own on public.files
-  for update to authenticated using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+  for update to authenticated
+  using (owner_id = auth.uid())
+  with check (owner_id = auth.uid() and public.is_active_member());
 
 drop policy if exists files_delete_own_or_admin on public.files;
 create policy files_delete_own_or_admin on public.files
@@ -621,14 +659,22 @@ create policy fs_write on public.file_subjects
   for all to authenticated
   using (exists (select 1 from public.files f
                   where f.id = file_id and (f.owner_id = auth.uid() or public.is_admin())))
-  with check (exists (select 1 from public.files f
+  with check (public.is_active_member() and exists (select 1 from public.files f
                   where f.id = file_id and (f.owner_id = auth.uid() or public.is_admin())));
 
 -- VOTES: you only ever see your own row. Totals come from the counters on
 -- `files`, so nobody can reconstruct who voted which way.
+-- is_active_member() is not decoration here. cast_vote() checks it, but the
+-- policy is what a hand-rolled request meets: `insert into votes` with the
+-- department's own anon key skips the function entirely, and the counter
+-- trigger is security definer, so a suspended member could go on moving
+-- scores. The USING half stays on identity alone, so a suspension does not
+-- also hide someone's existing votes from them.
 drop policy if exists votes_own on public.votes;
 create policy votes_own on public.votes
-  for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+  for all to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid() and public.is_active_member());
 
 -- COMMENTS
 drop policy if exists comments_read on public.comments;
