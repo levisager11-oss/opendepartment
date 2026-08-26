@@ -33,7 +33,7 @@ export default async function NewDepartmentPage() {
         <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3">
           <Link href="/" className="flex items-center gap-3">
             <Seal size={38} idPrefix="new-hdr" />
-            <span className="font-[family-name:var(--font-serif)] text-base font-black text-white">
+            <span className="font-serif text-base font-black text-white">
               <T k="od.name" />
             </span>
           </Link>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useI18n } from "@/lib/i18n/provider";
+import { Spinner } from "@/components/Spinner";
 import { useTenant, useTenantClient } from "@/lib/tenant/context";
 import type { TranslationKey } from "@/lib/i18n/dictionary";
 
@@ -186,7 +187,7 @@ export function DeptLoginForm({
         {error && (
           <p
             role="alert"
-            className="border-l-[3px] border-stamp-red bg-stamp-red/8 px-3 py-2 text-sm text-stamp-red"
+            className="notice notice-error"
           >
             {error}
           </p>
@@ -194,13 +195,19 @@ export function DeptLoginForm({
         {info && (
           <p
             role="status"
-            className="border-l-[3px] border-stamp-green bg-stamp-green/8 px-3 py-2 text-sm text-stamp-green"
+            className="notice notice-ok"
           >
             {info}
           </p>
         )}
 
-        <button type="submit" disabled={busy} className="btn btn-primary !py-2.5">
+        <button
+          type="submit"
+          disabled={busy}
+          aria-busy={busy}
+          className="btn btn-primary"
+        >
+          {busy && <Spinner />}
           {busy
             ? t("auth.working")
             : mode === "signup"

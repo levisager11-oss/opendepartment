@@ -33,7 +33,7 @@ export function FileMeta({
     <dl className="grid gap-x-8 gap-y-3 border-b border-paper-300 p-5 sm:grid-cols-2">
       {rows.map(([label, value]) => (
         <div key={label} className="flex items-baseline gap-3">
-          <dt className="docket w-32 shrink-0 !text-[0.6rem]">{label}</dt>
+          <dt className="docket w-32 shrink-0 text-3xs text-ink-500">{label}</dt>
           <dd className="typewriter min-w-0 truncate text-sm text-ink-900">
             {value}
           </dd>
@@ -45,7 +45,7 @@ export function FileMeta({
           whoever happens to be looking at their screen. */}
       {ownerEmail && (
         <div className="flex items-baseline gap-3 sm:col-span-2">
-          <dt className="docket w-32 shrink-0 !text-[0.6rem] !text-stamp-red">
+          <dt className="docket w-32 shrink-0 text-3xs text-stamp-red">
             {t("file.uploaderEmail")}
           </dt>
           <dd>

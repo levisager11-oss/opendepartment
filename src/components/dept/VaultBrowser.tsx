@@ -177,10 +177,10 @@ export function VaultBrowser({
     <div className="mx-auto max-w-7xl px-4 py-8">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <span className="docket">
+          <span className="docket text-2xs text-ink-500">
             {branding.subjectLabel.toUpperCase()} FILE INDEX
           </span>
-          <h1 className="font-[family-name:var(--font-serif)] text-3xl font-black text-gov-900">
+          <h1 className="font-serif text-3xl font-black text-gov-900">
             {t("vault.title")}
           </h1>
           <p className="typewriter mt-1 text-sm text-ink-500">
@@ -193,7 +193,7 @@ export function VaultBrowser({
         </Link>
       </div>
 
-      <div className="paper mb-6 rounded-xs p-3">
+      <div className="paper mb-6 p-3">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <div className="relative flex-1">
             <svg
@@ -209,7 +209,7 @@ export function VaultBrowser({
               <path d="M20 20l-4-4" strokeLinecap="round" />
             </svg>
             <input
-              className="field !pl-9"
+              className="field field-icon"
               placeholder={t("vault.search")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -219,7 +219,7 @@ export function VaultBrowser({
 
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:flex">
             <select
-              className="field !py-2 !text-sm"
+              className="field"
               value={sort}
               onChange={(e) => setSort(e.target.value as SortKey)}
               aria-label={t("vault.sort")}
@@ -232,7 +232,7 @@ export function VaultBrowser({
             </select>
 
             <select
-              className="field !py-2 !text-sm"
+              className="field"
               value={subjectId}
               onChange={(e) => setSubjectId(e.target.value)}
               aria-label={t("vault.filter.subject")}
@@ -248,7 +248,7 @@ export function VaultBrowser({
             </select>
 
             <select
-              className="field !py-2 !text-sm"
+              className="field"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               aria-label={t("vault.filter.category")}
@@ -264,7 +264,7 @@ export function VaultBrowser({
             </select>
 
             <select
-              className="field !py-2 !text-sm"
+              className="field"
               value={kind}
               onChange={(e) => setKind(e.target.value)}
               aria-label={t("vault.filter.kind")}
@@ -309,7 +309,7 @@ export function VaultBrowser({
           {t("vault.loading")}
         </p>
       ) : error ? (
-        <div className="paper rounded-xs px-6 py-10 text-center">
+        <div className="paper px-6 py-10 text-center">
           <p className="text-ink-700">{t("common.error")}</p>
           <button
             type="button"
@@ -320,8 +320,8 @@ export function VaultBrowser({
           </button>
         </div>
       ) : files.length === 0 ? (
-        <div className="paper rounded-xs px-6 py-16 text-center">
-          <span className="stamp stamp-red !text-sm">NO RECORDS</span>
+        <div className="paper px-6 py-16 text-center">
+          <span className="stamp stamp-red text-sm">NO RECORDS</span>
           <p className="mt-5 text-ink-500">
             {hasFilters ? t("vault.empty") : t("vault.emptyAll")}
           </p>

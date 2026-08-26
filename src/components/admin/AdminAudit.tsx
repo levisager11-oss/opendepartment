@@ -7,7 +7,7 @@ export function AdminAudit({ entries }: { entries: AuditEntry[] }) {
   const { t, formatDate } = useI18n();
 
   return (
-    <div className="paper scroll-x rounded-xs">
+    <div className="paper scroll-x">
       <table className="w-full min-w-2xl text-sm">
         <thead>
           <tr className="border-b border-paper-300 text-left">
@@ -17,7 +17,7 @@ export function AdminAudit({ entries }: { entries: AuditEntry[] }) {
               t("admin.audit.actor"),
               "",
             ].map((label, i) => (
-              <th key={i} className="docket px-3 py-2 !text-[0.6rem]">
+              <th key={i} className="docket px-3 py-2 text-3xs text-ink-500">
                 {label}
               </th>
             ))}

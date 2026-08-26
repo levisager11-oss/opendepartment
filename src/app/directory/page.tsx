@@ -24,7 +24,7 @@ export default async function DirectoryPage() {
 
   return (
     <MarketingShell wide>
-      <h1 className="mb-2 font-[family-name:var(--font-serif)] text-3xl font-black text-ink-900">
+      <h1 className="mb-2 font-serif text-3xl font-black text-ink-900">
         <T k="od.directory" />
       </h1>
       <p className="mb-10 max-w-prose text-sm leading-relaxed text-ink-500">
@@ -39,7 +39,7 @@ export default async function DirectoryPage() {
           </p>
           <Link
             href="/new"
-            className="inline-block bg-gov-900 px-5 py-2.5 text-sm font-bold text-white hover:bg-gov-800"
+            className="btn btn-primary"
           >
             <T k="od.create" />
           </Link>
@@ -59,7 +59,7 @@ export default async function DirectoryPage() {
                   idPrefix={`dir-${dept.slug}`}
                 />
                 <span className="min-w-0">
-                  <span className="block font-[family-name:var(--font-serif)] text-base font-bold text-ink-900">
+                  <span className="block font-serif text-base font-bold text-ink-900">
                     {dept.display_name}
                   </span>
                   {dept.tagline && (
@@ -67,7 +67,7 @@ export default async function DirectoryPage() {
                       {dept.tagline}
                     </span>
                   )}
-                  <span className="docket mt-2 block !text-[0.6rem]">
+                  <span className="docket mt-2 block text-3xs text-ink-500">
                     /d/{dept.slug}
                   </span>
                 </span>

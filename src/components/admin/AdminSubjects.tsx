@@ -52,8 +52,8 @@ export function AdminSubjects({ subjects }: { subjects: AdminSubject[] }) {
 
   return (
     <div className="grid gap-5 lg:grid-cols-[22rem_1fr]">
-      <form onSubmit={add} className="paper h-fit rounded-xs p-5">
-        <p className="docket mb-3">{t("admin.subjects.add")}</p>
+      <form onSubmit={add} className="paper h-fit p-5">
+        <p className="docket mb-3 text-2xs text-ink-500">{t("admin.subjects.add")}</p>
 
         <label className="label" htmlFor="subject-name">
           {t("admin.subjects.name")}
@@ -95,7 +95,7 @@ export function AdminSubjects({ subjects }: { subjects: AdminSubject[] }) {
 
       <div className="grid h-fit gap-3 sm:grid-cols-2">
         {subjects.map((subject) => (
-          <div key={subject.id} className="paper rounded-xs p-4">
+          <div key={subject.id} className="paper p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="typewriter font-bold text-gov-900">
@@ -106,7 +106,7 @@ export function AdminSubjects({ subjects }: { subjects: AdminSubject[] }) {
                     {subject.description}
                   </p>
                 )}
-                <p className="docket mt-2 !text-[0.6rem]">
+                <p className="docket mt-2 text-3xs text-ink-500">
                   {subject.file_count} {t("admin.subjects.files")}
                 </p>
               </div>

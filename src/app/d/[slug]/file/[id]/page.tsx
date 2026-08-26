@@ -9,6 +9,7 @@ import { ReportButton } from "@/components/dept/ReportButton";
 import { DeleteFileButton } from "@/components/dept/DeleteFileButton";
 import { FileMeta } from "@/components/FileMeta";
 import { T } from "@/components/T";
+import { privatePage } from "@/lib/seo";
 import {
   STORAGE_BUCKET,
   caseLabel,
@@ -17,6 +18,13 @@ import {
 } from "@/lib/tenant/types";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Member-only, so it stays out of the index even when the department
+ * itself is public. The canonical is left to the department layout on
+ * purpose: one address per archive, not one per screen.
+ */
+export const metadata = privatePage("Exhibit");
 
 export default async function FilePage({
   params,
@@ -94,19 +102,19 @@ export default async function FilePage({
     <div className="mx-auto max-w-5xl px-4 py-8">
       <Link
         href={`/d/${slug}/vault`}
-        className="docket mb-4 inline-flex items-center gap-1 hover:!text-gov-800"
+        className="docket mb-4 inline-flex items-center gap-1 hover:text-gov-800 text-2xs text-ink-500"
       >
         <span aria-hidden>←</span> <T k="file.back" />
       </Link>
 
       <div className="paper-tab ml-6 inline-block px-4 py-1">
-        <span className="docket !text-ink-700">
+        <span className="docket text-ink-700 text-2xs">
           {caseLabel(file.case_number, member.branding.docketPrefix)} ·{" "}
           {file.category}
         </span>
       </div>
 
-      <article className="paper rounded-xs">
+      <article className="paper">
         <header className="flex flex-wrap items-start gap-4 border-b border-paper-300 p-5">
           <VoteButtons
             fileId={file.id}
@@ -115,7 +123,7 @@ export default async function FilePage({
           />
 
           <div className="min-w-0 flex-1">
-            <h1 className="font-[family-name:var(--font-serif)] text-2xl leading-tight font-black text-gov-900">
+            <h1 className="font-serif text-2xl leading-tight font-black text-gov-900">
               {file.title}
             </h1>
             {file.description && (
@@ -126,14 +134,14 @@ export default async function FilePage({
 
             {file.subjects.length > 0 && (
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <span className="docket">
+                <span className="docket text-2xs text-ink-500">
                   <T k="file.subjects" />:
                 </span>
                 {file.subjects.map((s) => (
                   <Link
                     key={s.id}
                     href={`/d/${slug}/vault?subject=${s.id}`}
-                    className="typewriter rounded-xs border border-paper-400 bg-paper-100 px-2 py-0.5 text-xs text-gov-800 hover:border-gov-600"
+                    className="typewriter rounded-card border border-paper-400 bg-paper-100 px-2 py-0.5 text-xs text-gov-800 hover:border-gov-600"
                   >
                     {s.name}
                   </Link>
@@ -143,7 +151,7 @@ export default async function FilePage({
           </div>
 
           <div className="flex shrink-0 flex-col items-end gap-2">
-            <span className="stamp stamp-red animate-stamp !text-xs">
+            <span className="stamp stamp-red animate-stamp text-xs">
               {file.kind.toUpperCase()}
             </span>
           </div>

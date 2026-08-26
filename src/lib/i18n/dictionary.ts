@@ -431,6 +431,18 @@ export const dictionary = {
       "This account is not a member of this archive. Joining needs a valid invite code -- ask an administrator for one.",
     "error.banned": "Your access has been suspended by an administrator.",
     "error.notFound": "Page not found.",
+    "error.crashed": "This page did not load",
+    "error.crashedBody":
+      "Something failed while assembling this page. Trying again usually works -- the archive itself is untouched.",
+    "error.deptCrashedBody":
+      "This department's Supabase project did not answer, or its schema is not installed yet. Nothing has been lost: the files live in that project, not here.",
+    "error.deptNotFound": "No such department",
+    "error.deptNotFoundBody":
+      "Nothing is registered at this address. Check the link, or browse the departments that chose to be listed.",
+    "error.reference": "Reference",
+    "error.fileNotFound": "Exhibit not found",
+    "error.fileNotFoundBody":
+      "This exhibit is not in the archive. It may have been withdrawn by its owner or removed by an administrator.",
   },
 
   de: {
@@ -863,6 +875,18 @@ export const dictionary = {
       "Dieses Konto ist kein Mitglied dieses Archivs. Für den Beitritt wird ein gültiger Einladungscode benötigt -- fragen Sie die Administration danach.",
     "error.banned": "Ihr Zugang wurde von der Administration gesperrt.",
     "error.notFound": "Seite nicht gefunden.",
+    "error.crashed": "Diese Seite wurde nicht geladen",
+    "error.crashedBody":
+      "Beim Zusammenstellen dieser Seite ist etwas fehlgeschlagen. Ein zweiter Versuch genügt meistens -- am Archiv selbst hat sich nichts geändert.",
+    "error.deptCrashedBody":
+      "Das Supabase-Projekt dieser Abteilung hat nicht geantwortet, oder das Schema ist noch nicht installiert. Es ist nichts verloren: Die Dateien liegen in jenem Projekt, nicht bei uns.",
+    "error.deptNotFound": "Keine solche Abteilung",
+    "error.deptNotFoundBody":
+      "Unter dieser Adresse ist nichts registriert. Prüfen Sie den Link, oder sehen Sie sich die Abteilungen an, die öffentlich gelistet sind.",
+    "error.reference": "Referenz",
+    "error.fileNotFound": "Dokument nicht gefunden",
+    "error.fileNotFoundBody":
+      "Dieses Dokument liegt nicht im Archiv. Es wurde möglicherweise von der Eigentümerin oder dem Eigentümer zurückgezogen oder von der Administration entfernt.",
   },
 } as const;
 

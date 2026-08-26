@@ -107,7 +107,7 @@ export function AdminInvites({ invites }: { invites: InviteEntry[] }) {
 
   return (
     <div className="flex flex-col gap-5">
-      <form onSubmit={create} className="paper rounded-xs p-4">
+      <form onSubmit={create} className="paper p-4">
         <p className="mb-3 text-sm font-semibold text-ink-900">
           {t("invite.create")}
         </p>
@@ -128,7 +128,7 @@ export function AdminInvites({ invites }: { invites: InviteEntry[] }) {
               <button
                 type="button"
                 onClick={() => setCode(randomCode())}
-                className="btn btn-ghost !px-3"
+                className="btn btn-ghost"
                 title={t("invite.regenerate")}
               >
                 ↻
@@ -201,7 +201,7 @@ export function AdminInvites({ invites }: { invites: InviteEntry[] }) {
         </label>
 
         {grantsAdmin && (
-          <p className="mt-2 border-l-[3px] border-stamp-red bg-stamp-red/8 px-3 py-2 text-xs text-stamp-red">
+          <p className="notice notice-error mt-2 text-xs">
             {t("invite.grantsAdminWarning")}
           </p>
         )}
@@ -214,12 +214,12 @@ export function AdminInvites({ invites }: { invites: InviteEntry[] }) {
       </form>
 
       {invites.length === 0 ? (
-        <div className="paper rounded-xs py-14 text-center">
-          <span className="stamp stamp-blue !text-sm">NO INVITES</span>
+        <div className="paper py-14 text-center">
+          <span className="stamp stamp-blue text-sm">NO INVITES</span>
           <p className="mt-5 text-sm text-ink-500">{t("invite.none")}</p>
         </div>
       ) : (
-        <div className="paper scroll-x rounded-xs">
+        <div className="paper scroll-x">
           <table className="w-full min-w-3xl text-sm">
             <thead>
               <tr className="border-b border-paper-300 text-left">
@@ -231,7 +231,7 @@ export function AdminInvites({ invites }: { invites: InviteEntry[] }) {
                   t("invite.status"),
                   "",
                 ].map((label, i) => (
-                  <th key={i} className="docket px-3 py-2 !text-[0.6rem]">
+                  <th key={i} className="docket px-3 py-2 text-3xs text-ink-500">
                     {label}
                   </th>
                 ))}
@@ -250,7 +250,7 @@ export function AdminInvites({ invites }: { invites: InviteEntry[] }) {
                     <td className="typewriter px-3 py-2 whitespace-nowrap">
                       {invite.code}
                       {invite.grants_admin && (
-                        <span className="stamp stamp-red ml-2 !border-2 !px-1.5 !py-0 !text-[0.55rem]">
+                        <span className="stamp stamp-red ml-2 stamp-sm">
                           ADMIN
                         </span>
                       )}

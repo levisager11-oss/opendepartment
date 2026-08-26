@@ -52,7 +52,7 @@ export function AdminFiles({ files }: { files: AdminFile[] }) {
   }
 
   return (
-    <div className="paper rounded-xs">
+    <div className="paper">
       <div className="border-b border-paper-300 p-3">
         <input
           className="field"
@@ -77,7 +77,7 @@ export function AdminFiles({ files }: { files: AdminFile[] }) {
                 t("file.submittedOn"),
                 "",
               ].map((label, i) => (
-                <th key={i} className="docket px-3 py-2 !text-[0.6rem]">
+                <th key={i} className="docket px-3 py-2 text-3xs text-ink-500">
                   {label}
                 </th>
               ))}
@@ -99,7 +99,7 @@ export function AdminFiles({ files }: { files: AdminFile[] }) {
                   >
                     {file.title}
                   </Link>
-                  <span className="docket !text-[0.55rem]">
+                  <span className="docket text-3xs text-ink-500">
                     {file.category} · {file.kind.toUpperCase()}
                   </span>
                 </td>
@@ -132,7 +132,7 @@ export function AdminFiles({ files }: { files: AdminFile[] }) {
                 </td>
                 <td className="px-3 py-2 tabular-nums">
                   {file.report_count > 0 ? (
-                    <span className="rounded-full bg-stamp-red px-1.5 py-0.5 text-[0.65rem] font-bold text-white">
+                    <span className="rounded-full bg-stamp-red px-1.5 py-0.5 text-2xs font-bold text-white">
                       {file.report_count}
                     </span>
                   ) : (

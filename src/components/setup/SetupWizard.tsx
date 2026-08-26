@@ -212,11 +212,11 @@ export function SetupWizard({
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10">
-      <h1 className="mb-1 font-[family-name:var(--font-serif)] text-3xl font-black text-ink-900">
+      <h1 className="mb-1 font-serif text-3xl font-black text-ink-900">
         {t("setup.title")}
       </h1>
       {step < 6 && (
-        <p className="docket mb-8">{t("setup.step", { n: step, total: 5 })}</p>
+        <p className="docket mb-8 text-2xs text-ink-500">{t("setup.step", { n: step, total: 5 })}</p>
       )}
 
       {/* ---------------------------------------------------------------- */}
@@ -315,7 +315,7 @@ export function SetupWizard({
             href="https://supabase.com/dashboard/new"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-block bg-gov-900 px-4 py-2 text-sm font-bold text-white hover:bg-gov-800"
+            className="btn btn-primary"
           >
             {t("setup.openSupabase")} ↗
           </a>
@@ -333,7 +333,7 @@ export function SetupWizard({
           <div className="relative">
             {/* Preview only. The copy button is the supported path -- the
                 elision below is not valid SQL on its own. */}
-            <pre className="max-h-64 overflow-auto border border-paper-400 bg-ink-900 p-3 text-[0.7rem] leading-relaxed text-paper-100">
+            <pre className="max-h-64 overflow-auto border border-paper-400 bg-ink-900 p-3 text-2xs leading-relaxed text-paper-100">
               {fullSql.slice(0, 900)}
               {`\n\n-- [ ${fullSql.length - 1500} more characters elided --\n`}
               {`--   press "${t("setup.copySql")}" to take the whole thing ]\n\n`}
@@ -342,7 +342,7 @@ export function SetupWizard({
             <button
               type="button"
               onClick={copySql}
-              className="absolute right-2 top-2 bg-gold-500 px-3 py-1 text-xs font-bold text-gov-950 hover:bg-gold-400"
+              className="absolute right-2 top-2 btn btn-sm btn-accent"
             >
               {copied ? t("setup.sqlCopied") : t("setup.copySql")}
             </button>
@@ -475,7 +475,7 @@ export function SetupWizard({
               type="button"
               onClick={verifyAndCreate}
               disabled={busy || !url || !anonKey || !signedIn}
-              className="ml-auto bg-gov-900 px-5 py-2 font-bold text-white hover:bg-gov-800 disabled:opacity-40"
+              className="btn btn-primary ml-auto"
             >
               {busy ? t("setup.verifying") : t("setup.verify")}
             </button>
@@ -512,14 +512,14 @@ export function SetupWizard({
             </li>
           </ol>
 
-          <p className="border-l-[3px] border-stamp-red bg-stamp-red/8 px-3 py-2 text-xs leading-relaxed text-ink-700">
+          <p className="notice notice-error text-xs text-ink-700">
             {t("email.reminder")}
           </p>
 
           <div className="flex flex-wrap items-center justify-center gap-4 pt-1">
             <Link
               href={`/d/${slug}`}
-              className="bg-gold-500 px-6 py-3 font-bold text-gov-950 hover:bg-gold-400"
+              className="btn btn-lg btn-accent"
             >
               {t("setup.openDept")}
             </Link>
@@ -563,7 +563,7 @@ function Field({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         spellCheck={false}
-        className={`w-full border border-paper-400 bg-white px-3 py-2 text-sm text-ink-900 outline-none focus:border-gov-700 ${
+        className={`field ${
           mono ? "typewriter" : ""
         }`}
       />
@@ -578,7 +578,7 @@ function Next({ disabled, onClick }: { disabled: boolean; onClick: () => void })
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="w-full bg-gov-900 px-5 py-2.5 font-bold text-white hover:bg-gov-800 disabled:opacity-40"
+      className="btn btn-primary w-full"
     >
       →
     </button>
@@ -606,7 +606,7 @@ function Nav({
       <button
         type="button"
         onClick={onNext}
-        className="ml-auto bg-gov-900 px-5 py-2 font-bold text-white hover:bg-gov-800"
+        className="btn btn-primary ml-auto"
       >
         {nextLabel ?? "→"}
       </button>

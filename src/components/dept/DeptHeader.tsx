@@ -59,16 +59,15 @@ export function DeptHeader({
           />
           <span className="leading-tight">
             <span
-              className="block font-[family-name:var(--font-serif)] text-[0.65rem] uppercase tracking-[0.18em]"
-              style={{ color: branding.accent }}
+              className="block font-serif text-2xs font-bold uppercase tracking-seal text-accent"
             >
               {branding.sealTop}
             </span>
-            <span className="block font-[family-name:var(--font-serif)] text-lg font-black text-white">
+            <span className="block font-serif text-lg font-black text-white">
               {branding.departmentName}
             </span>
             {branding.tagline && (
-              <span className="hidden text-[0.65rem] uppercase tracking-[0.14em] text-gov-100/60 sm:block">
+              <span className="hidden text-2xs uppercase tracking-stamp text-gov-100/60 sm:block">
                 {branding.tagline}
               </span>
             )}
@@ -83,7 +82,7 @@ export function DeptHeader({
               <Link
                 key={link.href}
                 href={link.href}
-                className={`rounded-xs px-3 py-2 text-sm font-semibold transition-colors ${
+                className={`rounded-card px-3 py-2 text-sm font-semibold transition-colors ${
                   active
                     ? "bg-white/15 text-white"
                     : "text-gov-100/80 hover:bg-white/10 hover:text-white"
@@ -101,12 +100,11 @@ export function DeptHeader({
           {signedIn && (
             <div className="hidden items-center gap-3 border-l border-white/15 pl-4 md:flex">
               <span className="text-right leading-tight">
-                <span className="block text-[0.6rem] uppercase tracking-wider text-gov-100/50">
+                <span className="block text-3xs uppercase tracking-wider text-gov-100/50">
                   {t("nav.signedInAs")}
                 </span>
                 <span
-                  className="typewriter block text-sm"
-                  style={{ color: branding.accent }}
+                  className="typewriter block text-sm text-accent"
                 >
                   {username ?? "—"}
                 </span>
@@ -160,8 +158,7 @@ export function DeptHeader({
             ))}
             <div className="flex items-center justify-between py-3">
               <span
-                className="typewriter text-sm"
-                style={{ color: branding.accent }}
+                className="typewriter text-sm text-accent"
               >
                 {username ?? "—"}
               </span>

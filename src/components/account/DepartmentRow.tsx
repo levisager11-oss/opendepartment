@@ -46,15 +46,15 @@ export function DepartmentRow({ dept }: { dept: Dept }) {
   return (
     <li className="paper flex flex-wrap items-center gap-x-4 gap-y-2 p-4">
       <div className="min-w-0 flex-1">
-        <p className="font-[family-name:var(--font-serif)] text-base font-bold text-ink-900">
+        <p className="font-serif text-base font-bold text-ink-900">
           {dept.display_name}
           {dept.status === "suspended" && (
-            <span className="stamp stamp-red ml-3 !border-2 !px-1.5 !py-0 text-[0.6rem]">
+            <span className="stamp stamp-red ml-3 stamp-sm">
               suspended
             </span>
           )}
         </p>
-        <p className="docket mt-1 !text-[0.6rem]">
+        <p className="docket mt-1 text-3xs text-ink-500">
           /d/{dept.slug} · {formatDate(dept.created_at)}
         </p>
       </div>
@@ -63,14 +63,14 @@ export function DepartmentRow({ dept }: { dept: Dept }) {
         type="button"
         onClick={toggleVisibility}
         disabled={busy}
-        className="border border-paper-400 px-3 py-1.5 text-xs text-ink-700 hover:bg-paper-200 disabled:opacity-40"
+        className="btn btn-sm btn-ghost"
       >
         {t(visibility === "public" ? "setup.public" : "setup.unlisted")}
       </button>
 
       <Link
         href={`/d/${dept.slug}`}
-        className="bg-gov-900 px-3 py-1.5 text-xs font-bold text-white hover:bg-gov-800"
+        className="btn btn-sm btn-primary"
       >
         {t("account.visit")}
       </Link>

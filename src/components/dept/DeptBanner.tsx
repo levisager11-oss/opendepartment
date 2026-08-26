@@ -24,7 +24,7 @@ export function DeptBanner() {
     <div className="gov-banner">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-3 gap-y-1 px-4 py-1.5">
         <span
-          className="stamp stamp-red !border-2 !px-1.5 !py-0 text-[0.6rem] !opacity-100"
+          className="stamp stamp-red stamp-sm stamp-solid"
           style={{ transform: "rotate(-2deg)" }}
         >
           {t("gov.parody")}
@@ -46,7 +46,7 @@ export function DeptBanner() {
 
       {open && (
         <div className="border-t border-white/10 bg-black/25">
-          <div className="mx-auto max-w-7xl space-y-2 px-4 py-2 text-[0.6875rem] leading-relaxed opacity-85">
+          <div className="mx-auto max-w-7xl space-y-2 px-4 py-2 text-2xs leading-relaxed opacity-85">
             <p>{t("gov.disclaimer")}</p>
             <p>
               {t("dept.hostedNotice", { name: branding.departmentName })}{" "}

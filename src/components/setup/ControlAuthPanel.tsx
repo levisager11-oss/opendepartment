@@ -79,7 +79,7 @@ export function ControlAuthPanel({ onSignedIn }: { onSignedIn: () => void }) {
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         placeholder={t("auth.email")}
-        className="w-full border border-paper-400 bg-white px-3 py-2 text-sm outline-none focus:border-gov-700"
+        className="field"
       />
       <input
         type="password"
@@ -89,7 +89,7 @@ export function ControlAuthPanel({ onSignedIn }: { onSignedIn: () => void }) {
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         placeholder={t("auth.password")}
-        className="w-full border border-paper-400 bg-white px-3 py-2 text-sm outline-none focus:border-gov-700"
+        className="field"
       />
 
       {/* Registering a department means taking responsibility for what other
@@ -107,6 +107,7 @@ export function ControlAuthPanel({ onSignedIn }: { onSignedIn: () => void }) {
             <Link
               href="/legal/terms"
               target="_blank"
+              rel="noopener"
               className="text-gov-800 underline underline-offset-2"
             >
               {t("legal.terms")}
@@ -115,6 +116,7 @@ export function ControlAuthPanel({ onSignedIn }: { onSignedIn: () => void }) {
             <Link
               href="/legal/privacy"
               target="_blank"
+              rel="noopener"
               className="text-gov-800 underline underline-offset-2"
             >
               {t("legal.privacy")}
@@ -130,7 +132,7 @@ export function ControlAuthPanel({ onSignedIn }: { onSignedIn: () => void }) {
         <button
           type="submit"
           disabled={busy || (mode === "signup" && !accepted)}
-          className="bg-gov-900 px-4 py-2 text-sm font-bold text-white hover:bg-gov-800 disabled:opacity-40"
+          className="btn btn-primary"
         >
           {mode === "signup" ? t("auth.signup") : t("auth.signin")}
         </button>

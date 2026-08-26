@@ -92,10 +92,16 @@ export function ReportButton({ fileId }: { fileId: string }) {
         onClick={(e) => {
           if (e.target === dialogRef.current) setOpen(false);
         }}
-        className="paper m-auto w-[min(92vw,32rem)] rounded-xs p-0 backdrop:bg-ink-900/60"
+        aria-labelledby="report-dialog-title"
+        className="paper m-auto w-dialog p-0 backdrop:bg-ink-900/60"
       >
         <div className="p-6">
-          <p className="docket mb-1 !text-stamp-red">{t("report.title")}</p>
+          <p
+            id="report-dialog-title"
+            className="docket mb-1 text-2xs text-stamp-red"
+          >
+            {t("report.title")}
+          </p>
 
           {done ? (
             <>

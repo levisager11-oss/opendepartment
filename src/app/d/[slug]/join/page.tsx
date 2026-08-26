@@ -3,12 +3,20 @@ import { requireDepartment } from "@/lib/tenant/auth";
 import { DeptLoginForm } from "@/components/dept/DeptLoginForm";
 import { Seal } from "@/components/Seal";
 import { T } from "@/components/T";
+import { privatePage } from "@/lib/seo";
 
 /**
  * Invite landing page. An invite link is just /d/<slug>/join?code=XYZ, so a
  * code can be handed out in a group chat and the recipient lands on a sign-up
  * form with the code already filled in.
  */
+/**
+ * Member-only, so it stays out of the index even when the department
+ * itself is public. The canonical is left to the department layout on
+ * purpose: one address per archive, not one per screen.
+ */
+export const metadata = privatePage("Redeem an invite");
+
 export default async function JoinPage({
   params,
   searchParams,
@@ -31,7 +39,7 @@ export default async function JoinPage({
           accent={branding.accent}
           idPrefix="join"
         />
-        <h1 className="font-[family-name:var(--font-serif)] text-2xl font-black text-ink-900">
+        <h1 className="font-serif text-2xl font-black text-ink-900">
           <T k="invite.title" vars={{ name: branding.departmentName }} />
         </h1>
       </div>

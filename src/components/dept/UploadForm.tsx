@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { Spinner } from "@/components/Spinner";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n/provider";
 import { useTenant, useTenantClient } from "@/lib/tenant/context";
@@ -162,16 +163,18 @@ export function UploadForm({
           chooseFile(e.dataTransfer.files?.[0] ?? null);
         }}
         onClick={() => inputRef.current?.click()}
-        className={`paper cursor-pointer rounded-xs border-2 border-dashed px-6 py-10 text-center transition-colors ${
-          dragging
-            ? "!border-gov-700 !bg-gov-100"
-            : "!border-paper-400 hover:!border-gov-600"
+        className={`dropzone px-6 py-10 text-center ${
+          dragging ? "dropzone-active" : ""
         }`}
       >
         <input
           ref={inputRef}
+          id="upload-file"
           type="file"
-          className="hidden"
+          // sr-only, not hidden: display:none takes the input out of the tab
+          // order, which left the dropzone unreachable by keyboard entirely.
+          // The zone shows the focus ring for it via :focus-within.
+          className="sr-only"
           accept={Object.keys(ACCEPTED_MIME).join(",")}
           onChange={(e) => chooseFile(e.target.files?.[0] ?? null)}
         />
@@ -183,10 +186,13 @@ export function UploadForm({
               <img
                 src={preview}
                 alt=""
-                className="h-24 w-24 rounded-xs border border-paper-400 object-cover"
+                width={96}
+                height={96}
+                decoding="async"
+                className="h-24 w-24 rounded-card border border-paper-400 object-cover"
               />
             ) : (
-              <div className="flex h-24 w-24 items-center justify-center rounded-xs border border-paper-400 bg-paper-200 text-ink-500">
+              <div className="flex h-24 w-24 items-center justify-center rounded-card border border-paper-400 bg-paper-200 text-ink-500">
                 <KindIcon kind={kindFromMime(file.type)} size={34} />
               </div>
             )}
@@ -194,7 +200,7 @@ export function UploadForm({
               <p className="typewriter text-sm break-all text-ink-900">
                 {file.name}
               </p>
-              <p className="docket mt-1">
+              <p className="docket mt-1 text-2xs text-ink-500">
                 {formatBytes(file.size)} · {file.type}
               </p>
               <button
@@ -224,8 +230,13 @@ export function UploadForm({
             >
               <path d="M12 16V4M8 8l4-4 4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" />
             </svg>
-            <p className="font-semibold text-ink-700">{t("upload.dropzone")}</p>
-            <p className="docket mt-1">
+            <label
+              htmlFor="upload-file"
+              className="cursor-pointer font-semibold text-ink-700"
+            >
+              {t("upload.dropzone")}
+            </label>
+            <p className="docket mt-1 text-2xs text-ink-500">
               {t("upload.dropzoneHint", { mb: maxUploadMb })}
             </p>
           </>
@@ -233,7 +244,7 @@ export function UploadForm({
       </div>
 
       {/* metadata */}
-      <div className="paper rounded-xs p-5">
+      <div className="paper p-5">
         <div className="flex flex-col gap-4">
           <div>
             <label className="label" htmlFor="title">
@@ -298,7 +309,7 @@ export function UploadForm({
                         onClick={() => toggleSubject(s.id)}
                         aria-pressed={on}
                         title={s.description ?? undefined}
-                        className={`typewriter cursor-pointer rounded-xs border px-2.5 py-1 text-xs transition-colors ${
+                        className={`typewriter cursor-pointer rounded-card border px-2.5 py-1 text-xs transition-colors ${
                           on
                             ? "border-gov-800 bg-gov-800 text-white"
                             : "border-paper-400 bg-paper-100 text-ink-700 hover:border-gov-600"
@@ -320,8 +331,8 @@ export function UploadForm({
       </div>
 
       {/* accountability */}
-      <div className="paper rounded-xs border-l-4 !border-l-stamp-red p-5">
-        <p className="docket mb-2 !text-stamp-red">{t("notice.title")}</p>
+      <div className="paper paper-flag-red p-5">
+        <p className="docket mb-2 text-stamp-red text-2xs">{t("notice.title")}</p>
         <p className="text-sm leading-relaxed text-ink-700">
           {t("notice.body")}
         </p>
@@ -340,7 +351,7 @@ export function UploadForm({
       {error && (
         <p
           role="alert"
-          className="border-l-[3px] border-stamp-red bg-stamp-red/8 px-3 py-2 text-sm text-stamp-red"
+          className="notice notice-error"
         >
           {error}
         </p>
@@ -350,8 +361,10 @@ export function UploadForm({
         <button
           type="submit"
           disabled={!ready}
-          className="btn btn-primary !px-6 !py-3"
+          aria-busy={busy}
+          className="btn btn-lg btn-primary"
         >
+          {busy && <Spinner />}
           {busy ? t("upload.submitting") : t("upload.submit")}
         </button>
 
@@ -361,7 +374,7 @@ export function UploadForm({
             role="progressbar"
             aria-label={t("upload.progress")}
           >
-            <div className="h-full w-1/3 animate-[fade-up_1.1s_ease-in-out_infinite_alternate] bg-gov-700" />
+            <div className="h-full w-1/3 animate-indeterminate bg-gov-700" />
           </div>
         )}
       </div>

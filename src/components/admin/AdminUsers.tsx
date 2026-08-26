@@ -53,7 +53,7 @@ export function AdminUsers({
   }
 
   return (
-    <div className="paper scroll-x rounded-xs">
+    <div className="paper scroll-x">
       <table className="w-full min-w-3xl text-sm">
         <thead>
           <tr className="border-b border-paper-300 text-left">
@@ -64,7 +64,7 @@ export function AdminUsers({
               t("admin.users.joined"),
               "",
             ].map((label, i) => (
-              <th key={i} className="docket px-3 py-2 !text-[0.6rem]">
+              <th key={i} className="docket px-3 py-2 text-3xs text-ink-500">
                 {label}
               </th>
             ))}
@@ -85,12 +85,12 @@ export function AdminUsers({
                     {user.username ?? "—"}
                   </span>
                   {user.is_admin && (
-                    <span className="ml-2 rounded-xs bg-gov-800 px-1.5 py-0.5 text-[0.55rem] font-bold tracking-wider text-white">
+                    <span className="ml-2 rounded-card bg-gov-800 px-1.5 py-0.5 text-3xs font-bold tracking-wider text-white">
                       {t("admin.users.admin").toUpperCase()}
                     </span>
                   )}
                   {user.is_banned && (
-                    <span className="ml-2 rounded-xs bg-stamp-red px-1.5 py-0.5 text-[0.55rem] font-bold tracking-wider text-white">
+                    <span className="ml-2 rounded-card bg-stamp-red px-1.5 py-0.5 text-3xs font-bold tracking-wider text-white">
                       SUSPENDED
                     </span>
                   )}

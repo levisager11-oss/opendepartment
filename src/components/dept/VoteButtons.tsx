@@ -76,7 +76,7 @@ export function VoteButtons({
         disabled={pending}
         aria-label={t("vote.up")}
         aria-pressed={vote === 1}
-        className={`${pad} cursor-pointer rounded-xs transition-colors ${
+        className={`${pad} cursor-pointer rounded-card transition-colors ${
           vote === 1
             ? "text-stamp-green"
             : "text-ink-400 hover:bg-paper-200 hover:text-stamp-green"
@@ -117,7 +117,7 @@ export function VoteButtons({
         disabled={pending}
         aria-label={t("vote.down")}
         aria-pressed={vote === -1}
-        className={`${pad} cursor-pointer rounded-xs transition-colors ${
+        className={`${pad} cursor-pointer rounded-card transition-colors ${
           vote === -1
             ? "text-stamp-red"
             : "text-ink-400 hover:bg-paper-200 hover:text-stamp-red"

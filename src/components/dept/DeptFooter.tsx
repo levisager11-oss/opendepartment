@@ -10,9 +10,7 @@ export function DeptFooter() {
   const { branding, href, slug } = useTenant();
 
   return (
-    <footer className="mt-16 border-t-[3px] bg-gov-950 text-gov-100"
-      style={{ borderTopColor: branding.accent }}
-    >
+    <footer className="mt-16 gov-rule-top bg-gov-950 text-gov-100">
       <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 md:grid-cols-[auto_1fr_auto]">
         <div className="flex items-start gap-4">
           <Seal
@@ -24,7 +22,7 @@ export function DeptFooter() {
             idPrefix={`ftr-${slug}`}
           />
           <div className="leading-tight">
-            <p className="font-[family-name:var(--font-serif)] text-base font-bold text-white">
+            <p className="font-serif text-base font-bold text-white">
               {branding.departmentName}
             </p>
             {branding.tagline && (
@@ -59,7 +57,7 @@ export function DeptFooter() {
       </div>
 
       <div className="border-t border-white/10">
-        <div className="docket mx-auto max-w-7xl px-4 py-3 !text-gov-100/40">
+        <div className="docket mx-auto max-w-7xl px-4 py-3 text-gov-100/40 text-2xs">
           {t("gov.parody")} · {new Date().getFullYear()} · {branding.sealTop}
         </div>
       </div>

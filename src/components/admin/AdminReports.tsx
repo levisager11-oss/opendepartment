@@ -88,8 +88,8 @@ export function AdminReports({ reports }: { reports: AdminReport[] }) {
       </label>
 
       {visible.length === 0 ? (
-        <div className="paper rounded-xs py-14 text-center">
-          <span className="stamp stamp-green !text-sm">ALL CLEAR</span>
+        <div className="paper py-14 text-center">
+          <span className="stamp stamp-green text-sm">ALL CLEAR</span>
           <p className="mt-5 text-sm text-ink-500">{t("admin.reports.none")}</p>
         </div>
       ) : (
@@ -97,23 +97,23 @@ export function AdminReports({ reports }: { reports: AdminReport[] }) {
           {visible.map((report) => (
             <li
               key={report.id}
-              className={`paper rounded-xs border-l-4 p-4 ${
+              className={`paper p-4 ${
                 report.status === "open"
-                  ? "!border-l-stamp-red"
-                  : "!border-l-paper-400 opacity-70"
+                  ? "paper-flag-red"
+                  : "paper-flag-muted opacity-70"
               }`}
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="mb-1 flex flex-wrap items-center gap-2">
-                    <span className="stamp stamp-red !border-2 !px-1.5 !py-0 !text-[0.6rem]">
+                    <span className="stamp stamp-red stamp-sm">
                       {t(REASON_KEYS[report.reason] ?? "report.reason.other")}
                     </span>
-                    <span className="docket !text-[0.6rem]">
+                    <span className="docket text-3xs text-ink-500">
                       {formatDate(report.created_at)}
                     </span>
                     {report.status !== "open" && (
-                      <span className="docket !text-[0.6rem] !text-stamp-green">
+                      <span className="docket text-3xs text-stamp-green">
                         {report.status.toUpperCase()}
                       </span>
                     )}
@@ -122,7 +122,7 @@ export function AdminReports({ reports }: { reports: AdminReport[] }) {
                   {report.file_id ? (
                     <Link
                       href={href(`file/${report.file_id}`)}
-                      className="font-[family-name:var(--font-serif)] font-bold text-gov-800 hover:underline"
+                      className="font-serif font-bold text-gov-800 hover:underline"
                     >
                       {report.file_title ?? report.file_id}
                     </Link>
@@ -136,9 +136,9 @@ export function AdminReports({ reports }: { reports: AdminReport[] }) {
                     </p>
                   )}
 
-                  <p className="docket mt-2 !text-[0.6rem]">
+                  <p className="docket mt-2 text-3xs text-ink-500">
                     {t("admin.reports.reportedBy")}:{" "}
-                    <span className="typewriter !normal-case">
+                    <span className="typewriter normal-case">
                       {report.reporter_username ?? "—"}
                     </span>
                   </p>
@@ -150,7 +150,7 @@ export function AdminReports({ reports }: { reports: AdminReport[] }) {
                       type="button"
                       onClick={() => destroyFile(report)}
                       disabled={busyId === report.id || !report.file_id}
-                      className="btn btn-danger !px-3 !py-1.5 !text-xs"
+                      className="btn btn-sm btn-danger"
                     >
                       {t("admin.reports.deleteFile")}
                     </button>
@@ -158,7 +158,7 @@ export function AdminReports({ reports }: { reports: AdminReport[] }) {
                       type="button"
                       onClick={() => setStatus(report.id, "resolved")}
                       disabled={busyId === report.id}
-                      className="btn btn-ghost !px-3 !py-1.5 !text-xs"
+                      className="btn btn-sm btn-ghost"
                     >
                       {t("admin.reports.resolve")}
                     </button>
@@ -166,7 +166,7 @@ export function AdminReports({ reports }: { reports: AdminReport[] }) {
                       type="button"
                       onClick={() => setStatus(report.id, "dismissed")}
                       disabled={busyId === report.id}
-                      className="btn btn-ghost !px-3 !py-1.5 !text-xs"
+                      className="btn btn-sm btn-ghost"
                     >
                       {t("admin.reports.dismiss")}
                     </button>

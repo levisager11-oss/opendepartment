@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { Seal } from "@/components/Seal";
+import {
+  MarketingFooter,
+  MarketingHeader,
+} from "@/components/MarketingShell";
 import { T } from "@/components/T";
-import { LanguageToggle } from "@/components/LanguageToggle";
 import { KofiButton } from "@/components/KofiButton";
 import { SITE_NAME, SITE_URL, absolute } from "@/lib/seo";
 
@@ -53,41 +56,17 @@ export default function LandingPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
       />
 
-      <header className="masthead gov-rule">
-        <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3">
-          <Link href="/" className="flex items-center gap-3">
-            <Seal size={42} className="shrink-0" idPrefix="od-hdr" />
-            <span className="font-[family-name:var(--font-serif)] text-lg font-black text-white">
-              <T k="od.name" />
-            </span>
-          </Link>
-          <div className="ml-auto flex items-center gap-4">
-            <LanguageToggle light />
-            <Link
-              href="/directory"
-              className="hidden text-sm text-gov-100/80 hover:text-white sm:block"
-            >
-              <T k="od.directory" />
-            </Link>
-            <Link
-              href="/new"
-              className="bg-gold-500 px-3 py-2 text-sm font-bold text-gov-950 transition-colors hover:bg-gold-400"
-            >
-              <T k="od.create" />
-            </Link>
-          </div>
-        </div>
-      </header>
+      <MarketingHeader />
 
       <main className="flex-1">
         {/* --- hero ------------------------------------------------------ */}
         <section className="border-b border-paper-400 bg-gov-950 text-gov-100">
           <div className="mx-auto grid max-w-5xl gap-10 px-4 py-20 md:grid-cols-[1fr_auto] md:items-center">
             <div>
-              <p className="docket mb-3 !text-gold-300">
+              <p className="docket mb-3 text-gold-300 text-2xs">
                 <T k="od.tagline" />
               </p>
-              <h1 className="mb-5 font-[family-name:var(--font-serif)] text-4xl font-black leading-tight text-white sm:text-5xl">
+              <h1 className="mb-5 font-serif text-4xl font-black leading-tight text-white sm:text-5xl">
                 <T k="od.name" />
               </h1>
               <p className="mb-8 max-w-prose text-base leading-relaxed text-gov-100/80">
@@ -96,7 +75,7 @@ export default function LandingPage() {
               <div className="flex flex-wrap items-center gap-4">
                 <Link
                   href="/new"
-                  className="bg-gold-500 px-6 py-3 font-bold text-gov-950 transition-colors hover:bg-gold-400"
+                  className="btn btn-lg btn-accent"
                 >
                   <T k="od.create" />
                 </Link>
@@ -128,7 +107,7 @@ export default function LandingPage() {
             { title: "od.free", body: "od.freeBody" },
           ].map((card) => (
             <div key={card.title} className="paper p-6">
-              <h2 className="mb-2 font-[family-name:var(--font-serif)] text-lg font-bold text-ink-900">
+              <h2 className="mb-2 font-serif text-lg font-bold text-ink-900">
                 <T k={card.title as never} />
               </h2>
               <p className="text-sm leading-relaxed text-ink-700">
@@ -141,7 +120,7 @@ export default function LandingPage() {
         {/* --- how it works ---------------------------------------------- */}
         <section className="border-t border-paper-400 bg-paper-50">
           <div className="mx-auto max-w-3xl px-4 py-16">
-            <h2 className="mb-8 text-center font-[family-name:var(--font-serif)] text-2xl font-bold text-ink-900">
+            <h2 className="mb-8 text-center font-serif text-2xl font-bold text-ink-900">
               <T k="setup.title" />
             </h2>
             <ol className="space-y-6">
@@ -165,7 +144,7 @@ export default function LandingPage() {
             <div className="mt-10 text-center">
               <Link
                 href="/new"
-                className="inline-block bg-gov-900 px-6 py-3 font-bold text-white transition-colors hover:bg-gov-800"
+                className="btn btn-lg btn-primary"
               >
                 <T k="od.create" />
               </Link>
@@ -184,22 +163,7 @@ export default function LandingPage() {
         </section>
       </main>
 
-      <footer className="border-t-[3px] border-gold-500 bg-gov-950 text-gov-100">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-8 text-xs text-gov-100/60">
-          <span className="font-[family-name:var(--font-serif)] text-sm font-bold text-white">
-            <T k="od.name" />
-          </span>
-          <Link href="/legal/terms" className="hover:text-white">
-            <T k="legal.terms" />
-          </Link>
-          <Link href="/legal/privacy" className="hover:text-white">
-            <T k="legal.privacy" />
-          </Link>
-          <Link href="/account" className="ml-auto hover:text-white">
-            <T k="account.title" />
-          </Link>
-        </div>
-      </footer>
+      <MarketingFooter />
     </>
   );
 }

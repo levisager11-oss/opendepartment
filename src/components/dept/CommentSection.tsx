@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Spinner } from "@/components/Spinner";
 import { useI18n } from "@/lib/i18n/provider";
 import { useTenantClient } from "@/lib/tenant/context";
 import type { Comment } from "@/lib/tenant/types";
@@ -68,10 +69,10 @@ export function CommentSection({
   return (
     <section className="mt-8">
       <div className="paper-tab ml-6 inline-block px-4 py-1">
-        <span className="docket !text-ink-700">{t("comments.title")}</span>
+        <span className="docket text-ink-700 text-2xs">{t("comments.title")}</span>
       </div>
 
-      <div className="paper rounded-xs p-5">
+      <div className="paper p-5">
         {comments.length === 0 ? (
           <p className="typewriter py-6 text-center text-sm text-ink-400">
             {t("comments.empty")}
@@ -91,7 +92,7 @@ export function CommentSection({
                         </span>
                       )}
                     </span>
-                    <span className="docket !text-[0.6rem]">
+                    <span className="docket text-3xs text-ink-500">
                       {formatDate(comment.created_at)}
                     </span>
 
@@ -132,14 +133,16 @@ export function CommentSection({
             </p>
           )}
           <div className="mt-3 flex items-center justify-between">
-            <span className="docket !text-[0.6rem]">
+            <span className="docket text-3xs text-ink-500">
               {body.length} / 2000
             </span>
             <button
               type="submit"
               disabled={busy || !body.trim()}
+              aria-busy={busy}
               className="btn btn-primary"
             >
+              {busy && <Spinner />}
               {busy ? t("common.saving") : t("comments.submit")}
             </button>
           </div>

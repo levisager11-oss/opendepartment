@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Spinner } from "@/components/Spinner";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n/provider";
 import { useTenant, useTenantClient } from "@/lib/tenant/context";
@@ -58,7 +59,7 @@ export function DeptUsernameForm() {
         </label>
         <input
           id="username"
-          className="field typewriter !text-lg"
+          className="field typewriter text-lg"
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder={t("onboarding.placeholder")}
@@ -72,7 +73,7 @@ export function DeptUsernameForm() {
       {error && (
         <p
           role="alert"
-          className="border-l-[3px] border-stamp-red bg-stamp-red/8 px-3 py-2 text-sm text-stamp-red"
+          className="notice notice-error"
         >
           {error}
         </p>
@@ -81,8 +82,10 @@ export function DeptUsernameForm() {
       <button
         type="submit"
         disabled={busy || !valid}
-        className="btn btn-primary !py-2.5"
+        aria-busy={busy}
+        className="btn btn-primary"
       >
+        {busy && <Spinner />}
         {busy ? t("common.saving") : t("onboarding.submit")}
       </button>
     </form>

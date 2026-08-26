@@ -3,6 +3,14 @@ import { requireDepartment } from "@/lib/tenant/auth";
 import { DeptLoginForm } from "@/components/dept/DeptLoginForm";
 import { Seal } from "@/components/Seal";
 import { T } from "@/components/T";
+import { privatePage } from "@/lib/seo";
+
+/**
+ * Member-only, so it stays out of the index even when the department
+ * itself is public. The canonical is left to the department layout on
+ * purpose: one address per archive, not one per screen.
+ */
+export const metadata = privatePage("Sign in");
 
 export default async function DepartmentLoginPage({
   params,
@@ -23,10 +31,10 @@ export default async function DepartmentLoginPage({
           accent={branding.accent}
           idPrefix="login"
         />
-        <h1 className="font-[family-name:var(--font-serif)] text-2xl font-black text-ink-900">
+        <h1 className="font-serif text-2xl font-black text-ink-900">
           <T k="auth.title" />
         </h1>
-        <p className="docket mt-2">
+        <p className="docket mt-2 text-2xs text-ink-500">
           <T k="auth.subtitle" />
         </p>
       </div>

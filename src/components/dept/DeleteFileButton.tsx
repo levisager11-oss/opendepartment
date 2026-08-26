@@ -58,10 +58,10 @@ export function DeleteFileButton({
       <button
         type="button"
         onClick={() => setConfirming(true)}
-        className="btn btn-ghost !text-stamp-red !border-stamp-red/40"
+        className="btn btn-ghost-danger"
       >
         {t("file.delete")}
-        {!isOwner && <span className="docket !text-[0.55rem]">ADMIN</span>}
+        {!isOwner && <span className="docket text-3xs text-ink-500">ADMIN</span>}
       </button>
     );
   }

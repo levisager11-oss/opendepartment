@@ -1,6 +1,7 @@
 import { requireDeptAdmin } from "@/lib/tenant/auth";
 import { createTenantClient } from "@/lib/tenant/server";
 import { AdminPanel } from "@/components/admin/AdminPanel";
+import { privatePage } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,13 @@ export const dynamic = "force-dynamic";
  * them away; and even if that check were bypassed, every query below would
  * simply return nothing.
  */
+/**
+ * Member-only, so it stays out of the index even when the department
+ * itself is public. The canonical is left to the department layout on
+ * purpose: one address per archive, not one per screen.
+ */
+export const metadata = privatePage("Administration");
+
 export default async function AdminPage({
   params,
 }: {

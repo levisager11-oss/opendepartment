@@ -33,6 +33,14 @@ export async function generateMetadata({
       description,
       path: `/d/${slug}`,
     }),
+    // Overrides the plain string pageMetadata() returns. Without a template
+    // here, a sub-page that sets `title: "The Vault"` would fall back to the
+    // root layout's template and render "The Vault -- OpenDepartment",
+    // dropping the one word that says which archive you are looking at.
+    title: {
+      default: dept.display_name,
+      template: `%s -- ${dept.display_name}`,
+    },
     // Unlisted departments stay out of search results. A department that opted
     // into the public directory is fair game.
     robots:

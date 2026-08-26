@@ -38,7 +38,7 @@ export default async function DepartmentFrontDoor({
           </p>
           <Link
             href="/new"
-            className="mt-6 inline-block bg-gov-900 px-5 py-2.5 font-bold text-white hover:bg-gov-800"
+            className="btn btn-lg btn-primary mt-6"
           >
             <T k="setup.title" />
           </Link>
@@ -70,11 +70,11 @@ export default async function DepartmentFrontDoor({
         idPrefix="door"
       />
 
-      <p className="docket mb-3">
+      <p className="docket mb-3 text-2xs text-ink-500">
         <T k="dept.frontDoor" />
       </p>
 
-      <h1 className="mb-4 font-[family-name:var(--font-serif)] text-4xl font-black text-ink-900">
+      <h1 className="mb-4 font-serif text-4xl font-black text-ink-900">
         {branding.departmentName}
       </h1>
 
@@ -90,7 +90,7 @@ export default async function DepartmentFrontDoor({
         ].map((s) => (
           <div key={s.label} className="paper px-3 py-4">
             <dt className="typewriter text-2xl font-bold text-ink-900">{s.n}</dt>
-            <dd className="docket mt-1 !text-[0.6rem]">
+            <dd className="docket mt-1 text-3xs text-ink-500">
               <T k={s.label as never} />
             </dd>
           </div>

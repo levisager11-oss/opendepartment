@@ -6,9 +6,19 @@ import { I18nProvider } from "@/lib/i18n/provider";
 import { detectLocale } from "@/lib/i18n/detect";
 import { SITE_NAME, SITE_URL } from "@/lib/seo";
 
+/**
+ * Three families, and the third earns its place: Special Elite is the
+ * typewriter register the whole parody rests on -- dockets, stamps, usernames.
+ * It ships one weight over the latin subset and only ever sets short strings.
+ *
+ * The weight lists are the payload, and they are pruned to what actually
+ * renders. Merriweather is used at 900 for page titles and 700 for card
+ * headings and never at 400, so 400 is not requested; every `font-serif` call
+ * site in the app carries an explicit bold or black.
+ */
 const merriweather = Merriweather({
   subsets: ["latin"],
-  weight: ["400", "700", "900"],
+  weight: ["700", "900"],
   variable: "--font-merriweather",
   display: "swap",
 });

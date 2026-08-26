@@ -3,8 +3,16 @@ import { createTenantClient } from "@/lib/tenant/server";
 import { UploadForm } from "@/components/dept/UploadForm";
 import { T } from "@/components/T";
 import type { Subject } from "@/lib/tenant/types";
+import { privatePage } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Member-only, so it stays out of the index even when the department
+ * itself is public. The canonical is left to the department layout on
+ * purpose: one address per archive, not one per screen.
+ */
+export const metadata = privatePage("Submit evidence");
 
 export default async function UploadPage({
   params,
@@ -23,10 +31,10 @@ export default async function UploadPage({
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
       <div className="mb-6">
-        <span className="docket">
+        <span className="docket text-2xs text-ink-500">
           <T k="upload.subtitle" />
         </span>
-        <h1 className="font-[family-name:var(--font-serif)] text-3xl font-black text-gov-900">
+        <h1 className="font-serif text-3xl font-black text-gov-900">
           <T k="upload.title" />
         </h1>
       </div>

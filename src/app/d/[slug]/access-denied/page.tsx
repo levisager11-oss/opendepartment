@@ -2,6 +2,14 @@ import Link from "next/link";
 import { requireDepartment } from "@/lib/tenant/auth";
 import { Seal } from "@/components/Seal";
 import { T } from "@/components/T";
+import { privatePage } from "@/lib/seo";
+
+/**
+ * Member-only, so it stays out of the index even when the department
+ * itself is public. The canonical is left to the department layout on
+ * purpose: one address per archive, not one per screen.
+ */
+export const metadata = privatePage("Access denied");
 
 export default async function AccessDeniedPage({
   params,
