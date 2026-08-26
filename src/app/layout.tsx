@@ -4,6 +4,7 @@ import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { I18nProvider } from "@/lib/i18n/provider";
 import { detectLocale } from "@/lib/i18n/detect";
+import { SITE_NAME, SITE_URL } from "@/lib/seo";
 
 const merriweather = Merriweather({
   subsets: ["latin"],
@@ -26,12 +27,62 @@ const specialElite = Special_Elite({
   display: "swap",
 });
 
+const DESCRIPTION =
+  "Run your own parody document archive. Members upload exhibits, vote and " +
+  "argue in the comments -- stored in a Supabase project you own, not ours. " +
+  "Free, invite-only by default, about five minutes to set up.";
+
+/**
+ * Site-wide metadata. Two things here are load-bearing:
+ *
+ *  - `title.template` -- every child page sets a bare `title` ("Sign in"),
+ *    and without the template those pages would lose the brand entirely in
+ *    search results and browser tabs.
+ *  - `alternates.canonical: "/"` -- resolved against metadataBase, so each
+ *    route that sets its own canonical overrides this and every route that
+ *    does not still gets an absolute self-reference rather than none.
+ */
 export const metadata: Metadata = {
-  metadataBase: new URL("https://opendepartment.vercel.app"),
-  title: "OpenDepartment",
-  description:
-    "Run your own parody document archive. Your database, your members, your rules.",
-  robots: { index: true, follow: true },
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: `${SITE_NAME} -- run your own files`,
+    template: `%s -- ${SITE_NAME}`,
+  },
+  description: DESCRIPTION,
+  applicationName: SITE_NAME,
+  keywords: [
+    "parody document archive",
+    "mock government archive",
+    "self-hosted file archive",
+    "Supabase",
+    "classroom roleplay",
+    "declassified document generator",
+  ],
+  alternates: { canonical: "/" },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, "max-image-preview": "large" },
+  },
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    title: `${SITE_NAME} -- run your own files`,
+    description: DESCRIPTION,
+    url: "/",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${SITE_NAME} -- run your own files`,
+    description: DESCRIPTION,
+  },
+  // Note for anyone adding a page below: a page that sets `openGraph` or
+  // `twitter` replaces this object wholesale rather than merging into it, and
+  // silently loses the share image with it. Use pageMetadata() from lib/seo.
+  // The site is not a phone directory; stop Safari turning docket numbers
+  // like "LF-0001" into tappable phone links.
+  formatDetection: { telephone: false, address: false, email: false },
+  verification: { google: "SaTamI2kIpo5f0OCzfcUgvO0unoBJtge3sSRhG_iZnA" },
 };
 
 export const viewport: Viewport = {

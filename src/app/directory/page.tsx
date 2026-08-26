@@ -1,10 +1,18 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { publicDirectory } from "@/lib/control/departments";
 import { MarketingShell } from "@/components/MarketingShell";
 import { Seal } from "@/components/Seal";
 import { T } from "@/components/T";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata = { title: "Public departments" };
+export const metadata: Metadata = pageMetadata({
+  title: "Public departments",
+  description:
+    "Browse the parody document archives whose owners chose to be listed. "
+    + "Most OpenDepartment departments are unlisted and reachable only by invitation.",
+  path: "/directory",
+});
 
 /**
  * Only departments whose owner explicitly chose "public" appear here. The

@@ -46,7 +46,13 @@ export function contactLine(): string {
 export function getLegalDoc(
   doc: LegalDoc,
   locale: Locale
-): { title: string; updated: string; sections: LegalSection[] } {
+): {
+  title: string;
+  updated: string;
+  /** Meta description only -- never rendered on the page. */
+  description: string;
+  sections: LegalSection[];
+} {
   const contact = contactLine();
 
   if (locale === "de") {
@@ -54,6 +60,8 @@ export function getLegalDoc(
       return {
         title: "Nutzungsbedingungen",
         updated: "Stand: 25. August 2026",
+        description:
+          "OpenDepartment ist ein Werkzeug für satirische, fiktive Archive und betreibt selbst keines. Wer ein Departement anlegt, verantwortet dessen Inhalt.",
         sections: [
           {
             heading: "1. Was OpenDepartment ist",
@@ -88,6 +96,8 @@ export function getLegalDoc(
     return {
       title: "Datenschutzerklärung",
       updated: "Stand: 25. August 2026",
+      description:
+        "Was OpenDepartment speichert: Adresse, Supabase-URL, öffentlicher anon-Key und Anzeigename eines Departements. Dateien, Kommentare und Mitglieder liegen ausschliesslich in Ihrem eigenen Projekt.",
       sections: [
         {
           heading: "1. Was wir speichern",
@@ -119,6 +129,8 @@ export function getLegalDoc(
     return {
       title: "Terms of use",
       updated: "Last updated: 25 August 2026",
+      description:
+        "OpenDepartment is a tool for building satirical, fictional archives and runs none of them itself. Whoever creates a department is responsible for what is in it.",
       sections: [
         {
           heading: "1. What OpenDepartment is",
@@ -150,6 +162,8 @@ export function getLegalDoc(
   return {
     title: "Privacy notice",
     updated: "Last updated: 25 August 2026",
+    description:
+      "What OpenDepartment stores: a department's address, Supabase URL, public anon key and display name. Files, comments and member accounts live only in your own project.",
     sections: [
       {
         heading: "1. What we store",

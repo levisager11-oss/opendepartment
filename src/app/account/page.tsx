@@ -5,8 +5,9 @@ import { MarketingShell } from "@/components/MarketingShell";
 import { Seal } from "@/components/Seal";
 import { T } from "@/components/T";
 import { DepartmentRow } from "@/components/account/DepartmentRow";
+import { privatePage } from "@/lib/seo";
 
-export const metadata = { title: "Your departments" };
+export const metadata = privatePage("Your departments", { path: "/account" });
 
 export default async function AccountPage() {
   if (!CONTROL_CONFIGURED) redirect("/");

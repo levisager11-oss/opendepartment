@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { detectLocale } from "@/lib/i18n/detect";
 import { getLegalDoc, type LegalDoc } from "@/lib/legal";
 import { MarketingShell } from "@/components/MarketingShell";
+import { pageMetadata } from "@/lib/seo";
 
 const DOCS: LegalDoc[] = ["terms", "privacy"];
 
@@ -16,9 +17,13 @@ export async function generateMetadata({
   params: Promise<{ doc: string }>;
 }): Promise<Metadata> {
   const { doc } = await params;
-  if (!DOCS.includes(doc as LegalDoc)) return { title: "Not found" };
+  if (!DOCS.includes(doc as LegalDoc)) {
+    return { title: "Not found", robots: { index: false, follow: false } };
+  }
   const locale = await detectLocale();
-  return { title: getLegalDoc(doc as LegalDoc, locale).title };
+  const { title, description } = getLegalDoc(doc as LegalDoc, locale);
+
+  return pageMetadata({ title, description, path: `/legal/${doc}` });
 }
 
 export default async function LegalPage({

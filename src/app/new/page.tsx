@@ -4,6 +4,13 @@ import { SetupWizard } from "@/components/setup/SetupWizard";
 import { TENANT_SCHEMA_SQL } from "@/lib/tenant/schema-sql.generated";
 import { Seal } from "@/components/Seal";
 import { T } from "@/components/T";
+import { privatePage } from "@/lib/seo";
+
+export const metadata = privatePage("Create a department", {
+  path: "/new",
+  description:
+    "Set up your own OpenDepartment archive on a Supabase project you own.",
+});
 
 /**
  * The origin is derived from the incoming request rather than from an env var,

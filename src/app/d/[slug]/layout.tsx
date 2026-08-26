@@ -7,6 +7,7 @@ import { TenantProvider } from "@/lib/tenant/context";
 import { DeptBanner } from "@/components/dept/DeptBanner";
 import { DeptHeader } from "@/components/dept/DeptHeader";
 import { DeptFooter } from "@/components/dept/DeptFooter";
+import { pageMetadata, SITE_NAME } from "@/lib/seo";
 
 export async function generateMetadata({
   params,
@@ -15,11 +16,23 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const dept = await resolveDepartment(slug);
-  if (!dept) return { title: "Not found" };
+  if (!dept) return { title: "Not found", robots: { index: false, follow: false } };
+
+  const description =
+    dept.tagline ??
+    `${dept.display_name} -- a parody document archive on ${SITE_NAME}.`;
 
   return {
-    title: dept.display_name,
-    description: dept.tagline ?? undefined,
+    // Share cards are worth having either way: an unlisted department is
+    // still pasted into group chats, and noindex says nothing about how a
+    // link unfurls there. The canonical points at the front door even from a
+    // sub-route, so a department has one address in the index, not one per
+    // page.
+    ...pageMetadata({
+      title: dept.display_name,
+      description,
+      path: `/d/${slug}`,
+    }),
     // Unlisted departments stay out of search results. A department that opted
     // into the public directory is fair game.
     robots:

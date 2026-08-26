@@ -1,7 +1,8 @@
 import { MarketingShell } from "@/components/MarketingShell";
 import { AccountLoginForm } from "@/components/account/AccountLoginForm";
+import { privatePage } from "@/lib/seo";
 
-export const metadata = { title: "Sign in" };
+export const metadata = privatePage("Sign in", { path: "/account/login" });
 
 export default async function AccountLoginPage({
   searchParams,

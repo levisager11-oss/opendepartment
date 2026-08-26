@@ -3,10 +3,56 @@ import { Seal } from "@/components/Seal";
 import { T } from "@/components/T";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { KofiButton } from "@/components/KofiButton";
+import { SITE_NAME, SITE_URL, absolute } from "@/lib/seo";
+
+/**
+ * Structured data for the landing page.
+ *
+ * WebSite carries the SearchAction-less basics that let Google show a
+ * sitelinks block; SoftwareApplication is the accurate type for what
+ * OpenDepartment actually is -- a tool you install into your own Supabase
+ * project, free, with nothing to buy. `offers` at price 0 is what makes the
+ * "free" claim machine-readable rather than marketing copy.
+ */
+const JSON_LD = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": `${SITE_URL}/#website`,
+      url: SITE_URL,
+      name: SITE_NAME,
+      description:
+        "Run your own parody document archive on a Supabase project you own.",
+      inLanguage: ["en", "de"],
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": `${SITE_URL}/#app`,
+      name: SITE_NAME,
+      url: SITE_URL,
+      applicationCategory: "WebApplication",
+      operatingSystem: "Any",
+      description:
+        "Build a mock government archive for your class, your team or your "
+        + "group chat. Members upload exhibits, vote on them and argue in the "
+        + "comments. Files live in a Supabase project you own.",
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+      isAccessibleForFree: true,
+      screenshot: absolute("/opengraph-image"),
+    },
+  ],
+};
 
 export default function LandingPage() {
   return (
     <>
+      <script
+        type="application/ld+json"
+        // Values are our own constants, not user input.
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
+      />
+
       <header className="masthead gov-rule">
         <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3">
           <Link href="/" className="flex items-center gap-3">
