@@ -30,10 +30,10 @@ export function FileMeta({
   ];
 
   return (
-    <dl className="grid gap-x-8 gap-y-3 border-b border-paper-300 p-5 sm:grid-cols-2">
+    <dl className="grid grid-cols-1 gap-x-8 gap-y-2.5 border-b border-paper-300 p-4 sm:grid-cols-2 sm:gap-y-3 sm:p-5">
       {rows.map(([label, value]) => (
-        <div key={label} className="flex items-baseline gap-3">
-          <dt className="docket w-32 shrink-0 text-3xs text-ink-500">{label}</dt>
+        <div key={label} className="flex flex-col sm:flex-row sm:items-baseline sm:gap-3">
+          <dt className="docket shrink-0 text-3xs text-ink-500 sm:w-32">{label}</dt>
           <dd className="typewriter min-w-0 truncate text-sm text-ink-900">
             {value}
           </dd>
@@ -44,8 +44,8 @@ export function FileMeta({
           reveal -- so an admin does not flash a classmate's address at
           whoever happens to be looking at their screen. */}
       {ownerEmail && (
-        <div className="flex items-baseline gap-3 sm:col-span-2">
-          <dt className="docket w-32 shrink-0 text-3xs text-stamp-red">
+        <div className="flex flex-col sm:col-span-2 sm:flex-row sm:items-baseline sm:gap-3">
+          <dt className="docket shrink-0 text-3xs text-stamp-red sm:w-32">
             {t("file.uploaderEmail")}
           </dt>
           <dd>

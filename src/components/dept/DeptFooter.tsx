@@ -11,7 +11,7 @@ export function DeptFooter() {
 
   return (
     <footer className="mt-16 gov-rule-top bg-gov-950 text-gov-100">
-      <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 md:grid-cols-[auto_1fr_auto]">
+      <div className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-4 py-8 sm:gap-8 sm:py-10 md:grid-cols-[auto_1fr_auto]">
         <div className="flex items-start gap-4">
           <Seal
             size={56}
@@ -43,14 +43,14 @@ export function DeptFooter() {
           </p>
         </div>
 
-        <nav className="flex flex-col gap-2 text-xs md:text-right">
-          <Link href={href("legal/terms")} className="hover:text-white hover:underline">
+        <nav className="flex flex-col gap-1 text-xs sm:gap-2 md:text-right">
+          <Link href={href("legal/terms")} className="py-1 hover:text-white hover:underline sm:py-0">
             {t("legal.terms")}
           </Link>
-          <Link href={href("legal/privacy")} className="hover:text-white hover:underline">
+          <Link href={href("legal/privacy")} className="py-1 hover:text-white hover:underline sm:py-0">
             {t("legal.privacy")}
           </Link>
-          <Link href={href("legal/imprint")} className="hover:text-white hover:underline">
+          <Link href={href("legal/imprint")} className="py-1 hover:text-white hover:underline sm:py-0">
             {t("legal.imprint")}
           </Link>
         </nav>

@@ -99,7 +99,7 @@ export default async function FilePage({
   const canDelete = file.owner_id === member.userId || member.profile.is_admin;
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8">
+    <div className="mx-auto max-w-5xl px-4 py-6 sm:py-8">
       <Link
         href={`/d/${slug}/vault`}
         className="docket mb-4 inline-flex items-center gap-1 hover:text-gov-800 text-2xs text-ink-500"
@@ -115,7 +115,7 @@ export default async function FilePage({
       </div>
 
       <article className="paper">
-        <header className="flex flex-wrap items-start gap-4 border-b border-paper-300 p-5">
+        <header className="flex flex-wrap items-start gap-3 border-b border-paper-300 p-4 sm:gap-4 sm:p-5">
           <VoteButtons
             fileId={file.id}
             initialScore={file.score}
@@ -123,7 +123,7 @@ export default async function FilePage({
           />
 
           <div className="min-w-0 flex-1">
-            <h1 className="font-serif text-2xl leading-tight font-black text-gov-900">
+            <h1 className="font-serif text-xl leading-tight font-black break-words text-gov-900 sm:text-2xl">
               {file.title}
             </h1>
             {file.description && (
@@ -151,13 +151,13 @@ export default async function FilePage({
           </div>
 
           <div className="flex shrink-0 flex-col items-end gap-2">
-            <span className="stamp stamp-red animate-stamp text-xs">
+            <span className="stamp stamp-red animate-stamp text-2xs sm:text-xs">
               {file.kind.toUpperCase()}
             </span>
           </div>
         </header>
 
-        <div className="border-b border-paper-300 bg-paper-200 p-4">
+        <div className="border-b border-paper-300 bg-paper-200 p-2 sm:p-4">
           <FileViewer
             kind={file.kind}
             url={signed?.signedUrl ?? null}
@@ -172,7 +172,7 @@ export default async function FilePage({
           signedUrl={signed?.signedUrl ?? null}
         />
 
-        <div className="flex flex-wrap items-center gap-3 border-t border-paper-300 p-5">
+        <div className="flex flex-wrap items-center gap-3 border-t border-paper-300 p-4 sm:p-5">
           {signed?.signedUrl && (
             <a
               href={signed.signedUrl}

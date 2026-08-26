@@ -51,7 +51,7 @@ export function AdminSubjects({ subjects }: { subjects: AdminSubject[] }) {
   }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[22rem_1fr]">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[22rem_1fr]">
       <form onSubmit={add} className="paper h-fit p-5">
         <p className="docket mb-3 text-2xs text-ink-500">{t("admin.subjects.add")}</p>
 
@@ -93,7 +93,7 @@ export function AdminSubjects({ subjects }: { subjects: AdminSubject[] }) {
         </p>
       </form>
 
-      <div className="grid h-fit gap-3 sm:grid-cols-2">
+      <div className="grid h-fit grid-cols-1 gap-3 sm:grid-cols-2">
         {subjects.map((subject) => (
           <div key={subject.id} className="paper p-4">
             <div className="flex items-start justify-between gap-3">

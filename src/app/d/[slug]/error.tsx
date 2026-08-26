@@ -30,7 +30,7 @@ export default function DepartmentError({
   }, [error]);
 
   return (
-    <div className="mx-auto max-w-xl px-4 py-24 text-center">
+    <div className="mx-auto max-w-xl px-4 py-16 text-center sm:py-24">
       <p className="stamp stamp-red mb-6 inline-block">{t("error.crashed")}</p>
 
       <p className="mb-8 text-sm leading-relaxed text-ink-700">

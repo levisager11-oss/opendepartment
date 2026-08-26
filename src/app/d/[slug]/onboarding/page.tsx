@@ -23,15 +23,15 @@ export default async function OnboardingPage({
   if (member.profile.username) redirect(`/d/${slug}/vault`);
 
   return (
-    <div className="mx-auto max-w-md px-4 py-16">
-      <h1 className="mb-2 font-serif text-2xl font-black text-ink-900">
+    <div className="mx-auto max-w-md px-4 py-10 sm:py-16">
+      <h1 className="mb-2 font-serif text-2xl font-black break-words text-ink-900">
         <T k="onboarding.title" />
       </h1>
       <p className="mb-8 text-sm leading-relaxed text-ink-700">
         <T k="onboarding.body" />
       </p>
 
-      <div className="paper p-6">
+      <div className="paper p-5 sm:p-6">
         <DeptUsernameForm />
       </div>
     </div>

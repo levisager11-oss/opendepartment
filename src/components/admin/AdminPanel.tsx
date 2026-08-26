@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n/provider";
 import { formatBytes } from "@/lib/tenant/types";
 import type { TranslationKey } from "@/lib/i18n/dictionary";
@@ -65,6 +65,37 @@ export function AdminPanel({
   const usedPercent = Math.min(100, (totalBytes / STORAGE_QUOTA) * 100);
 
   const tabRefs = useRef<Partial<Record<Tab, HTMLButtonElement | null>>>({});
+  const stripRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Six tabs do not fit across a phone, so the strip scrolls -- and the tab
+   * you just selected could sit entirely outside the visible part of it,
+   * leaving the panel below with nothing on screen saying which one it is.
+   *
+   * Written against the strip's own scrollLeft rather than scrollIntoView.
+   * scrollIntoView walks every scrollable ancestor, and "nearest" is no
+   * defence: with the page a pixel or two wider than the viewport it took the
+   * whole document sideways along with the strip, so selecting a tab shunted
+   * the masthead and the heading off the left edge. This can only ever move
+   * this one element, and only when the tab really is out of view -- which at
+   * a width that fits all six is never.
+   */
+  useEffect(() => {
+    const strip = stripRef.current;
+    const button = tabRefs.current[tab];
+    if (!strip || !button) return;
+
+    // Measured off bounding rects, not offsetLeft: the buttons are
+    // position:relative and the strip is not, so offsetLeft is relative to
+    // whatever positioned ancestor happens to be above this component.
+    const box = strip.getBoundingClientRect();
+    const target = button.getBoundingClientRect();
+    if (target.left < box.left) {
+      strip.scrollLeft -= box.left - target.left;
+    } else if (target.right > box.right) {
+      strip.scrollLeft += target.right - box.right;
+    }
+  }, [tab]);
 
   /**
    * Arrow-key movement across the tab strip, per the WAI-ARIA tabs pattern.
@@ -92,13 +123,13 @@ export function AdminPanel({
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8">
+    <div className="mx-auto max-w-7xl px-4 py-6 sm:py-8">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <span className="docket text-stamp-red text-2xs">
             RESTRICTED · CLEARANCE REQUIRED
           </span>
-          <h1 className="font-serif text-3xl font-black text-gov-900">
+          <h1 className="font-serif text-2xl font-black break-words text-gov-900 sm:text-3xl">
             {t("admin.title")}
           </h1>
           <p className="typewriter mt-1 text-sm text-ink-500">
@@ -107,8 +138,8 @@ export function AdminPanel({
         </div>
 
         {/* storage meter */}
-        <div className="paper min-w-64 px-4 py-3">
-          <div className="docket mb-2 flex items-baseline justify-between text-2xs text-ink-500">
+        <div className="paper w-full min-w-64 px-4 py-3 sm:w-auto">
+          <div className="docket mb-2 flex flex-wrap items-baseline justify-between gap-x-3 text-2xs text-ink-500">
             <span>{t("admin.storage")}</span>
             <span className="typewriter text-xs normal-case tracking-normal text-ink-900">
               {formatBytes(totalBytes)}{" "}
@@ -131,7 +162,7 @@ export function AdminPanel({
       </div>
 
       {/* tabs */}
-      <div className="scroll-x mb-5 border-b-2 border-paper-400">
+      <div ref={stripRef} className="scroll-x mb-5 border-b-2 border-paper-400">
         <div
           role="tablist"
           aria-label={t("admin.title")}

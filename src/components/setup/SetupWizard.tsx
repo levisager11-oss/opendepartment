@@ -224,8 +224,8 @@ export function SetupWizard({
     name.trim().length > 0 && slugState === "free" && docket.trim().length > 0;
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-10">
-      <h1 className="mb-1 font-serif text-3xl font-black text-ink-900">
+    <div className="mx-auto max-w-2xl px-4 py-8 sm:py-10">
+      <h1 className="mb-1 font-serif text-2xl font-black break-words text-ink-900 sm:text-3xl">
         {t("setup.title")}
       </h1>
       {step < 6 && (
@@ -234,7 +234,7 @@ export function SetupWizard({
 
       {/* ---------------------------------------------------------------- */}
       {step === 1 && (
-        <div className="paper space-y-6 p-6">
+        <div className="paper space-y-6 p-5 sm:p-6">
           <Field
             label={t("setup.name")}
             help={t("setup.nameHelp")}
@@ -248,8 +248,15 @@ export function SetupWizard({
               {t("setup.slug")}
             </label>
             <div className="flex items-center border border-paper-400 bg-white">
-              <span className="typewriter px-2 py-2 text-sm text-ink-400">
-                {origin}/d/
+              {/*
+                The origin is 20-odd characters of prefix in front of a field
+                the user has to actually read while typing. On a phone it left
+                the input hanging off the right edge of the screen, so below
+                sm only "/d/" stays and the whole address is spelled out under
+                the field instead.
+              */}
+              <span className="typewriter shrink-0 py-2 pr-0.5 pl-2 text-sm text-ink-400 sm:pr-2">
+                <span className="hidden sm:inline">{origin}</span>/d/
               </span>
               <input
                 value={slug}
@@ -257,11 +264,19 @@ export function SetupWizard({
                   setSlugTouched(true);
                   setSlug(e.target.value.toLowerCase());
                 }}
-                className="typewriter flex-1 bg-transparent px-1 py-2 text-sm text-ink-900 outline-none"
+                // min-w-0: an <input> carries an intrinsic default width and
+                // min-width:auto, which is what let it push the box wider than
+                // the screen rather than taking the room it was given.
+                className="typewriter w-full min-w-0 flex-1 bg-transparent px-1 py-2 text-base text-ink-900 outline-none sm:text-sm"
                 spellCheck={false}
               />
             </div>
-            <p className="mt-1 text-xs text-ink-500">{t("setup.slugHelp")}</p>
+            <p className="mt-1 text-xs text-ink-500">
+              <span className="typewriter text-ink-400 sm:hidden">
+                {origin}/d/
+              </span>{" "}
+              {t("setup.slugHelp")}
+            </p>
             {slugState === "taken" && (
               <p className="mt-1 text-xs text-stamp-red">
                 {t("setup.slugTaken")}
@@ -279,7 +294,7 @@ export function SetupWizard({
             )}
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field
               label={t("setup.subjectLabel")}
               help={t("setup.subjectHelp")}
@@ -333,7 +348,7 @@ export function SetupWizard({
 
       {/* ---------------------------------------------------------------- */}
       {step === 2 && (
-        <div className="paper space-y-4 p-6">
+        <div className="paper space-y-4 p-5 sm:p-6">
           <p className="text-base text-ink-900">{t("setup.supabaseIntro")}</p>
           <p className="text-sm leading-relaxed text-ink-700">
             {t("setup.supabaseSteps")}
@@ -352,7 +367,7 @@ export function SetupWizard({
 
       {/* ---------------------------------------------------------------- */}
       {step === 3 && (
-        <div className="paper space-y-4 p-6">
+        <div className="paper space-y-4 p-5 sm:p-6">
           <p className="text-sm leading-relaxed text-ink-700">
             {t("setup.sqlIntro")}
           </p>
@@ -385,7 +400,7 @@ export function SetupWizard({
           without this the first invited member simply never gets their
           confirmation and nobody can tell why. */}
       {step === 4 && (
-        <div className="paper space-y-5 p-6">
+        <div className="paper space-y-5 p-5 sm:p-6">
           <div className="border-l-4 border-stamp-red bg-stamp-red/5 p-4">
             <p className="mb-1 text-sm font-bold text-ink-900">
               {t("email.why")}
@@ -427,7 +442,7 @@ export function SetupWizard({
 
       {/* ---------------------------------------------------------------- */}
       {step === 5 && (
-        <div className="paper space-y-5 p-6">
+        <div className="paper space-y-5 p-5 sm:p-6">
           <p className="text-sm leading-relaxed text-ink-700">
             {t("setup.credsIntro")}
           </p>
@@ -512,7 +527,7 @@ export function SetupWizard({
 
       {/* ---------------------------------------------------------------- */}
       {step === 6 && (
-        <div className="paper space-y-5 p-8">
+        <div className="paper space-y-5 p-5 sm:p-8">
           <p className="stamp stamp-green mx-auto block w-fit text-sm">
             {t("setup.done")}
           </p>

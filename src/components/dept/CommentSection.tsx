@@ -72,7 +72,7 @@ export function CommentSection({
         <span className="docket text-ink-700 text-2xs">{t("comments.title")}</span>
       </div>
 
-      <div className="paper p-5">
+      <div className="paper p-4 sm:p-5">
         {comments.length === 0 ? (
           <p className="typewriter py-6 text-center text-sm text-ink-400">
             {t("comments.empty")}

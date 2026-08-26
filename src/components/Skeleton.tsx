@@ -35,8 +35,9 @@ export function SkeletonHeading() {
 }
 
 /**
- * Mirrors FileCard: the folder tab, the 80px thumbnail, the vote rail and four
- * lines of metadata. Kept in step with that component by hand -- if the card
+ * Mirrors FileCard: the folder tab, the thumbnail (56px on a phone, 80px from
+ * sm up), the vote rail and four lines of metadata. Kept in step with that
+ * component by hand -- if the card
  * grows a row, this grows a row.
  */
 export function SkeletonFileCard() {
@@ -45,9 +46,9 @@ export function SkeletonFileCard() {
       <div className="paper-tab ml-4 inline-block px-3 py-0.5">
         <SkeletonLine width="w-16" className="h-2" />
       </div>
-      <div className="paper flex gap-3 p-3">
+      <div className="paper flex gap-2.5 p-2.5 sm:gap-3 sm:p-3">
         <SkeletonBlock className="h-14 w-8 shrink-0" />
-        <SkeletonBlock className="h-20 w-20 shrink-0" />
+        <SkeletonBlock className="h-14 w-14 shrink-0 sm:h-20 sm:w-20" />
         <div className="min-w-0 flex-1 space-y-2 py-0.5">
           <SkeletonLine width="w-24" className="h-3" />
           <SkeletonLine width="w-3/4" className="h-4" />
@@ -61,7 +62,7 @@ export function SkeletonFileCard() {
 
 export function SkeletonCardGrid({ count = 6 }: { count?: number }) {
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
       {Array.from({ length: count }, (_, i) => (
         <SkeletonFileCard key={i} />
       ))}

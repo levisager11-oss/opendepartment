@@ -252,7 +252,7 @@ export function DeptLoginForm({
             setError(null);
             setInfo(null);
           }}
-          className="cursor-pointer text-gov-800 underline underline-offset-2 hover:text-gov-600"
+          className="cursor-pointer py-1.5 text-gov-800 underline underline-offset-2 hover:text-gov-600 sm:py-0"
         >
           {mode === "signup" ? t("auth.toSignin") : t("auth.toSignup")}
         </button>
@@ -265,7 +265,7 @@ export function DeptLoginForm({
               setError(null);
               setInfo(null);
             }}
-            className="cursor-pointer text-ink-500 underline underline-offset-2 hover:text-ink-700"
+            className="cursor-pointer py-1.5 text-ink-500 underline underline-offset-2 hover:text-ink-700 sm:py-0"
           >
             {t("auth.forgot")}
           </button>

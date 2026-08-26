@@ -7,7 +7,7 @@ export default function DirectoryLoading() {
       <div className="skeleton mb-2 h-9 w-72 max-w-full" />
       <SkeletonLine width="w-full max-w-prose" className="mb-10" />
 
-      <ul className="grid gap-4 sm:grid-cols-2">
+      <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {Array.from({ length: 4 }, (_, i) => (
           <li key={i}>
             <div className="paper flex h-full items-start gap-4 p-5">

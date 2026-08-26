@@ -29,7 +29,7 @@ export default async function DepartmentFrontDoor({
 
     if (probe.error) {
       return (
-        <div className="mx-auto max-w-xl px-4 py-24 text-center">
+        <div className="mx-auto max-w-xl px-4 py-16 text-center sm:py-24">
           <p className="stamp stamp-red mb-6 inline-block">
             <T k="dept.notSetUp" />
           </p>
@@ -60,7 +60,7 @@ export default async function DepartmentFrontDoor({
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-20 text-center">
+    <div className="mx-auto max-w-3xl px-4 py-12 text-center sm:py-20">
       <Seal
         size={140}
         className="mx-auto mb-8 drop-shadow-xl"
@@ -74,7 +74,7 @@ export default async function DepartmentFrontDoor({
         <T k={branding.openJoin ? "dept.frontDoorOpen" : "dept.frontDoor"} />
       </p>
 
-      <h1 className="mb-4 font-serif text-4xl font-black text-ink-900">
+      <h1 className="mb-4 font-serif text-3xl font-black break-words text-ink-900 sm:text-4xl">
         {branding.departmentName}
       </h1>
 
@@ -82,13 +82,13 @@ export default async function DepartmentFrontDoor({
         {branding.tagline ?? <T k="landing.subtitle" />}
       </p>
 
-      <dl className="mx-auto mb-12 grid max-w-lg grid-cols-3 gap-4">
+      <dl className="mx-auto mb-10 grid max-w-lg grid-cols-3 gap-2 sm:mb-12 sm:gap-4">
         {[
           { n: stats.files, label: "landing.stat.files" },
           { n: stats.subjects, label: "landing.stat.subjects" },
           { n: stats.members, label: "landing.stat.members" },
         ].map((s) => (
-          <div key={s.label} className="paper px-3 py-4">
+          <div key={s.label} className="paper px-2 py-3 sm:px-3 sm:py-4">
             <dt className="typewriter text-2xl font-bold text-ink-900">{s.n}</dt>
             <dd className="docket mt-1 text-3xs text-ink-500">
               <T k={s.label as never} />
@@ -110,7 +110,7 @@ export default async function DepartmentFrontDoor({
             department ends up looking shut. */}
         <Link
           href={`/d/${slug}/join`}
-          className="text-sm text-ink-700 underline underline-offset-4 hover:text-ink-900"
+          className="py-2 text-sm text-ink-700 underline underline-offset-4 hover:text-ink-900 sm:py-0"
         >
           <T k={branding.openJoin ? "dept.joinOpen" : "dept.haveInvite"} />
         </Link>

@@ -8,7 +8,7 @@ import { SkeletonCardGrid, SkeletonHeading } from "@/components/Skeleton";
  */
 export default function VaultLoading() {
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8">
+    <div className="mx-auto max-w-7xl px-4 py-6 sm:py-8">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <SkeletonHeading />
         <div className="skeleton h-10 w-40" />

@@ -18,7 +18,7 @@ export const metadata = privatePage("Department not found");
  */
 export default function DepartmentNotFound() {
   return (
-    <div className="mx-auto flex max-w-lg flex-1 flex-col items-center justify-center px-4 py-24 text-center">
+    <div className="mx-auto flex max-w-lg flex-1 flex-col items-center justify-center px-4 py-16 text-center sm:py-24">
       <Seal size={90} className="mb-8 opacity-50" idPrefix="dnf" />
 
       <h1 className="stamp stamp-red mb-6 inline-block text-lg">

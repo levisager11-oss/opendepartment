@@ -26,12 +26,12 @@ export default async function AccountPage() {
   return (
     <MarketingShell wide>
       <div className="mb-8 flex flex-wrap items-center gap-4">
-        <h1 className="font-serif text-3xl font-black text-ink-900">
+        <h1 className="font-serif text-2xl font-black break-words text-ink-900 sm:text-3xl">
           <T k="account.title" />
         </h1>
         <Link
           href="/new"
-          className="btn btn-primary ml-auto"
+          className="btn btn-primary sm:ml-auto"
         >
           <T k="od.create" />
         </Link>

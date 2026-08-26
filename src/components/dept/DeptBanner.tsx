@@ -22,7 +22,16 @@ export function DeptBanner() {
 
   return (
     <div className="gov-banner">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-3 gap-y-1 px-4 py-1.5">
+      {/*
+        Three items that fit one 1280px row and never fit a 375px one. Left to
+        wrap on their own they stacked into three separate lines and the
+        imprint toggle ended up alone on the last, its chevron riding into the
+        line above. The `order` swap below pairs the stamp with the toggle on
+        row one and gives the accountability sentence the whole of row two --
+        two clean lines instead of three ragged ones. Both `order` values are
+        reset at sm, where the row has never wrapped.
+      */}
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2 sm:py-1.5">
         <span
           className="stamp stamp-red stamp-sm stamp-solid"
           style={{ transform: "rotate(-2deg)" }}
@@ -30,7 +39,7 @@ export function DeptBanner() {
           {t("gov.parody")}
         </span>
 
-        <span className="opacity-80">
+        <span className="order-3 w-full opacity-80 sm:order-2 sm:w-auto">
           {t("gov.official", { name: branding.departmentName })}
         </span>
 
@@ -38,7 +47,7 @@ export function DeptBanner() {
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="ml-auto cursor-pointer underline decoration-dotted underline-offset-2 opacity-70 transition-opacity hover:opacity-100"
+          className="order-2 ml-auto cursor-pointer underline decoration-dotted underline-offset-2 opacity-70 transition-opacity hover:opacity-100 sm:order-3"
         >
           {open ? "⌃" : "⌄"} {t("legal.imprint")}
         </button>

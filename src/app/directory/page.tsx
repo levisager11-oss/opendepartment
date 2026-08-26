@@ -24,7 +24,7 @@ export default async function DirectoryPage() {
 
   return (
     <MarketingShell wide>
-      <h1 className="mb-2 font-serif text-3xl font-black text-ink-900">
+      <h1 className="mb-2 font-serif text-2xl font-black break-words text-ink-900 sm:text-3xl">
         <T k="od.directory" />
       </h1>
       <p className="mb-10 max-w-prose text-sm leading-relaxed text-ink-500">
@@ -45,7 +45,7 @@ export default async function DirectoryPage() {
           </Link>
         </div>
       ) : (
-        <ul className="grid gap-4 sm:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {departments.map((dept) => (
             <li key={dept.slug}>
               <Link

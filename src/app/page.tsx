@@ -61,12 +61,12 @@ export default function LandingPage() {
       <main className="flex-1">
         {/* --- hero ------------------------------------------------------ */}
         <section className="border-b border-paper-400 bg-gov-950 text-gov-100">
-          <div className="mx-auto grid max-w-5xl gap-10 px-4 py-20 md:grid-cols-[1fr_auto] md:items-center">
+          <div className="mx-auto grid max-w-5xl grid-cols-1 gap-10 px-4 py-12 sm:py-20 md:grid-cols-[1fr_auto] md:items-center">
             <div>
               <p className="docket mb-3 text-gold-300 text-2xs">
                 <T k="od.tagline" />
               </p>
-              <h1 className="mb-5 font-serif text-4xl font-black leading-tight text-white sm:text-5xl">
+              <h1 className="mb-5 font-serif text-[2rem] font-black break-words leading-tight text-white sm:text-5xl">
                 <T k="od.name" />
               </h1>
               <p className="mb-8 max-w-prose text-base leading-relaxed text-gov-100/80">
@@ -81,7 +81,7 @@ export default function LandingPage() {
                 </Link>
                 <Link
                   href="/directory"
-                  className="text-sm text-gov-100/80 underline underline-offset-4 hover:text-white"
+                  className="py-2 text-sm text-gov-100/80 underline underline-offset-4 hover:text-white sm:py-0"
                 >
                   <T k="od.browse" />
                 </Link>
@@ -100,13 +100,13 @@ export default function LandingPage() {
         </section>
 
         {/* --- the three things that matter ------------------------------ */}
-        <section className="mx-auto grid max-w-5xl gap-6 px-4 py-16 md:grid-cols-3">
+        <section className="mx-auto grid max-w-5xl grid-cols-1 gap-4 px-4 py-12 sm:gap-6 sm:py-16 md:grid-cols-3">
           {[
             { title: "od.yourData", body: "od.yourDataBody" },
             { title: "od.private", body: "od.privateBody" },
             { title: "od.free", body: "od.freeBody" },
           ].map((card) => (
-            <div key={card.title} className="paper p-6">
+            <div key={card.title} className="paper p-5 sm:p-6">
               <h2 className="mb-2 font-serif text-lg font-bold text-ink-900">
                 <T k={card.title as never} />
               </h2>
@@ -119,7 +119,7 @@ export default function LandingPage() {
 
         {/* --- how it works ---------------------------------------------- */}
         <section className="border-t border-paper-400 bg-paper-50">
-          <div className="mx-auto max-w-3xl px-4 py-16">
+          <div className="mx-auto max-w-3xl px-4 py-12 sm:py-16">
             <h2 className="mb-8 text-center font-serif text-2xl font-bold text-ink-900">
               <T k="setup.title" />
             </h2>

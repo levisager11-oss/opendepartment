@@ -16,7 +16,7 @@ export const metadata = privatePage("Page not found");
  */
 export default function NotFound() {
   return (
-    <div className="mx-auto flex max-w-lg flex-1 flex-col items-center justify-center px-4 py-24 text-center">
+    <div className="mx-auto flex max-w-lg flex-1 flex-col items-center justify-center px-4 py-16 text-center sm:py-24">
       <Seal size={90} className="mb-8 opacity-50" idPrefix="nf" />
       {/* The stamp is the page's heading, not decoration -- Tailwind's
           preflight resets heading size and weight, so the .stamp utility

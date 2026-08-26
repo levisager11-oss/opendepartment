@@ -155,7 +155,7 @@ export function ControlAuthPanel({
         <button
           type="button"
           onClick={() => setMode(mode === "signup" ? "signin" : "signup")}
-          className="text-xs text-ink-500 underline"
+          className="py-1.5 text-xs text-ink-500 underline sm:py-0"
         >
           {mode === "signup" ? t("auth.toSignin") : t("auth.toSignup")}
         </button>

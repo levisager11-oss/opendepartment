@@ -44,26 +44,36 @@ export function DeptHeader({
 
   return (
     <header className="masthead gov-rule sticky top-0 z-40 shadow-lg">
-      <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3">
+      <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:gap-4">
         <Link
           href={signedIn ? href("vault") : href()}
-          className="flex items-center gap-3 transition-opacity hover:opacity-90"
+          className="flex min-w-0 items-center gap-2.5 transition-opacity hover:opacity-90 sm:gap-3"
         >
+          {/* 34px on a phone, so a long department name still gets most of the
+              row; the size prop stays 46 and the sm: class restores it, which
+              is the same 46px the attribute would have drawn. Sized in CSS
+              rather than by rendering the seal twice -- the svg passes
+              className straight to its root, and a stylesheet rule beats a
+              width/height presentation attribute. */}
           <Seal
             size={46}
-            className="shrink-0 drop-shadow-md"
+            className="size-[2.125rem] shrink-0 drop-shadow-md sm:size-[2.875rem]"
             top={branding.sealTop}
             bottom={branding.sealBottom}
             accent={branding.accent}
             idPrefix={`hdr-${slug}`}
           />
-          <span className="leading-tight">
+          {/* min-w-0 on both the link and this column is what lets the
+              truncation below actually happen: a flex item defaults to
+              min-width:auto and would rather push the language toggle off the
+              screen than let its text shorten. */}
+          <span className="min-w-0 leading-tight">
             <span
-              className="block font-serif text-2xs font-bold uppercase tracking-seal text-accent"
+              className="block truncate font-serif text-2xs font-bold uppercase tracking-seal text-accent"
             >
               {branding.sealTop}
             </span>
-            <span className="block font-serif text-lg font-black text-white">
+            <span className="block truncate font-serif text-base font-black text-white sm:text-lg">
               {branding.departmentName}
             </span>
             {branding.tagline && (
@@ -94,7 +104,7 @@ export function DeptHeader({
           })}
         </nav>
 
-        <div className="ml-auto flex items-center gap-4 md:ml-0">
+        <div className="ml-auto flex shrink-0 items-center gap-3 md:ml-0 md:gap-4">
           <LanguageToggle light />
 
           {signedIn && (
@@ -126,7 +136,9 @@ export function DeptHeader({
               onClick={() => setMenuOpen((v) => !v)}
               aria-expanded={menuOpen}
               aria-label="Menu"
-              className="cursor-pointer p-1 text-white md:hidden"
+              // -mr-2 buys the 24px glyph a 40px tap target without moving it
+              // off the right margin. This button only ever renders below md.
+              className="-mr-2 cursor-pointer p-2 text-white md:hidden"
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
                 <path
@@ -146,26 +158,40 @@ export function DeptHeader({
       {menuOpen && signedIn && (
         <div className="border-t border-white/10 bg-gov-950 md:hidden">
           <nav className="mx-auto flex max-w-7xl flex-col px-4 py-2">
-            {links.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setMenuOpen(false)}
-                className="border-b border-white/5 py-3 text-sm font-semibold text-gov-100/90"
-              >
-                {link.label}
-              </Link>
-            ))}
-            <div className="flex items-center justify-between py-3">
-              <span
-                className="typewriter text-sm text-accent"
-              >
-                {username ?? "—"}
+            {links.map((link) => {
+              const active =
+                pathname === link.href || pathname.startsWith(link.href + "/");
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setMenuOpen(false)}
+                  aria-current={active ? "page" : undefined}
+                  // py-3.5 over a 20px line box is a 48px row. The drawer is
+                  // the only navigation a phone gets, so its rows are the one
+                  // place on the site where a thumb has to land reliably.
+                  className={`border-b border-white/5 py-3.5 text-sm font-semibold ${
+                    active ? "text-accent" : "text-gov-100/90"
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
+            <div className="flex items-center justify-between gap-3 py-2">
+              <span className="min-w-0 truncate leading-tight">
+                <span className="block text-3xs uppercase tracking-wider text-gov-100/50">
+                  {t("nav.signedInAs")}
+                </span>
+                <span className="typewriter block truncate text-sm text-accent">
+                  {username ?? "—"}
+                </span>
               </span>
               <button
                 type="button"
                 onClick={signOut}
-                className="cursor-pointer text-xs text-gov-100/70 underline"
+                disabled={signingOut}
+                className="-mr-2 shrink-0 cursor-pointer px-2 py-3 text-xs text-gov-100/70 underline disabled:opacity-50"
               >
                 {t("nav.signout")}
               </button>

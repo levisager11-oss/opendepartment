@@ -23,7 +23,7 @@ export default async function AccessDeniedPage({
   const { branding } = await requireDepartment(slug);
 
   return (
-    <div className="mx-auto max-w-lg px-4 py-24 text-center">
+    <div className="mx-auto max-w-lg px-4 py-16 text-center sm:py-24">
       <Seal
         size={90}
         className="mx-auto mb-8 opacity-50"

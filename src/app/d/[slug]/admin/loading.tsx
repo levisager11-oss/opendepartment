@@ -7,14 +7,14 @@ import { SkeletonHeading, SkeletonPanel } from "@/components/Skeleton";
  */
 export default function AdminLoading() {
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8">
+    <div className="mx-auto max-w-7xl px-4 py-6 sm:py-8">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <SkeletonHeading />
-        <SkeletonPanel className="h-20 min-w-64" />
+        <SkeletonPanel className="h-20 w-full min-w-64 sm:w-auto" />
       </div>
 
-      <div className="mb-5 border-b-2 border-paper-400">
-        <div className="flex gap-1">
+      <div className="scroll-x mb-5 border-b-2 border-paper-400">
+        <div className="flex min-w-max gap-1">
           {Array.from({ length: 6 }, (_, i) => (
             <div key={i} className="skeleton h-9 w-28" />
           ))}

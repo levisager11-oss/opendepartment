@@ -39,8 +39,8 @@ export default async function LegalPage({
 
   return (
     <MarketingShell>
-      <article className="paper p-8">
-        <h1 className="mb-1 font-serif text-3xl font-black text-ink-900">
+      <article className="paper p-5 sm:p-8">
+        <h1 className="mb-1 font-serif text-2xl font-black break-words text-ink-900 sm:text-3xl">
           {title}
         </h1>
         <p className="docket mb-8 text-2xs text-ink-500">{updated}</p>

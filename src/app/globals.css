@@ -153,6 +153,23 @@ body {
   outline-offset: 2px;
 }
 
+/* A native checkbox or radio draws at 13px, which beside body text on a phone
+   reads as a rendering fault rather than a control you are meant to hit. The
+   bump is mobile-only and deliberately modest -- every one of them in this
+   codebase sits inside its own <label>, so the tap target was never the
+   problem; how small it looked was. */
+@media (width < 40rem) {
+  input[type="checkbox"],
+  input[type="radio"] {
+    width: 1rem;
+    height: 1rem;
+    /* Every one of these is a flex item sitting beside a label, so without
+       this the width above is only a starting point: the text next to it wins
+       the space back and shrinks the box straight to its intrinsic 13px. */
+    flex-shrink: 0;
+  }
+}
+
 /* Navy-on-navy is invisible. Anything focused inside the official chrome gets
    the gold ring instead -- the masthead nav, the sign-out button and the
    language toggle all land here. */
@@ -420,6 +437,16 @@ body {
   line-height: 1.375rem;
   color: var(--color-ink-900);
   transition: border-color 150ms ease-out, box-shadow 150ms ease-out;
+  /* Below the first breakpoint the text goes up to 16px. Not a taste call:
+     mobile Safari zooms the whole page in when you focus a control smaller
+     than 16px and never zooms back out, which left every form on the site --
+     sign-in, upload, invite codes, the setup wizard -- scrolled sideways the
+     moment you tapped a field. Only the font-size moves; the 2.5rem box is
+     built from padding over a locked 1.375rem line box, so the control still
+     lines up with a .btn next to it to the pixel. */
+  @media (width < 40rem) {
+    font-size: var(--text-base);
+  }
   &::placeholder {
     color: var(--color-ink-400);
   }

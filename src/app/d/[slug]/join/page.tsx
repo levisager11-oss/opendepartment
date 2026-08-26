@@ -29,7 +29,7 @@ export default async function JoinPage({
   const { branding } = await requireDepartment(slug);
 
   return (
-    <div className="mx-auto max-w-md px-4 py-16">
+    <div className="mx-auto max-w-md px-4 py-10 sm:py-16">
       <div className="mb-8 text-center">
         <Seal
           size={80}
@@ -39,12 +39,12 @@ export default async function JoinPage({
           accent={branding.accent}
           idPrefix="join"
         />
-        <h1 className="font-serif text-2xl font-black text-ink-900">
+        <h1 className="font-serif text-2xl font-black break-words text-ink-900">
           <T k="invite.title" vars={{ name: branding.departmentName }} />
         </h1>
       </div>
 
-      <div className="paper p-6">
+      <div className="paper p-5 sm:p-6">
         <Suspense fallback={null}>
           <DeptLoginForm initialMode="signup" presetInvite={code} />
         </Suspense>

@@ -26,7 +26,7 @@ export function FileCard({
         </span>
       </div>
 
-      <div className="paper relative flex gap-3 p-3 transition-shadow group-hover:shadow-md">
+      <div className="paper relative flex gap-2.5 p-2.5 transition-shadow group-hover:shadow-md sm:gap-3 sm:p-3">
         <VoteButtons
           fileId={file.id}
           initialScore={file.score}
@@ -36,9 +36,9 @@ export function FileCard({
 
         <Link
           href={href(`file/${file.id}`)}
-          className="flex min-w-0 flex-1 gap-3"
+          className="flex min-w-0 flex-1 gap-2.5 sm:gap-3"
         >
-          <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-card border border-paper-400 bg-paper-200">
+          <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-card border border-paper-400 bg-paper-200 sm:h-20 sm:w-20">
             {thumbnail ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -77,7 +77,7 @@ export function FileCard({
               )}
             </div>
 
-            <h3 className="truncate font-serif text-base font-bold text-gov-900 group-hover:underline">
+            <h3 className="line-clamp-2 font-serif text-base font-bold text-gov-900 group-hover:underline sm:block sm:truncate">
               {file.title}
             </h3>
 

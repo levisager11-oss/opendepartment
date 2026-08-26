@@ -105,8 +105,13 @@ export function AdminReports({ reports }: { reports: AdminReport[] }) {
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="mb-1 flex flex-wrap items-center gap-2">
-                    <span className="stamp stamp-red stamp-sm">
+                  <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-3 sm:gap-y-2">
+                    {/* Capped on a phone so a long reason wraps to two short
+                        lines instead of one 330px one. A stamp is rotated, and
+                        the wider it is the further its ends swing out of its
+                        own box -- at full width the German labels came down
+                        across the date underneath. */}
+                    <span className="stamp stamp-red stamp-sm max-w-52 sm:max-w-none">
                       {t(REASON_KEYS[report.reason] ?? "report.reason.other")}
                     </span>
                     <span className="docket text-3xs text-ink-500">
@@ -145,7 +150,7 @@ export function AdminReports({ reports }: { reports: AdminReport[] }) {
                 </div>
 
                 {report.status === "open" && (
-                  <div className="flex shrink-0 flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2 sm:shrink-0">
                     <button
                       type="button"
                       onClick={() => destroyFile(report)}

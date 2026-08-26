@@ -31,7 +31,7 @@ export default async function DepartmentLoginPage({
           accent={branding.accent}
           idPrefix="login"
         />
-        <h1 className="font-serif text-2xl font-black text-ink-900">
+        <h1 className="font-serif text-2xl font-black break-words text-ink-900">
           <T k="auth.title" />
         </h1>
         <p className="docket mt-2 text-2xs text-ink-500">

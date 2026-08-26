@@ -45,7 +45,7 @@ export function DepartmentRow({ dept }: { dept: Dept }) {
 
   return (
     <li className="paper flex flex-wrap items-center gap-x-4 gap-y-2 p-4">
-      <div className="min-w-0 flex-1">
+      <div className="w-full min-w-0 sm:flex-1">
         <p className="font-serif text-base font-bold text-ink-900">
           {dept.display_name}
           {dept.status === "suspended" && (
@@ -83,7 +83,7 @@ export function DepartmentRow({ dept }: { dept: Dept }) {
         type="button"
         onClick={delist}
         disabled={busy}
-        className="text-xs text-stamp-red underline underline-offset-2 disabled:opacity-40"
+        className="py-2 text-xs text-stamp-red underline underline-offset-2 disabled:opacity-40 sm:py-0"
       >
         {t("account.delist")}
       </button>

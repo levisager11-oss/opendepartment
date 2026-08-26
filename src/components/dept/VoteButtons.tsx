@@ -59,7 +59,11 @@ export function VoteButtons({
   }
 
   const iconSize = size === "sm" ? 16 : 20;
-  const pad = size === "sm" ? "p-1" : "p-1.5";
+  // The arrows are the one control on a card that is meant to be used without
+  // opening anything, and at p-1 the small variant was a 24px target. The
+  // padding doubles below sm and the sm: half of each pair puts the desktop
+  // button back exactly where it was.
+  const pad = size === "sm" ? "p-2 sm:p-1" : "p-2.5 sm:p-1.5";
 
   return (
     <div

@@ -174,13 +174,13 @@ export function VaultBrowser({
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8">
+    <div className="mx-auto max-w-7xl px-4 py-6 sm:py-8">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <span className="docket text-2xs text-ink-500">
             {branding.subjectLabel.toUpperCase()} FILE INDEX
           </span>
-          <h1 className="font-serif text-3xl font-black text-gov-900">
+          <h1 className="font-serif text-2xl font-black break-words text-gov-900 sm:text-3xl">
             {t("vault.title")}
           </h1>
           <p className="typewriter mt-1 text-sm text-ink-500">
@@ -328,7 +328,7 @@ export function VaultBrowser({
         </div>
       ) : (
         <>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {files.map((file) => (
               <FileCard
                 key={file.id}

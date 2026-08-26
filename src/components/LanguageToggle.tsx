@@ -33,11 +33,16 @@ export function LanguageToggle({ light = false }: { light?: boolean }) {
               |
             </span>
           )}
+          {/* The label is two characters wide, which on a phone is a 15x16px
+              target -- under half of what a thumb can reliably hit. The
+              padding below only exists under sm and is reset at the
+              breakpoint, so the desktop toggle keeps its original tight
+              metrics. */}
           <button
             type="button"
             onClick={() => pick(code)}
             aria-current={locale === code ? "true" : undefined}
-            className={`uppercase transition-colors cursor-pointer ${
+            className={`cursor-pointer px-1.5 py-2 uppercase transition-colors sm:px-0 sm:py-0 ${
               locale === code ? active : base
             }`}
           >
