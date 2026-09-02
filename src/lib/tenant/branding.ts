@@ -24,6 +24,14 @@ export type Branding = {
   claimed: boolean;
   /** Public department: anybody may sign up, no invite code needed. */
   openJoin: boolean;
+  /**
+   * Who answers for this department. Rendered on its own legal pages, which
+   * have to be readable by somebody who is not a member -- that is what an
+   * imprint is for -- so both come from department_identity() rather than from
+   * the members-only settings row.
+   */
+  operatorName: string | null;
+  operatorContact: string | null;
 };
 
 export const FALLBACK_BRANDING: Branding = {
@@ -38,7 +46,32 @@ export const FALLBACK_BRANDING: Branding = {
   maxUploadMb: 25,
   claimed: false,
   openJoin: false,
+  operatorName: null,
+  operatorContact: null,
 };
+
+/**
+ * The accent is the one setting that reaches the page as CSS rather than as
+ * text: the department layout sets it as the custom property `--accent`, and
+ * globals.css substitutes it into real declarations (`background: var(--accent)`,
+ * and a color-mix beside it). A custom property is a token stream, so a value
+ * carrying a semicolon reparses into EXTRA declarations at every one of those
+ * substitution sites -- which is a CSS injection an administrator could aim at
+ * every member of their own department.
+ *
+ * db/tenant-schema.sql now refuses to store anything but six hex digits. This
+ * is the same rule applied on the way out, for the department that has not
+ * re-run the schema yet: their settings row may already hold a poisoned value,
+ * and it must not reach a style attribute on the strength of a promise made in
+ * a file they have not run.
+ */
+const HEX = /^#[0-9a-f]{6}$/i;
+
+function safeAccent(value: unknown): string {
+  return typeof value === "string" && HEX.test(value.trim())
+    ? value.trim()
+    : FALLBACK_BRANDING.accent;
+}
 
 /**
  * Read a department's identity without a session.
@@ -68,7 +101,7 @@ export const getBranding = cache(
       docketPrefix: row.docket_prefix ?? "CF",
       sealTop: row.seal_top ?? FALLBACK_BRANDING.sealTop,
       sealBottom: row.seal_bottom ?? FALLBACK_BRANDING.sealBottom,
-      accent: row.accent ?? FALLBACK_BRANDING.accent,
+      accent: safeAccent(row.accent),
       categories:
         Array.isArray(row.categories) && row.categories.length > 0
           ? row.categories
@@ -79,6 +112,11 @@ export const getBranding = cache(
       // was added, and absent reads as false -- which is the safe way round:
       // the door stays shut until its owner opens it on purpose.
       openJoin: Boolean(row.open_join),
+      // Absent on a department that has not re-run the schema since these were
+      // added to department_identity(); the legal page says so rather than
+      // inventing a name.
+      operatorName: row.operator_name ?? null,
+      operatorContact: row.operator_contact ?? null,
     };
   }
 );

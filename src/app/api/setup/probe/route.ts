@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { probeTenant } from "@/lib/tenant/branding";
+import { createControlClient, CONTROL_CONFIGURED } from "@/lib/control/client";
+import { clientKey, rateLimit } from "@/lib/rate-limit";
 
 /**
  * Ask a candidate Supabase project whether it is ready to become a department.
@@ -8,7 +10,23 @@ import { probeTenant } from "@/lib/tenant/branding";
  * endpoint takes a user-supplied address and makes a server-side request to
  * it, which is exactly the shape of an SSRF, so the allowed target set has to
  * be closed rather than merely discouraged.
+ *
+ * Two things gate it besides that pin, because the pin only says WHERE the
+ * request may go, not who may cause one:
+ *
+ *  - AN ACCOUNT. The answer distinguishes "no schema" from "unreachable" from
+ *    "already claimed", which makes an open version of this a way to sweep
+ *    Supabase for projects running OpenDepartment and find the UNCLAIMED ones
+ *    -- and an unclaimed project whose URL and anon key you hold is one signup
+ *    away from belonging to you, because the first account through the door
+ *    founds the department. The wizard already requires an account before it
+ *    reaches this step (registering the slug needs an owner to attach it to),
+ *    so nothing legitimate is turned away.
+ *  - A RATE LIMIT. Even with an account, one address should not be able to
+ *    drive an unbounded number of outbound requests from our servers.
  */
+const LIMIT = 10;
+const WINDOW_MS = 60_000;
 const SUPABASE_HOST = /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/;
 
 /**
@@ -43,6 +61,36 @@ function looksLikeServiceKey(key: string): boolean {
 }
 
 export async function POST(request: Request) {
+  // Without a control plane there is no account to require and no directory to
+  // register into; the wizard says so on this step. Refusing outright is the
+  // honest answer rather than probing on behalf of nobody.
+  if (!CONTROL_CONFIGURED) {
+    return NextResponse.json({ error: "NO_CONTROL_PLANE" }, { status: 503 });
+  }
+
+  const {
+    data: { user },
+  } = await (await createControlClient()).auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "NOT_SIGNED_IN" }, { status: 401 });
+  }
+
+  // Keyed on the account first: the address is a fallback for a caller we
+  // cannot otherwise name, and is not what authorises anything.
+  const limited = rateLimit(`probe:${user.id}`, LIMIT, WINDOW_MS);
+  const byAddress = rateLimit(`probe-ip:${clientKey(request)}`, LIMIT, WINDOW_MS);
+  if (!limited.ok || !byAddress.ok) {
+    return NextResponse.json(
+      { error: "RATE_LIMITED" },
+      {
+        status: 429,
+        headers: {
+          "retry-after": String(Math.max(limited.retryAfter, byAddress.retryAfter)),
+        },
+      }
+    );
+  }
+
   let body: { url?: string; key?: string };
   try {
     body = await request.json();
