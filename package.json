@@ -9,7 +9,8 @@
     "prebuild": "npm run build:schema",
     "build": "next build",
     "start": "next start",
-    "typecheck": "npm run build:schema && tsc --noEmit"
+    "typecheck": "npm run build:schema && tsc --noEmit",
+    "test:rls": "bash db/test/run.sh"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

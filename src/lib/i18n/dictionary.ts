@@ -68,7 +68,7 @@ export const dictionary = {
     "settings.categoriesEmpty": "Keep at least one category.",
     "settings.upload": "Largest upload",
     "settings.uploadHint":
-      "Megabytes. Your storage bucket refuses anything over {cap} MB whatever this says, so it is capped to match.",
+      "Megabytes, up to {cap}. Your storage bucket is resized to match when you save.",
     "settings.operator": "Who runs this department",
     "settings.operatorHint":
       "Shown in the footer. The person named here is the one answerable for what is in the archive, which is the point of naming them.",
@@ -231,6 +231,10 @@ export const dictionary = {
       "Could not reach that project. Check the URL and the key.",
     "setup.claimed":
       "That project already has an administrator. Connect a fresh Supabase project instead.",
+    "setup.signInFirst":
+      "Sign in to your OpenDepartment account before connecting a project.",
+    "setup.rateLimited":
+      "That is a lot of checks in a short time. Wait a minute and try again.",
     "setup.done": "Your department is live",
     "setup.openDept": "Open your department",
     "setup.visibility": "Listing",
@@ -250,6 +254,12 @@ export const dictionary = {
     "account.signInBody":
       "This account only manages your department listings. It is separate from your membership inside any department.",
     "account.visit": "Visit",
+    "account.refresh": "Refresh name",
+    "account.refreshing": "Reading...",
+    "account.refreshed": "Updated",
+    "account.refreshFailed": "Could not read that department",
+    "account.refreshHint":
+      "Reads the name and tagline from the department's own settings and updates its directory entry.",
     "account.delist": "Remove listing",
     "account.delistConfirm":
       "Remove this department from OpenDepartment? Its address stops working. The data stays in your own Supabase project and is not touched.",
@@ -548,7 +558,7 @@ export const dictionary = {
     "settings.categoriesEmpty": "Behalten Sie mindestens eine Kategorie.",
     "settings.upload": "Grösster Upload",
     "settings.uploadHint":
-      "Megabyte. Ihr Storage-Bucket weist alles über {cap} MB ohnehin ab, deshalb ist der Wert entsprechend begrenzt.",
+      "Megabyte, höchstens {cap}. Ihr Storage-Bucket wird beim Speichern entsprechend angepasst.",
     "settings.operator": "Wer dieses Departement betreibt",
     "settings.operatorHint":
       "Erscheint im Fussbereich. Die hier genannte Person verantwortet den Inhalt des Archivs -- genau darum wird sie genannt.",
@@ -713,6 +723,10 @@ export const dictionary = {
       "Dieses Projekt ist nicht erreichbar. Prüfen Sie URL und Key.",
     "setup.claimed":
       "Dieses Projekt hat bereits eine Administration. Verbinden Sie stattdessen ein neues Supabase-Projekt.",
+    "setup.signInFirst":
+      "Melden Sie sich bei Ihrem OpenDepartment-Konto an, bevor Sie ein Projekt verbinden.",
+    "setup.rateLimited":
+      "Das sind viele Prüfungen in kurzer Zeit. Warten Sie eine Minute und versuchen Sie es erneut.",
     "setup.done": "Ihr Departement ist online",
     "setup.openDept": "Departement öffnen",
     "setup.visibility": "Listung",
@@ -732,6 +746,12 @@ export const dictionary = {
     "account.signInBody":
       "Dieses Konto verwaltet nur Ihre Departements-Einträge. Es ist von Ihrer Mitgliedschaft innerhalb eines Departements getrennt.",
     "account.visit": "Öffnen",
+    "account.refresh": "Namen aktualisieren",
+    "account.refreshing": "Wird gelesen...",
+    "account.refreshed": "Aktualisiert",
+    "account.refreshFailed": "Dieses Departement konnte nicht gelesen werden",
+    "account.refreshHint":
+      "Liest Name und Untertitel aus den Einstellungen des Departements und aktualisiert den Verzeichniseintrag.",
     "account.delist": "Eintrag entfernen",
     "account.delistConfirm":
       "Dieses Departement von OpenDepartment entfernen? Die Adresse funktioniert dann nicht mehr. Die Daten bleiben in Ihrem eigenen Supabase-Projekt unangetastet.",

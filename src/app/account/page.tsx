@@ -18,9 +18,16 @@ export default async function AccountPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/account/login?next=/account");
 
+  // supabase_url and anon_key ride along so the row can offer "refresh name":
+  // the directory keeps a CACHED copy of a department's name, and only the
+  // department's own project knows the current one. Both values are public by
+  // design -- they are already handed to every visitor of /d/<slug> -- and
+  // departments_read_own means an operator only ever sees their own.
   const { data: departments } = await supabase
     .from("departments")
-    .select("slug, display_name, tagline, visibility, status, created_at")
+    .select(
+      "slug, display_name, tagline, visibility, status, created_at, supabase_url, anon_key"
+    )
     .order("created_at", { ascending: false });
 
   return (

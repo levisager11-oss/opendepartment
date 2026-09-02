@@ -167,7 +167,16 @@ export function SetupWizard({
         UNREACHABLE: t("setup.unreachable"),
         BAD_URL: t("setup.unreachable"),
         BAD_KEY: t("setup.unreachable"),
+        // The probe needs an account -- it reports whether a project is
+        // unclaimed, and an unclaimed project is one signup away from
+        // belonging to whoever finds it. The button below is disabled until
+        // `signedIn`, so this is the session having expired mid-wizard rather
+        // than a step out of order.
+        NOT_SIGNED_IN: t("setup.signInFirst"),
+        NO_CONTROL_PLANE: t("setup.noControlPlane"),
+        RATE_LIMITED: t("setup.rateLimited"),
       };
+      if (probe.error === "NOT_SIGNED_IN") setSignedIn(false);
       setError(map[probe.error] ?? t("common.error"));
       setBusy(false);
       return;

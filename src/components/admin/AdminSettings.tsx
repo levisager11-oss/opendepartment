@@ -9,12 +9,22 @@ import { caseLabel } from "@/lib/tenant/types";
 import type { DepartmentSettings } from "./types";
 
 /**
- * The bucket's own file_size_limit, from db/tenant-schema.sql. Storage checks
- * it before RLS or anything in this app gets a say, so a max_upload_mb above
- * this number would only mean the browser waves a file through for storage to
- * reject with nothing useful to say about why.
+ * The ceiling db/tenant-schema.sql allows, and the same number its
+ * settings_upload_range CHECK enforces.
+ *
+ * This used to be 25 because the bucket's file_size_limit was frozen at 25 MB
+ * and storage checks that before RLS or anything in this app gets a say -- so
+ * a larger value here only meant the browser waved a file through for storage
+ * to reject with nothing useful to say about why. The bucket now follows this
+ * setting (a trigger resizes it), so the field can offer the whole range.
+ *
+ * Still a client-side convenience rather than the rule: the CHECK constraint
+ * in the tenant's own database is what a hand-rolled API call runs into.
+ * Supabase also applies a project-wide upload limit, which on the free tier is
+ * 50 MB -- a department whose project sets that lower will see storage refuse
+ * before this number is reached.
  */
-const BUCKET_CAP_MB = 25;
+const BUCKET_CAP_MB = 50;
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
