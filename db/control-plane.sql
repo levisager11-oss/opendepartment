@@ -115,6 +115,28 @@ create table if not exists public.abuse_reports (
 );
 create index if not exists abuse_status_idx on public.abuse_reports (status, created_at desc);
 
+-- Anybody may file one of these without an account, which is right for a
+-- takedown path and also means the insert policy below is an open write
+-- endpoint. Bounding the columns is what stops it being an open write endpoint
+-- of unlimited size. Existing rows are trimmed first so a control plane
+-- re-running this file is not refused by its own history.
+update public.abuse_reports
+   set slug           = left(slug, 40),
+       reporter_email = left(reporter_email, 160),
+       reason         = left(reason, 60),
+       details        = left(details, 4000)
+ where length(slug) > 40 or length(reporter_email) > 160
+    or length(reason) > 60 or length(details) > 4000;
+
+alter table public.abuse_reports drop constraint if exists abuse_reports_lengths;
+alter table public.abuse_reports
+  add constraint abuse_reports_lengths check (
+    char_length(slug)                       between 1 and 40
+    and char_length(coalesce(reporter_email, '')) <= 160
+    and char_length(reason)                 between 1 and 60
+    and char_length(coalesce(details, ''))  <= 4000
+  );
+
 -- ===========================================================================
 --  RLS
 -- ===========================================================================
@@ -249,6 +271,11 @@ exception
   when unique_violation then
     raise exception 'SLUG_UNAVAILABLE';
 end; $fn$;
+
+-- Trigger bodies and internals, not API. PostgREST lists whatever `anon` may
+-- execute, and Postgres grants EXECUTE to PUBLIC by default -- so anything not
+-- meant to be called over HTTP has to say so.
+revoke execute on function public.max_departments_per_operator() from anon, authenticated, public;
 
 grant execute on function public.resolve_department(text) to anon, authenticated;
 grant execute on function public.public_directory(integer) to anon, authenticated;

@@ -62,6 +62,43 @@ alter table public.settings
   add column if not exists open_join boolean not null default false;
 
 -- ---------------------------------------------------------------------------
+-- Value constraints on the settings row.
+--
+-- These used to live only in the administration screen, which meant they were
+-- advice: `settings` is admin-writable, and a hand-rolled PostgREST call skips
+-- the form entirely. `accent` in particular is substituted into real CSS
+-- (`background: var(--accent)`), so a value carrying a semicolon reparses into
+-- extra declarations -- an administrator could inject CSS into every page of
+-- their own department. Six hex digits is the only shape the app ever renders.
+--
+-- Existing rows are normalised FIRST. A department re-running this file may
+-- already hold a value the constraint would refuse, and the ALTER would fail
+-- on it rather than fixing it.
+-- ---------------------------------------------------------------------------
+update public.settings
+   set accent = '#b8860b'
+ where accent !~ '^#[0-9a-fA-F]{6}$';
+
+update public.settings
+   set max_upload_mb = least(greatest(coalesce(max_upload_mb, 25), 1), 50);
+
+update public.settings
+   set categories = array['EXHIBIT','MISCELLANEOUS']
+ where categories is null or cardinality(categories) = 0;
+
+alter table public.settings drop constraint if exists settings_accent_hex;
+alter table public.settings
+  add constraint settings_accent_hex check (accent ~ '^#[0-9a-fA-F]{6}$');
+
+alter table public.settings drop constraint if exists settings_upload_range;
+alter table public.settings
+  add constraint settings_upload_range check (max_upload_mb between 1 and 50);
+
+alter table public.settings drop constraint if exists settings_categories_present;
+alter table public.settings
+  add constraint settings_categories_present check (cardinality(categories) > 0);
+
+-- ---------------------------------------------------------------------------
 -- 1. INVITES -- the door into a department that has not opened itself up.
 --    A public department (settings.open_join) lets anybody sign up without
 --    one; codes still work there, because only a code can hand out
@@ -150,6 +187,51 @@ create index if not exists files_created_idx on public.files (created_at desc);
 create index if not exists files_score_idx   on public.files (score desc, created_at desc);
 create index if not exists files_owner_idx   on public.files (owner_id);
 
+-- ---------------------------------------------------------------------------
+-- What a member may claim about their own upload.
+--
+-- The accepted-type list lived only in the upload form, and the insert policy
+-- checks who you are rather than what you filed -- so a hand-rolled call could
+-- store any content type at all in the owner's bucket under the owner's name.
+-- `kind` drives which viewer renders the object, so it has to agree with
+-- `mime_type` rather than being a second thing the client asserts freely.
+--
+-- NOT VALID on purpose: this is enforced for every insert and update from here
+-- on, but a department re-running this file is not asked to delete documents
+-- its members filed under the old rules. Run
+-- `alter table public.files validate constraint files_accepted_type;` if you
+-- want the existing rows checked too.
+-- ---------------------------------------------------------------------------
+alter table public.files drop constraint if exists files_accepted_type;
+alter table public.files
+  add constraint files_accepted_type check (
+    (kind = 'image' and mime_type in ('image/jpeg','image/png','image/gif',
+       'image/webp','image/avif','image/heic','image/heif'))
+    or (kind = 'pdf'   and mime_type = 'application/pdf')
+    or (kind = 'video' and mime_type in ('video/mp4','video/webm',
+       'video/quicktime','video/x-m4v'))
+    or (kind = 'audio' and mime_type in ('audio/mpeg','audio/mp4','audio/x-m4a',
+       'audio/wav','audio/x-wav','audio/webm','audio/ogg'))
+  ) not valid;
+
+-- size_bytes is whatever the browser said it was -- the real bytes are in
+-- storage, which enforces the bucket's own limit. A lying value here only
+-- distorts the "storage used" figure on the administration screen, but there
+-- is no reason to accept a negative or absurd one.
+alter table public.files drop constraint if exists files_size_sane;
+alter table public.files
+  add constraint files_size_sane
+  check (size_bytes between 0 and 52428800) not valid;
+
+alter table public.files drop constraint if exists files_text_lengths;
+alter table public.files
+  add constraint files_text_lengths check (
+    char_length(title) between 1 and 200
+    and char_length(coalesce(description, '')) <= 2000
+    and char_length(original_name) between 1 and 200
+    and char_length(category) <= 60
+  ) not valid;
+
 create table if not exists public.file_subjects (
   file_id     uuid not null references public.files(id) on delete cascade,
   subject_id  uuid not null references public.subjects(id) on delete cascade,
@@ -209,6 +291,16 @@ delete from public.reports r
 
 create unique index if not exists reports_one_per_file_idx
   on public.reports (file_id, reporter_id) where file_id is not null;
+
+-- The report dialog offers six reasons and nothing else, so the column should
+-- say so: free text here is an unbounded write into the admin queue. NOT VALID
+-- for the same reason as `files` above -- reports already filed are left alone.
+alter table public.reports drop constraint if exists reports_known_reason;
+alter table public.reports
+  add constraint reports_known_reason check (
+    reason in ('illegal','personal','copyright','sexual','harassment','other')
+    and char_length(coalesce(details, '')) <= 2000
+  ) not valid;
 
 -- 9. AUDIT LOG -- every deletion and moderation action is recorded.
 create table if not exists public.audit_log (
@@ -369,10 +461,21 @@ create trigger reports_changed after insert or update or delete on public.report
 --  MEMBER RPCs
 -- ===========================================================================
 
+-- Every other function on this page re-checks something before it writes.
+-- This one did not, and Postgres grants EXECUTE to PUBLIC by default -- so the
+-- department's anon key, which is in the page source of its own front door,
+-- was enough to drive unbounded writes into the owner's database. The
+-- membership check is what every other member RPC already does; the revoke is
+-- what stops a signed-out caller reaching it at all.
 create or replace function public.increment_view(target uuid)
-returns void language sql security definer set search_path = public as $fn$
+returns void language plpgsql security definer set search_path = public as $fn$
+begin
+  if not public.is_active_member() then return; end if;
   update public.files set view_count = view_count + 1 where id = target;
-$fn$;
+end; $fn$;
+
+revoke execute on function public.increment_view(uuid) from anon, public;
+grant  execute on function public.increment_view(uuid) to authenticated;
 
 create or replace function public.cast_vote(target uuid, new_value smallint)
 returns table (upvotes int, downvotes int, score int, my_vote int)
@@ -494,16 +597,22 @@ $fn$;
 -- change a set-returning function's result type, so without this a re-run
 -- would fail on a department that installed an earlier version of this file.
 -- The grant below re-applies what the drop takes away.
+-- operator_name and operator_contact are on the list because a department's
+-- own imprint has to render for somebody who is not a member -- that is the
+-- whole point of an imprint. They are the address the department already
+-- publishes in its footer, not a member's.
 drop function if exists public.department_identity();
 create or replace function public.department_identity()
 returns table (department_name text, tagline text, subject_label text,
                docket_prefix text, seal_top text, seal_bottom text,
                accent text, categories text[],
-               max_upload_mb integer, claimed boolean, open_join boolean)
+               max_upload_mb integer, claimed boolean, open_join boolean,
+               operator_name text, operator_contact text)
 language sql security definer set search_path = public as $fn$
   select s.department_name, s.tagline, s.subject_label, s.docket_prefix,
          s.seal_top, s.seal_bottom, s.accent, s.categories,
-         s.max_upload_mb, s.claimed, s.open_join
+         s.max_upload_mb, s.claimed, s.open_join,
+         s.operator_name, s.operator_contact
     from public.settings s where s.id;
 $fn$;
 
@@ -534,6 +643,21 @@ create policy settings_read on public.settings
 drop policy if exists settings_admin_write on public.settings;
 create policy settings_admin_write on public.settings
   for update to authenticated using (public.is_admin()) with check (public.is_admin());
+
+-- Same column-level reasoning as `profiles` and `files` below, and this table
+-- is the one that needed it most. `claimed` lives on this row: an
+-- administrator who set it back to false made handle_new_user() treat the very
+-- next signup as the one that founds the department -- no invite code, instant
+-- administrator. That is a backdoor which survives being demoted, and it opens
+-- a closed department on the way past.
+--
+-- What is left is presentation: the words, the palette and the door, which are
+-- an administrator's to change. `claimed` and `created_at` are not.
+revoke update on public.settings from anon, authenticated;
+grant  update (department_name, tagline, subject_label, docket_prefix,
+               seal_top, seal_bottom, accent, categories, max_upload_mb,
+               operator_name, operator_contact, open_join)
+  on public.settings to authenticated;
 
 -- INVITES: admins only. The signup trigger reads them as security definer.
 drop policy if exists invites_admin_all on public.invites;
@@ -595,9 +719,15 @@ drop policy if exists files_insert_own on public.files;
 create policy files_insert_own on public.files
   for insert to authenticated with check (owner_id = auth.uid() and public.is_active_member());
 
+-- is_active_member() here for the same reason it is on the insert policy above.
+-- Ownership alone said a banned member may still retitle and recategorise the
+-- documents they filed before they were banned -- they cannot read them any
+-- more, but they could still rewrite them blind.
 drop policy if exists files_update_own on public.files;
 create policy files_update_own on public.files
-  for update to authenticated using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+  for update to authenticated
+  using (owner_id = auth.uid() and public.is_active_member())
+  with check (owner_id = auth.uid() and public.is_active_member());
 
 drop policy if exists files_delete_own_or_admin on public.files;
 create policy files_delete_own_or_admin on public.files
@@ -626,9 +756,18 @@ create policy fs_write on public.file_subjects
 
 -- VOTES: you only ever see your own row. Totals come from the counters on
 -- `files`, so nobody can reconstruct who voted which way.
+-- Reading your own row stays open to anyone signed in, so a ban does not make
+-- the vote buttons render wrong. Writing is gated: cast_vote() already refuses
+-- a banned member, and this closes the direct-table path it left open.
 drop policy if exists votes_own on public.votes;
 create policy votes_own on public.votes
-  for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+  for select to authenticated using (user_id = auth.uid());
+
+drop policy if exists votes_write_own on public.votes;
+create policy votes_write_own on public.votes
+  for all to authenticated
+  using (user_id = auth.uid() and public.is_active_member())
+  with check (user_id = auth.uid() and public.is_active_member());
 
 -- COMMENTS
 drop policy if exists comments_read on public.comments;
@@ -690,9 +829,44 @@ grant select on public.files_public to authenticated;
 --  STORAGE -- private bucket. Downloads only ever happen through short-lived
 --  signed URLs, which a member's own anon-key session is allowed to mint.
 -- ===========================================================================
+-- The bucket's ceiling is derived from settings.max_upload_mb rather than
+-- frozen at 25. Storage checks file_size_limit before RLS or anything in the
+-- app gets a say, so a hardcoded number meant raising the cap on the
+-- administration screen produced uploads the browser waved through for storage
+-- to reject with nothing useful to say about why.
 insert into storage.buckets (id, name, public, file_size_limit)
-values ('department-files', 'department-files', false, 26214400)
-on conflict (id) do update set public = false;
+values ('department-files', 'department-files', false,
+        (select max_upload_mb from public.settings where id) * 1024 * 1024)
+on conflict (id) do update
+  set public = false,
+      file_size_limit = excluded.file_size_limit;
+
+-- ...and it keeps following the setting. Without this the two drift apart the
+-- first time an administrator changes the cap.
+--
+-- Wrapped in an exception handler because storage.buckets belongs to
+-- supabase_storage_admin: on a project where this function's owner cannot
+-- write it, a rebrand should still save rather than failing on the sync.
+create or replace function public.sync_bucket_limit()
+returns trigger language plpgsql security definer set search_path = public as $fn$
+begin
+  begin
+    update storage.buckets
+       set file_size_limit = new.max_upload_mb * 1024 * 1024
+     where id = 'department-files';
+  exception when others then
+    raise warning 'could not resize department-files bucket: %', sqlerrm;
+  end;
+  return null;
+end; $fn$;
+
+revoke execute on function public.sync_bucket_limit() from anon, authenticated, public;
+
+drop trigger if exists settings_upload_cap_changed on public.settings;
+create trigger settings_upload_cap_changed
+  after update of max_upload_mb on public.settings
+  for each row when (new.max_upload_mb is distinct from old.max_upload_mb)
+  execute function public.sync_bucket_limit();
 
 drop policy if exists "dept upload own folder" on storage.objects;
 create policy "dept upload own folder" on storage.objects
