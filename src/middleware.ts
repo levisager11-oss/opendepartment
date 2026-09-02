@@ -18,8 +18,19 @@ type CookieBundle = { name: string; value: string; options?: CookieOptions };
  * you are here.
  */
 
-/** Paths inside /d/<slug>/ that a signed-out visitor may reach. */
-const TENANT_PUBLIC = ["", "login", "join", "auth", "access-denied", "setup"];
+/**
+ * Paths inside /d/<slug>/ that a signed-out visitor may reach.
+ *
+ * `legal` is on the list because a department's imprint, terms and privacy
+ * notice have to be readable by somebody who is not a member -- an imprint
+ * only members can read is not an imprint, and the reader who needs it most is
+ * the stranger deciding who to complain to. They render from
+ * department_identity(), which is `security definer` and exposes nothing a
+ * front door does not already show.
+ */
+const TENANT_PUBLIC = [
+  "", "login", "join", "auth", "access-denied", "setup", "legal",
+];
 
 /**
  * Control-plane paths that require an OpenDepartment account.
