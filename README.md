@@ -247,18 +247,60 @@ the create-a-department flow run end to end on the live deployment).
 - Pinned departments (`STATIC_DEPARTMENTS`) and `db/seed-demo.sql`
 - Ko-fi button on the platform pages only, never inside a department
 
+- Per-department legal pages (`/d/<slug>/legal/{terms,privacy,imprint}`),
+  rendered from the department's own `operator_name` / `operator_contact`.
+  Readable without an account, because an imprint only members can read is not
+  an imprint. The footer had linked to these three addresses since before they
+  existed
+- Renaming a department in the **directory**. "Refresh name" on `/account`
+  reads the current name and tagline out of the department's own project and
+  writes them to its directory entry, under the operator's own RLS. It is the
+  operator's action rather than something the department posts, because
+  nothing in the control plane can verify a name handed to it — an endpoint
+  that accepted one would let anybody rewrite anybody's entry
+- The storage bucket's `file_size_limit` follows `settings.max_upload_mb`: a
+  trigger resizes the bucket when the cap changes, so the settings screen can
+  offer the whole range instead of stopping at a number frozen in the schema
+- **A SQL security suite** (`npm run test:rls`), 95 assertions over both
+  schemas. See below
+
 Not built yet:
 
-- Per-department legal pages (`/d/<slug>/legal/*`) driven by the tenant's own
-  `operator_name` / `operator_contact` settings
-- Renaming a department in the **directory**. The settings screen changes the
-  name everywhere inside the department, including the browser tab and the
-  share card, because those read the tenant's own row. `/directory` lists the
-  control plane's cached copy, and nothing updates it yet
-- Keeping the storage bucket's `file_size_limit` in step with
-  `settings.max_upload_mb`. The bucket is fixed at 25 MB, so the settings
-  screen caps the field there rather than offering a number storage would
-  refuse
+- A nonce-based CSP. The policy in `next.config.ts` still carries
+  `'unsafe-inline'` for scripts, because Next injects inline bootstrap and
+  threading a per-request nonce through the middleware is a change worth
+  making on its own. What is in place — `frame-ancestors`, `base-uri`,
+  `form-action`, a closed `connect-src` — is real; an XSS backstop it is not
+- Rate limiting that survives more than one serverless instance. The limiter
+  on the setup probe is in-memory and therefore per-instance
+
+## Testing the part that actually enforces things
+
+Every authorisation decision in OpenDepartment is made in SQL — an RLS policy,
+a column privilege, or an `is_admin()` check inside a `security definer`
+function. None of it is reachable from the TypeScript, which means none of it
+was covered by anything.
+
+```bash
+npm run test:rls
+```
+
+Builds a throwaway PostgreSQL cluster, shims the parts of Supabase the schemas
+depend on, applies both `db/*.sql` files twice, and checks that a member cannot
+promote themselves, that an administrator cannot un-claim their own department
+or put arbitrary text where CSS is rendered, that a banned member cannot write,
+that a signed-out visitor reaches only the two functions the front door needs,
+that the invite door admits and refuses the right people, and that a suspended
+department cannot delist its way out of a suspension. No Supabase project, no
+network, no credentials — just a `postgres` binary.
+
+Applying each schema twice is the point of a separate step: re-running these
+files is the documented upgrade path below, so idempotency fails the suite
+rather than somebody's SQL editor.
+
+The suite was written against the *unfixed* schema first and reports 12
+failures there. A test that cannot fail is not evidence.
+[db/test/README.md](db/test/README.md) has the rest.
 
 ## Upgrading a deployment that already exists
 
@@ -272,6 +314,21 @@ row level* live in those files, so:
   in their own project. Until they do, their members can still promote
   themselves. The wizard hands out the current file, so departments created
   from here on are fine.
+
+The current round of fixes adds, to the tenant schema: a column fence on
+`settings` (an administrator could set `claimed` back to false, which makes the
+next signup found the department again — no invite code, instant
+administrator), CHECK constraints on `accent`, `max_upload_mb` and
+`categories`, a membership check on `increment_view()` (it was `security
+definer` with no check and PUBLIC execute, so the anon key printed on every
+front door could drive unbounded writes), a constraint tying `mime_type` to
+`kind`, and `is_active_member()` on the vote and file-update policies. The
+constraints on existing rows are added `NOT VALID`, so re-running the file does
+not ask anybody to delete documents their members filed under the old rules.
+
+Nothing here needs the app to be redeployed first; the two are independent.
+The app also refuses a non-hex `accent` on the way out, so a department that
+has not re-run the file yet still cannot have CSS injected through it.
 
 ## Notes for whoever runs this
 

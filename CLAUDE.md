@@ -17,10 +17,27 @@ npm run dev         # regenerates schema-sql.generated.ts, then next dev
 npm run build        # regenerates schema-sql.generated.ts, then next build
 npm run typecheck    # regenerates schema-sql.generated.ts, then tsc --noEmit
 npm run build:schema  # just the codegen step (see below)
+npm run test:rls      # the SQL security suite (see below)
 ```
 
-There is no test suite and no lint script configured. There is no
-single-test-file runner because there are no tests.
+No lint script is configured, and `next.config.ts` sets
+`eslint.ignoreDuringBuilds`.
+
+The only tests are SQL. `npm run test:rls` builds a throwaway PostgreSQL
+cluster, applies a Supabase shim, applies both `db/*.sql` files **twice**
+(re-running them is the documented upgrade path, so idempotency is a tested
+property), and asserts the policies actually hold — 61 assertions against the
+tenant schema, 34 against the control plane. It needs a `postgres` server
+binary and nothing else: no Supabase project, no network, no credentials. See
+[db/test/README.md](db/test/README.md) before adding a case; the two rules that
+matter are that a test must run as `anon`/`authenticated` rather than the table
+owner (the owner bypasses RLS), and that a blocked write has two distinct
+shapes worth asserting separately. There is no single-test runner; the suites
+are two `.sql` files.
+
+**When you change a policy, a grant or a `security definer` function, add the
+assertion in the same commit** — and check it goes red against the old schema,
+or it is proving nothing.
 
 ## The two-database architecture (read this before touching auth/session code)
 
@@ -37,6 +54,15 @@ every bug class in this repo comes from conflating them:
    key only, stored as a row in the control plane). Holds settings,
    profiles, files, votes, comments, invites, audit log. Schema lives in
    [db/tenant-schema.sql](db/tenant-schema.sql).
+
+**Client-side validation of anything in `settings` is decoration.** The
+administration screen checks that the accent is six hex digits and clamps the
+upload cap, but `settings` is admin-writable over PostgREST, so a hand-rolled
+call skips the form. Every such rule has to exist as a CHECK constraint or a
+column privilege in [db/tenant-schema.sql](db/tenant-schema.sql) as well —
+`accent` especially, because it is substituted into real CSS
+(`background: var(--accent)`) and a value carrying a semicolon reparses into
+extra declarations.
 
 **OpenDepartment never holds a `service_role` key for any tenant.** Every
 privileged tenant operation (member listing, file deletion, owner email
@@ -113,7 +139,18 @@ overwritten otherwise.
   project during onboarding. Pins the target to `*.supabase.co`/`.in`
   before fetching (SSRF guard) and rejects any `service_role`-shaped key
   (both legacy JWT and new `sb_secret_` prefix) before it's ever stored.
-  Any change here needs to preserve both checks.
+  Also requires a control-plane session and rate-limits per account and per
+  address: the reply distinguishes "no schema" from "unreachable" from
+  "already claimed", and an unclaimed project whose URL and anon key you hold
+  is one signup away from being yours. Any change here needs to preserve all
+  of it.
+- `src/app/d/[slug]/legal/{terms,privacy,imprint}` — a department's own legal
+  pages, rendered from its `operator_name` / `operator_contact` settings via
+  `department_identity()`. Three real routes rather than one `[doc]` segment
+  on purpose: the department layout is dynamic, so a `notFound()` in a page
+  under it lands after the response starts streaming and renders a 404 page
+  with a 200 status. They are also in `TENANT_PUBLIC` — an imprint only
+  members can read is not an imprint.
 
 ## i18n
 
