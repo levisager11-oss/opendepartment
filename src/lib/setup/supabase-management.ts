@@ -13,7 +13,6 @@
 const API = "https://api.supabase.com";
 
 export type Org = { id?: string; slug?: string; name: string };
-export type ProjectSummary = { id: string; name: string; status?: string };
 
 async function call<T>(
   token: string,
@@ -100,10 +99,6 @@ export async function exchangeCode(opts: {
 
 export function listOrganizations(token: string) {
   return call<Org[]>(token, "/v1/organizations");
-}
-
-export function listProjects(token: string) {
-  return call<ProjectSummary[]>(token, "/v1/projects");
 }
 
 /**

@@ -179,6 +179,21 @@ The redirect URL to register is `https://YOUR-DEPLOYMENT/api/setup/oauth/callbac
                             read the anon key → configure auth → forget the token
 ```
 
+**Scopes to grant the OAuth app**, and nothing else — one per call the code
+actually makes:
+
+| Scope | Access | Why |
+| --- | --- | --- |
+| Organizations | Read | `GET /v1/organizations`, to know where to put the project |
+| Projects | Write | `POST /v1/projects`, and `GET /v1/projects/{ref}/health` to wait for it |
+| Database | Write | `POST /v1/projects/{ref}/database/query`, to install the schema |
+| Secrets | Read | `GET /v1/projects/{ref}/api-keys`, to read the anon key back |
+| Auth | Write | `PATCH /v1/projects/{ref}/config/auth`, the e-mail and callback step |
+
+Everything else stays at **No access**. The consent screen shows this list to
+every department owner, so a scope granted here and never used is a permission
+they are asked for and a reason not to click the button.
+
 What it deliberately does **not** do:
 
 - **It does not register the department.** That still happens from the browser
