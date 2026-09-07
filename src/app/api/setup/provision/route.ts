@@ -12,6 +12,7 @@ import {
   anonKey,
   configureAuth,
   createProject,
+  getProject,
   listOrganizations,
   projectHealth,
   projectRef,
@@ -117,6 +118,29 @@ export async function POST(request: NextRequest) {
     if (!/^[a-z0-9]{12,32}$/.test(ref)) {
       return finish(NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 }));
     }
+
+    // A resumed ref is a claim by the browser, not a fact, and it survives in
+    // sessionStorage until the tab closes. If it names nothing -- a project
+    // that failed to initialise, one deleted since, or a ref this endpoint
+    // reported for a creation that did not stick -- then every retry polls a
+    // project that will never come up and answers STILL_STARTING again. That
+    // is an unbreakable loop: the wizard keeps offering "carry on", the
+    // dashboard stays empty, and nothing ever says why. Ask once whether it
+    // exists, and if not, say so and take the ref away so the next press
+    // creates a real one.
+    const existing = await getProject(token, ref);
+    if (!existing.ok && existing.status === 404) {
+      return finish(
+        NextResponse.json({ error: "PROJECT_GONE", clearRef: true }, { status: 410 })
+      );
+    }
+    if (!existing.ok && (existing.status === 401 || existing.status === 403)) {
+      return finish(
+        NextResponse.json(refusal("project", existing.status, existing.message), {
+          status: 502,
+        })
+      );
+    }
   } else {
     const orgs = await listOrganizations(token);
     // A refusal here is not "you have no organisations", it is "Supabase would
@@ -150,7 +174,7 @@ export async function POST(request: NextRequest) {
         )
       );
     }
-    ref = projectRef(created.data);
+    ref = created.data ? projectRef(created.data) : "";
     if (!ref) {
       return finish(
         NextResponse.json(
@@ -169,6 +193,7 @@ export async function POST(request: NextRequest) {
   const deadline = Date.now() + READY_TIMEOUT_MS;
   let ready = false;
   let refused: { status: number; message: string } | null = null;
+  let gone = false;
   while (Date.now() < deadline) {
     await sleep(POLL_MS);
     const health = await projectHealth(token, ref);
@@ -180,6 +205,19 @@ export async function POST(request: NextRequest) {
       refused = { status: health.status, message: health.message };
       break;
     }
+    // A 404 from health is not on its own proof the project is gone: the
+    // services a brand new project reports on are registered a moment after
+    // the project itself is, so this is also what the first second or two of a
+    // perfectly healthy creation can look like. Ask the endpoint that does
+    // know. Only a project that the projects endpoint has also never heard of
+    // is actually gone -- anything else stays in the poll.
+    if (!health.ok && health.status === 404) {
+      const still = await getProject(token, ref);
+      if (!still.ok && still.status === 404) {
+        gone = true;
+        break;
+      }
+    }
     if (
       health.ok &&
       Array.isArray(health.data) &&
@@ -189,6 +227,12 @@ export async function POST(request: NextRequest) {
       ready = true;
       break;
     }
+  }
+
+  if (gone) {
+    return finish(
+      NextResponse.json({ error: "PROJECT_GONE", clearRef: true }, { status: 410 })
+    );
   }
 
   if (refused) {

@@ -274,6 +274,8 @@ export const dictionary = {
       "That Supabase account has no organisation to create a project in. Make one in the Supabase dashboard and try again.",
     "setup.stillStarting":
       "Your project was created and is still starting up. Wait a moment and press the button again -- it will carry on with the same project rather than making another.",
+    "setup.projectGone":
+      "The project this was carrying on from no longer exists in your Supabase account -- it was removed, or it never finished being created. That has been forgotten; press the button again and a new one will be created from scratch.",
     "setup.schemaFailedAuto":
       "The project was created, but the schema did not install. Open it in the Supabase dashboard and paste the SQL from the next step by hand.",
     "setup.provisionCreating": "Creating your project...",
@@ -901,6 +903,8 @@ export const dictionary = {
       "Dieses Supabase-Konto hat keine Organisation, in der ein Projekt entstehen könnte. Legen Sie im Supabase-Dashboard eine an und versuchen Sie es erneut.",
     "setup.stillStarting":
       "Ihr Projekt wurde angelegt und startet noch. Warten Sie einen Moment und drücken Sie die Schaltfläche erneut -- es wird mit demselben Projekt weitergemacht, kein zweites angelegt.",
+    "setup.projectGone":
+      "Das Projekt, an dem hier weitergemacht wurde, existiert in Ihrem Supabase-Konto nicht mehr -- es wurde entfernt oder nie fertig angelegt. Das ist jetzt vergessen; drücken Sie die Schaltfläche erneut, dann wird ein neues Projekt von Grund auf angelegt.",
     "setup.schemaFailedAuto":
       "Das Projekt wurde angelegt, das Schema aber nicht installiert. Öffnen Sie es im Supabase-Dashboard und fügen Sie das SQL aus dem nächsten Schritt von Hand ein.",
     "setup.provisionCreating": "Ihr Projekt wird angelegt...",
