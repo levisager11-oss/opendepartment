@@ -197,6 +197,21 @@ export function projectRef(project: { ref?: string; id?: string }): string {
   return project.ref ?? project.id ?? "";
 }
 
+/**
+ * One project, by ref.
+ *
+ * Used to tell "this project is still coming up" apart from "this project does
+ * not exist", which the health endpoint alone cannot do for a caller that is
+ * resuming: a ref that names nothing 404s exactly like one that names a
+ * project mid-creation does while its services are still registering.
+ */
+export function getProject(token: string, ref: string) {
+  return call<{ ref?: string; id?: string; name?: string; status?: string }>(
+    token,
+    `/v1/projects/${ref}`
+  );
+}
+
 export function projectHealth(token: string, ref: string) {
   return call<Array<{ name?: string; status?: string }>>(
     token,

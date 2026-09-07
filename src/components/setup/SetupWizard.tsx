@@ -467,6 +467,8 @@ export function SetupWizard({
       url?: string;
       key?: string;
       authConfigured?: boolean;
+      /** Set when the stored ref names a project that no longer exists. */
+      clearRef?: boolean;
     };
 
     try {
@@ -490,8 +492,13 @@ export function SetupWizard({
       return;
     }
 
-    // Remember the project even when the request failed after creating it.
-    if (result.ref) setProjectRef(result.ref);
+    // Remember the project even when the request failed after creating it --
+    // unless the server has just told us the ref names nothing. That ref lives
+    // in sessionStorage and is what makes this button "carry on" rather than
+    // "create", so leaving it in place after the project turned out not to
+    // exist is what turns one bad attempt into a loop nobody can leave.
+    if (result.clearRef) setProjectRef("");
+    else if (result.ref) setProjectRef(result.ref);
     setProvisioning(false);
     setProvisionStep(null);
 
@@ -502,6 +509,7 @@ export function SetupWizard({
         RATE_LIMITED: t("setup.rateLimited"),
         NO_ORGANISATION: t("setup.noOrganisation"),
         AUTH_EXPIRED: t("setup.oauthExpired"),
+        PROJECT_GONE: t("setup.projectGone"),
         API_REFUSED: t("setup.oauthRefused"),
         STILL_STARTING: t("setup.stillStarting"),
         SCHEMA_FAILED: t("setup.schemaFailedAuto"),
