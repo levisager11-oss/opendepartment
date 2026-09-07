@@ -14,6 +14,7 @@ import {
   createProject,
   listOrganizations,
   projectHealth,
+  projectRef,
   runSql,
 } from "@/lib/setup/supabase-management";
 import { requestOrigin } from "@/lib/setup/origin";
@@ -118,7 +119,22 @@ export async function POST(request: NextRequest) {
     }
   } else {
     const orgs = await listOrganizations(token);
-    if (!orgs.ok || orgs.data.length === 0) {
+    // A 401/403 here is not "you have no organisations", it is "this token may
+    // not read them" -- almost always an OAuth app published without the
+    // Organizations:Read scope. Saying so is the difference between the owner
+    // fixing it in a minute and giving up.
+    if (!orgs.ok) {
+      return finish(
+        NextResponse.json(
+          {
+            error: orgs.status === 401 || orgs.status === 403 ? "API_REFUSED" : "NO_ORGANISATION",
+            detail: orgs.message,
+          },
+          { status: 502 }
+        )
+      );
+    }
+    if (orgs.data.length === 0) {
       return finish(NextResponse.json({ error: "NO_ORGANISATION" }, { status: 400 }));
     }
     const org =
@@ -139,7 +155,15 @@ export async function POST(request: NextRequest) {
         )
       );
     }
-    ref = created.data.id;
+    ref = projectRef(created.data);
+    if (!ref) {
+      return finish(
+        NextResponse.json(
+          { error: "CREATE_FAILED", detail: "Supabase created a project but returned no ref." },
+          { status: 502 }
+        )
+      );
+    }
   }
 
   const projectUrl = `https://${ref}.supabase.co`;
@@ -149,9 +173,18 @@ export async function POST(request: NextRequest) {
   // broken schema rather than a slow provisioner.
   const deadline = Date.now() + READY_TIMEOUT_MS;
   let ready = false;
+  let refused: string | null = null;
   while (Date.now() < deadline) {
     await sleep(POLL_MS);
     const health = await projectHealth(token, ref);
+    // Reading a project's health is Projects:READ, which is a different box in
+    // the dashboard from the Projects:WRITE that created it. A token holding
+    // only write gets 403 here forever, and polling it out to the timeout would
+    // report "still starting" about a project that is already up.
+    if (!health.ok && (health.status === 401 || health.status === 403)) {
+      refused = health.message;
+      break;
+    }
     if (
       health.ok &&
       Array.isArray(health.data) &&
@@ -161,6 +194,15 @@ export async function POST(request: NextRequest) {
       ready = true;
       break;
     }
+  }
+
+  if (refused) {
+    // The project exists, so the token stays: adding the scope and pressing the
+    // button again carries on with it rather than making a second one.
+    return NextResponse.json(
+      { error: "API_REFUSED", detail: refused, ref, url: projectUrl, resumable: true },
+      { status: 502 }
+    );
   }
 
   if (!ready) {

@@ -180,12 +180,14 @@ The redirect URL to register is `https://YOUR-DEPLOYMENT/api/setup/oauth/callbac
 ```
 
 **Scopes to grant the OAuth app**, and nothing else — one per call the code
-actually makes:
+actually makes. Read and write are separate boxes in the dashboard, so a
+resource needed for both appears twice:
 
 | Scope | Access | Why |
 | --- | --- | --- |
 | Organizations | Read | `GET /v1/organizations`, to know where to put the project |
-| Projects | Write | `POST /v1/projects`, and `GET /v1/projects/{ref}/health` to wait for it |
+| Projects | Write | `POST /v1/projects`, to create it |
+| Projects | Read | `GET /v1/projects/{ref}/health`, to wait for it to come up |
 | Database | Write | `POST /v1/projects/{ref}/database/query`, to install the schema |
 | Secrets | Read | `GET /v1/projects/{ref}/api-keys`, to read the anon key back |
 | Auth | Write | `PATCH /v1/projects/{ref}/config/auth`, the e-mail and callback step |
@@ -193,6 +195,27 @@ actually makes:
 Everything else stays at **No access**. The consent screen shows this list to
 every department owner, so a scope granted here and never used is a permission
 they are asked for and a reason not to click the button.
+
+Two things about scopes that are easy to get wrong, because neither is visible
+from the code that asks for them:
+
+- **The authorize request does not name them.** Supabase's `scope` query
+  parameter is deprecated; an OAuth app's scopes are fixed when the app is
+  published, and the authorize endpoint reads them from there. `/oauth/start`
+  therefore sends no `scope` at all. Sending one that is not a member of the
+  granular vocabulary — `scope=all`, as an older revision of this code did, and
+  as Supabase's own integration sample still shows — narrows the grant to
+  nothing rather than widening it: the code exchanges cleanly, and every call
+  made with the resulting token comes back 403.
+- **Changing them later does not reach anybody who already authorised.** An
+  existing authorisation keeps the scopes it was granted; the operator has to
+  connect again for a new set to apply. If you add a missing scope, press
+  **Connect Supabase** once more rather than only pressing **Create my
+  project**.
+
+`Secrets` is the counter-intuitive one: the api-keys endpoint is filed under
+that tag, so reading the anon key is `Secrets → Read` rather than anything
+named after keys or projects.
 
 What it deliberately does **not** do:
 
@@ -209,6 +232,16 @@ What it deliberately does **not** do:
   creation and discarded. OpenDepartment never connects to a tenant's database
   directly — everything goes through PostgREST with the anon key — so keeping
   one would be keeping a credential for no reason.
+
+**When it does not work, it says so.** Every exit from the round trip names
+itself: the callback sends the wizard a reason (`declined`, `state`, `expired`,
+`session`, `exchange`, `unavailable`) plus whatever Supabase said, and
+`/oauth/status` distinguishes "no token" from `api_refused` — a token Supabase
+issued and then would not accept, which is what a missing scope looks like from
+here and the one failure that otherwise resembles success. Provisioning reports
+the same way: a 401/403 while waiting for the new project's health is reported
+as a refusal against the project it already made, rather than polled out to the
+timeout and reported as "still starting".
 
 Leave both variables unset and none of this exists: the wizard does not offer
 it and every route above answers 503. **The manual path is unchanged either

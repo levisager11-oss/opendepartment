@@ -26,7 +26,22 @@ export async function GET(request: NextRequest) {
   // A token that no longer works is not a connection. Listing organisations is
   // the cheapest call that proves it, and the wizard needs them anyway.
   const orgs = await listOrganizations(token);
-  if (!orgs.ok) return NextResponse.json({ available: true, connected: false });
+  if (!orgs.ok) {
+    // This is the branch that used to make the whole feature look like it did
+    // nothing: the round trip succeeds, a token is sealed into the cookie, and
+    // then the very first call with it is refused -- so the wizard asked "am I
+    // connected?", heard "no", and redrew the same Connect button with no hint
+    // that anything had happened at all. A refusal is now reported as one.
+    // 401/403 means the token is real but not allowed to do this, which is what
+    // an OAuth app published without Organizations:Read looks like from here.
+    const refused = orgs.status === 401 || orgs.status === 403;
+    return NextResponse.json({
+      available: true,
+      connected: false,
+      reason: refused ? "api_refused" : "api_unreachable",
+      detail: orgs.message.slice(0, 300),
+    });
+  }
 
   return NextResponse.json({
     available: true,

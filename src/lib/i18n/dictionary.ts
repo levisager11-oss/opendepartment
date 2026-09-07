@@ -249,6 +249,22 @@ export const dictionary = {
     "setup.manualTitle": "Or do it yourself",
     "setup.oauthFailed":
       "That did not complete. Nothing was created, and you can either try again or set the project up by hand below.",
+    "setup.oauthDeclined":
+      "The authorisation was not granted, so nothing was created. Try again, or set the project up by hand below.",
+    "setup.oauthState":
+      "That authorisation did not match the one this browser started. Begin again from this page rather than from an old tab or a bookmark.",
+    "setup.oauthTimedOut":
+      "That took longer than ten minutes, so the request expired. Press Connect Supabase again.",
+    "setup.oauthSession":
+      "You were signed out of OpenDepartment part-way through. Sign in again, then reconnect.",
+    "setup.oauthExchange":
+      "Supabase would not exchange the authorisation. If this deployment's address is not exactly the callback URL registered on the OAuth app, that is the usual cause.",
+    "setup.oauthUnavailable":
+      "This deployment is not offering automatic setup. Set the project up by hand below.",
+    "setup.oauthRefused":
+      "Supabase accepted the sign-in but refused the first request made with it -- the OAuth app is missing a permission. It needs Organizations read, Projects read and write, Database write, Secrets read, and Auth write. Change them in the Supabase dashboard, then connect again so a new authorisation picks them up.",
+    "setup.oauthUnreachable":
+      "Supabase could not be reached to confirm the connection. Try again in a moment, or set the project up by hand below.",
     "setup.oauthExpired":
       "The Supabase authorisation has expired. Connect again to carry on.",
     "setup.noOrganisation":
@@ -857,6 +873,22 @@ export const dictionary = {
     "setup.manualTitle": "Oder selber machen",
     "setup.oauthFailed":
       "Das wurde nicht abgeschlossen. Es wurde nichts angelegt; Sie können es erneut versuchen oder das Projekt unten von Hand einrichten.",
+    "setup.oauthDeclined":
+      "Die Freigabe wurde nicht erteilt, es wurde nichts angelegt. Versuchen Sie es erneut oder richten Sie das Projekt unten von Hand ein.",
+    "setup.oauthState":
+      "Diese Freigabe gehört nicht zu der, die dieser Browser begonnen hat. Beginnen Sie erneut auf dieser Seite, nicht aus einem alten Tab oder Lesezeichen.",
+    "setup.oauthTimedOut":
+      "Das hat länger als zehn Minuten gedauert, die Anfrage ist abgelaufen. Drücken Sie erneut auf Supabase verbinden.",
+    "setup.oauthSession":
+      "Sie wurden zwischendurch bei OpenDepartment abgemeldet. Melden Sie sich erneut an und verbinden Sie dann noch einmal.",
+    "setup.oauthExchange":
+      "Supabase hat die Freigabe nicht eingelöst. Der häufigste Grund ist, dass die Adresse dieser Installation nicht genau der Callback-URL entspricht, die in der OAuth-App hinterlegt ist.",
+    "setup.oauthUnavailable":
+      "Diese Installation bietet keine automatische Einrichtung an. Richten Sie das Projekt unten von Hand ein.",
+    "setup.oauthRefused":
+      "Supabase hat die Anmeldung angenommen, die erste Anfrage damit aber abgelehnt -- der OAuth-App fehlt eine Berechtigung. Nötig sind Organizations lesen, Projects lesen und schreiben, Database schreiben, Secrets lesen und Auth schreiben. Ändern Sie das im Supabase-Dashboard und verbinden Sie danach erneut, damit eine neue Freigabe sie übernimmt.",
+    "setup.oauthUnreachable":
+      "Supabase war nicht erreichbar, um die Verbindung zu bestätigen. Versuchen Sie es gleich noch einmal oder richten Sie das Projekt unten von Hand ein.",
     "setup.oauthExpired":
       "Die Supabase-Freigabe ist abgelaufen. Bitte erneut verbinden.",
     "setup.noOrganisation":

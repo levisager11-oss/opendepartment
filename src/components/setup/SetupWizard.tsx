@@ -166,6 +166,9 @@ export function SetupWizard({
     available: boolean;
     connected: boolean;
     organizations?: Array<{ id: string; name: string }>;
+    /** Why not connected, when the answer is more useful than "no". */
+    reason?: string;
+    detail?: string;
   } | null>(null);
   const [org, setOrg] = useState("");
   const [provisioning, setProvisioning] = useState(false);
@@ -252,6 +255,25 @@ export function SetupWizard({
   }, [step, signedIn, refreshOauth]);
 
   /**
+   * A token that Supabase will not accept is the one failure that looks like
+   * success: the authorisation completed, so nothing complained, and the wizard
+   * simply went on offering the button that had just been pressed. Say it.
+   */
+  useEffect(() => {
+    if (!oauth || oauth.connected || !oauth.reason) return;
+    setError(
+      [
+        oauth.reason === "api_refused"
+          ? t("setup.oauthRefused")
+          : t("setup.oauthUnreachable"),
+        oauth.detail,
+      ]
+        .filter(Boolean)
+        .join(" ")
+    );
+  }, [oauth, t]);
+
+  /**
    * The OAuth callback sends people back here with a verdict in the query
    * string, because it cannot render into a wizard whose state lives in this
    * tab. Read once, then taken out of the address bar so a reload does not
@@ -259,11 +281,25 @@ export function SetupWizard({
    */
   useEffect(() => {
     if (!restored) return;
-    const verdict = new URLSearchParams(window.location.search).get("oauth");
+    const params = new URLSearchParams(window.location.search);
+    const verdict = params.get("oauth");
     if (!verdict) return;
 
     if (verdict !== "ok") {
-      setError(t("setup.oauthFailed"));
+      // Each of these is a different thing to do about it, so each says a
+      // different thing. `detail` is Supabase's own words when it gave any.
+      const map: Record<string, string> = {
+        declined: t("setup.oauthDeclined"),
+        state: t("setup.oauthState"),
+        expired: t("setup.oauthTimedOut"),
+        session: t("setup.oauthSession"),
+        exchange: t("setup.oauthExchange"),
+        unavailable: t("setup.oauthUnavailable"),
+      };
+      const detail = params.get("detail");
+      setError(
+        [map[verdict] ?? t("setup.oauthFailed"), detail].filter(Boolean).join(" ")
+      );
     }
     // The automatic path only makes sense from the Supabase step onwards.
     setStep((current) => (current < 2 ? 2 : current));
@@ -453,6 +489,7 @@ export function SetupWizard({
         NOT_SIGNED_IN: t("setup.signInFirst"),
         RATE_LIMITED: t("setup.rateLimited"),
         NO_ORGANISATION: t("setup.noOrganisation"),
+        API_REFUSED: t("setup.oauthRefused"),
         STILL_STARTING: t("setup.stillStarting"),
         SCHEMA_FAILED: t("setup.schemaFailedAuto"),
       };
