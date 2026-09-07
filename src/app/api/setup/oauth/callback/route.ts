@@ -21,8 +21,12 @@ import { requestOrigin } from "@/lib/setup/origin";
  */
 export async function GET(request: NextRequest) {
   const origin = requestOrigin(request.headers);
-  const back = (why?: string) =>
-    NextResponse.redirect(`${origin}/new${why ? `?oauth=${why}` : "?oauth=ok"}`);
+  const back = (why?: string, detail?: string) =>
+    NextResponse.redirect(
+      `${origin}/new?oauth=${why ?? "ok"}${
+        detail ? `&detail=${encodeURIComponent(detail.slice(0, 120))}` : ""
+      }`
+    );
 
   if (!oauthConfigured()) return back("unavailable");
 
@@ -49,7 +53,7 @@ export async function GET(request: NextRequest) {
     redirectUri: `${origin}/api/setup/oauth/callback`,
     verifier,
   });
-  if (!exchanged.ok) return back("exchange");
+  if (!exchanged.ok) return back("exchange", exchanged.message);
 
   const response = back();
   // An hour is longer than provisioning takes and shorter than anybody leaves

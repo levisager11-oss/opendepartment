@@ -231,6 +231,21 @@ export const dictionary = {
 
     // --- setup wizard ---------------------------------------------------
     // --- one-click setup (only when this deployment registered an OAuth app)
+    "setup.oauthNotConfigured":
+      "One-click setup is not configured on this deployment.",
+    "setup.oauthDeclined":
+      "Supabase sent you back without an authorisation code -- usually the Cancel button, or a consent screen that was closed. Nothing was created.",
+    "setup.oauthState":
+      "The security token from the start of that round trip did not come back. This is usually a browser blocking cookies on the return from Supabase, or a different tab having started the flow. Try again in this tab.",
+    "setup.oauthExpiredFlow":
+      "That authorisation took longer than ten minutes and the one-time code for it expired. Start it again.",
+    "setup.oauthSession":
+      "Your OpenDepartment sign-in changed during the round trip, so the authorisation could not be matched to your account. Sign in again and retry.",
+    "setup.oauthExchange":
+      "Supabase would not exchange the authorisation code. The usual cause is a mismatch between the OAuth app and this deployment -- check that its callback URL is exactly this site plus /api/setup/oauth/callback, and that the client ID and secret in the environment belong to that same app.",
+    "setup.oauthScope":
+      "Supabase accepted the authorisation and then refused the first request ({status}). The OAuth app is most likely missing a permission: it needs Organizations read, Projects write, Database write, Secrets read and Auth write.",
+
     "setup.autoTitle": "Let OpenDepartment set it up for you",
     "setup.autoBody":
       "Connect your Supabase account and we will create the project, install the schema, switch off e-mail confirmation and allow your department's sign-in address -- the next three steps, done. You still own the project; it is created in your own Supabase organisation.",
@@ -839,6 +854,21 @@ export const dictionary = {
 
     // --- setup wizard ---------------------------------------------------
     // --- Ein-Klick-Einrichtung (nur mit registrierter OAuth-App) ---------
+    "setup.oauthNotConfigured":
+      "Die Ein-Klick-Einrichtung ist auf dieser Installation nicht konfiguriert.",
+    "setup.oauthDeclined":
+      "Supabase hat Sie ohne Autorisierungscode zurückgeschickt -- meist die Schaltfläche Abbrechen oder ein geschlossenes Zustimmungsfenster. Es wurde nichts angelegt.",
+    "setup.oauthState":
+      "Das Sicherheitstoken vom Beginn des Vorgangs kam nicht zurück. Meist blockiert der Browser Cookies bei der Rückkehr von Supabase, oder der Vorgang wurde in einem anderen Tab gestartet. Bitte in diesem Tab erneut versuchen.",
+    "setup.oauthExpiredFlow":
+      "Die Autorisierung hat länger als zehn Minuten gedauert, der einmalige Code dafür ist abgelaufen. Bitte neu starten.",
+    "setup.oauthSession":
+      "Ihre OpenDepartment-Anmeldung hat sich während des Vorgangs geändert, die Autorisierung liess sich Ihrem Konto nicht zuordnen. Bitte neu anmelden und erneut versuchen.",
+    "setup.oauthExchange":
+      "Supabase hat den Autorisierungscode nicht eingelöst. Meist passen OAuth-App und Installation nicht zusammen -- prüfen Sie, ob die Callback-URL exakt diese Website plus /api/setup/oauth/callback ist und ob Client-ID und Secret in der Umgebung zu genau dieser App gehören.",
+    "setup.oauthScope":
+      "Supabase hat die Autorisierung angenommen und dann die erste Anfrage abgelehnt ({status}). Vermutlich fehlt der OAuth-App eine Berechtigung: nötig sind Organizations lesen, Projects schreiben, Database schreiben, Secrets lesen und Auth schreiben.",
+
     "setup.autoTitle": "OpenDepartment richtet es für Sie ein",
     "setup.autoBody":
       "Verbinden Sie Ihr Supabase-Konto, und wir legen das Projekt an, installieren das Schema, schalten die E-Mail-Bestätigung ab und tragen die Anmeldeadresse Ihres Departements ein -- die nächsten drei Schritte, erledigt. Das Projekt gehört weiterhin Ihnen; es entsteht in Ihrer eigenen Supabase-Organisation.",
