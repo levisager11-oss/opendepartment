@@ -29,7 +29,7 @@ type CookieBundle = { name: string; value: string; options?: CookieOptions };
  * front door does not already show.
  */
 const TENANT_PUBLIC = [
-  "", "login", "join", "auth", "access-denied", "setup", "legal",
+  "", "login", "join", "auth", "access-denied", "legal",
 ];
 
 /**

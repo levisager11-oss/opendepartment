@@ -66,6 +66,22 @@ export const dictionary = {
     "settings.categoriesHint":
       "One per line, in the order they should appear. Existing documents keep the category they were filed under even if you remove it here.",
     "settings.categoriesEmpty": "Keep at least one category.",
+    "settings.memberQuota": "Storage per member",
+    "settings.memberQuotaHint":
+      "Megabytes one member may keep in total. Leave empty for no limit. A free Supabase project holds about a gigabyte, and the per-file limit above does not stop one person filling it.",
+    "settings.memberQuotaNone": "No limit",
+    "settings.quotaInvalid":
+      "Storage per member must be a whole number of megabytes, or empty for no limit.",
+    "settings.storage": "Storage",
+    "settings.orphans": "Objects with no document",
+    "settings.orphansHint":
+      "Deleting a document removes its row and then its file, which is two steps. A browser closed in between leaves the file behind: nothing in the archive can see it, and it still counts against your Supabase storage.",
+    "settings.orphansNone": "Nothing left behind.",
+    "settings.orphansPurge": "Delete these files",
+    "settings.orphansPurged": "Removed {n} file(s).",
+    "settings.orphansUnavailable":
+      "Could not read the storage listing. Re-run db/tenant-schema.sql in your project if you have not since this was added.",
+    "settings.usage": "What each member is keeping",
     "settings.upload": "Largest upload",
     "settings.uploadHint":
       "Megabytes, up to {cap}. Your storage bucket is resized to match when you save.",
@@ -289,7 +305,7 @@ export const dictionary = {
       "Reads the name and tagline from the department's own settings and updates its directory entry.",
     "account.delist": "Remove listing",
     "account.delistConfirm":
-      "Remove this department from OpenDepartment? Its address stops working. The data stays in your own Supabase project and is not touched.",
+      "Remove this department from OpenDepartment?\n\nThis cannot be undone. The address stops working permanently and becomes available for somebody else to register -- you cannot take it back, because your Supabase project has already been claimed and will be refused if you try to set it up again.\n\nYour data stays in your own Supabase project and is not touched.",
 
     // --- landing --------------------------------------------------------
     "landing.subtitle":
@@ -422,6 +438,12 @@ export const dictionary = {
     "upload.submitting": "Transmitting...",
     "upload.errorSize": "File exceeds the {mb} MB limit.",
     "upload.errorType": "That file type is not accepted.",
+    "upload.errorQuota":
+      "You have reached the storage limit for this department. Delete something you filed earlier, or ask an administrator to raise the limit.",
+    "upload.metadataStripped":
+      "Location and camera details were removed from this image before upload.",
+    "upload.metadataUnsupported":
+      "This image format cannot be cleaned in the browser, so it will be uploaded as it is -- including any location the camera recorded. Convert it to JPEG or PNG first if that matters.",
     "upload.errorTitle": "A document title is required.",
     "upload.errorNoFile": "Select a file first.",
     "upload.errorGeneric": "Upload failed. Please try again.",
@@ -591,6 +613,22 @@ export const dictionary = {
     "settings.categoriesHint":
       "Eine pro Zeile, in der gewünschten Reihenfolge. Bestehende Dokumente behalten ihre Kategorie, auch wenn Sie sie hier entfernen.",
     "settings.categoriesEmpty": "Behalten Sie mindestens eine Kategorie.",
+    "settings.memberQuota": "Speicher pro Mitglied",
+    "settings.memberQuotaHint":
+      "Megabyte, die ein Mitglied insgesamt belegen darf. Leer lassen für kein Limit. Ein kostenloses Supabase-Projekt fasst etwa ein Gigabyte, und das Limit pro Datei hindert eine einzelne Person nicht daran, es zu füllen.",
+    "settings.memberQuotaNone": "Kein Limit",
+    "settings.quotaInvalid":
+      "Speicher pro Mitglied muss eine ganze Zahl in Megabyte sein oder leer für kein Limit.",
+    "settings.storage": "Speicher",
+    "settings.orphans": "Dateien ohne Dokument",
+    "settings.orphansHint":
+      "Beim Löschen eines Dokuments wird zuerst der Datensatz und dann die Datei entfernt -- zwei Schritte. Wird der Browser dazwischen geschlossen, bleibt die Datei liegen: im Archiv ist sie unsichtbar, Ihren Supabase-Speicher belegt sie trotzdem.",
+    "settings.orphansNone": "Nichts liegen geblieben.",
+    "settings.orphansPurge": "Diese Dateien löschen",
+    "settings.orphansPurged": "{n} Datei(en) entfernt.",
+    "settings.orphansUnavailable":
+      "Die Speicherliste konnte nicht gelesen werden. Führen Sie db/tenant-schema.sql in Ihrem Projekt erneut aus, falls seit dieser Neuerung noch nicht geschehen.",
+    "settings.usage": "Was die Mitglieder belegen",
     "settings.upload": "Grösster Upload",
     "settings.uploadHint":
       "Megabyte, höchstens {cap}. Ihr Storage-Bucket wird beim Speichern entsprechend angepasst.",
@@ -816,7 +854,7 @@ export const dictionary = {
       "Liest Name und Untertitel aus den Einstellungen des Departements und aktualisiert den Verzeichniseintrag.",
     "account.delist": "Eintrag entfernen",
     "account.delistConfirm":
-      "Dieses Departement von OpenDepartment entfernen? Die Adresse funktioniert dann nicht mehr. Die Daten bleiben in Ihrem eigenen Supabase-Projekt unangetastet.",
+      "Dieses Departement von OpenDepartment entfernen?\n\nDas lässt sich nicht rückgängig machen. Die Adresse funktioniert dauerhaft nicht mehr und kann von jemand anderem registriert werden -- Sie bekommen sie nicht zurück, denn Ihr Supabase-Projekt gilt bereits als beansprucht und wird bei einer erneuten Einrichtung abgewiesen.\n\nIhre Daten bleiben in Ihrem eigenen Supabase-Projekt unangetastet.",
 
     // --- landing --------------------------------------------------------
     "landing.subtitle":
@@ -952,6 +990,12 @@ export const dictionary = {
     "upload.submitting": "Wird übermittelt...",
     "upload.errorSize": "Die Datei überschreitet das Limit von {mb} MB.",
     "upload.errorType": "Dieser Dateityp wird nicht akzeptiert.",
+    "upload.errorQuota":
+      "Sie haben das Speicherlimit dieses Departements erreicht. Löschen Sie etwas Früheres oder bitten Sie eine Administratorin, das Limit zu erhöhen.",
+    "upload.metadataStripped":
+      "Standort- und Kameradaten wurden vor dem Hochladen aus diesem Bild entfernt.",
+    "upload.metadataUnsupported":
+      "Dieses Bildformat lässt sich im Browser nicht bereinigen und wird unverändert hochgeladen -- samt allfälligem Standort aus der Kamera. Wandeln Sie es vorher in JPEG oder PNG um, falls das eine Rolle spielt.",
     "upload.errorTitle": "Ein Dokumenttitel ist erforderlich.",
     "upload.errorNoFile": "Wählen Sie zuerst eine Datei aus.",
     "upload.errorGeneric":

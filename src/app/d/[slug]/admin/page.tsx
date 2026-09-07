@@ -70,7 +70,7 @@ export default async function AdminPage({
     supabase
       .from("settings")
       .select(
-        "department_name, tagline, subject_label, docket_prefix, seal_top, seal_bottom, accent, categories, max_upload_mb, operator_name, operator_contact"
+        "department_name, tagline, subject_label, docket_prefix, seal_top, seal_bottom, accent, categories, max_upload_mb, max_member_storage_mb, operator_name, operator_contact"
       )
       .eq("id", true)
       .maybeSingle(),

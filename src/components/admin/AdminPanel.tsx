@@ -7,6 +7,7 @@ import type { TranslationKey } from "@/lib/i18n/dictionary";
 import { AdminFiles } from "./AdminFiles";
 import { AdminReports } from "./AdminReports";
 import { AdminUsers } from "./AdminUsers";
+import { AdminStorage } from "./AdminStorage";
 import { AdminInvites } from "./AdminInvites";
 import { AdminSubjects } from "./AdminSubjects";
 import { AdminAudit } from "./AdminAudit";
@@ -231,7 +232,13 @@ export function AdminPanel({
             administrator to overwrite the real values with blanks. */}
         {tab === "settings" &&
           (settings ? (
-            <AdminSettings settings={settings} />
+            <div className="flex flex-col gap-4">
+              <AdminSettings settings={settings} />
+              {/* Below the form rather than beside it: this one reads live
+                  from the project instead of from the page's own props, so it
+                  loads on its own and must not hold the form up. */}
+              <AdminStorage />
+            </div>
           ) : (
             <p className="paper px-6 py-14 text-center text-sm text-ink-500">
               {t("common.error")}

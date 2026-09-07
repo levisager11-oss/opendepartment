@@ -93,6 +93,10 @@ export function AdminSettings({ settings }: { settings: DepartmentSettings }) {
     accent: settings.accent,
     categories: settings.categories.join("\n"),
     max_upload_mb: String(settings.max_upload_mb),
+    max_member_storage_mb:
+      settings.max_member_storage_mb === null
+        ? ""
+        : String(settings.max_member_storage_mb),
     operator_name: settings.operator_name ?? "",
     operator_contact: settings.operator_contact ?? "",
   });
@@ -126,6 +130,17 @@ export function AdminSettings({ settings }: { settings: DepartmentSettings }) {
     setError(null);
 
     const mb = Number(form.max_upload_mb);
+
+    const quotaRaw = form.max_member_storage_mb.trim();
+    const quotaNumber = Number(quotaRaw);
+    if (quotaRaw && (!Number.isFinite(quotaNumber) || quotaNumber < 1)) {
+      setBusy(false);
+      return setError(t("settings.quotaInvalid"));
+    }
+    const quota = quotaRaw
+      ? Math.min(100000, Math.max(1, Math.round(quotaNumber)))
+      : null;
+
     const { data, error: updateError } = await supabase
       .from("settings")
       .update({
@@ -142,6 +157,10 @@ export function AdminSettings({ settings }: { settings: DepartmentSettings }) {
           BUCKET_CAP_MB,
           Math.max(1, Number.isFinite(mb) ? Math.round(mb) : 25)
         ),
+        // Empty means no cap. The CHECK constraint in the schema is what
+        // actually holds the range; this only keeps the form from sending
+        // something it will refuse.
+        max_member_storage_mb: quota,
         operator_name: form.operator_name.trim().slice(0, 120) || null,
         operator_contact: form.operator_contact.trim().slice(0, 160) || null,
       })
@@ -306,6 +325,27 @@ export function AdminSettings({ settings }: { settings: DepartmentSettings }) {
             max={BUCKET_CAP_MB}
             value={form.max_upload_mb}
             onChange={(e) => set("max_upload_mb", e.target.value)}
+          />
+        </Field>
+
+        {/* The per-file limit was the only ceiling there was, so thirty
+            members with a 25 MB cap could put 750 MB into a free tier that
+            holds one gigabyte -- and one member could do it alone. The person
+            who finds out is the administrator, by way of uploads that stop
+            working for everybody. */}
+        <Field
+          id="set-quota"
+          label={t("settings.memberQuota")}
+          hint={t("settings.memberQuotaHint")}
+        >
+          <input
+            id="set-quota"
+            className="field"
+            type="number"
+            min={1}
+            placeholder={t("settings.memberQuotaNone")}
+            value={form.max_member_storage_mb}
+            onChange={(e) => set("max_member_storage_mb", e.target.value)}
           />
         </Field>
       </Section>

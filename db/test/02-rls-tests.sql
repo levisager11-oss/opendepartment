@@ -357,19 +357,84 @@ select odtest.denied('a file cannot claim an absurd size',
     values (auth.uid(), 'Huge', 'EXHIBIT', 'p/z.png', 'z.png',
             'image/png', 999999999999, 'image')$$);
 
+-- The path is the owner's folder, so this fails on the policy rather than on
+-- the path fence below -- which is the property being tested here.
 select odtest.denied('a file cannot be filed for somebody else',
   $$insert into public.files
       (owner_id, title, category, storage_path, original_name, mime_type,
        size_bytes, kind)
     values ('44444444-4444-4444-4444-444444444444', 'Framed', 'EXHIBIT',
-            'p/w.png', 'w.png', 'image/png', 10, 'image')$$);
+            '44444444-4444-4444-4444-444444444444/w.png', 'w.png',
+            'image/png', 10, 'image')$$);
+
+-- ...and the row has to point at a path in the uploader's own folder. The
+-- storage policy fences the OBJECT; nothing fenced the row that claims it.
+select odtest.denied('a file row cannot claim a path outside its owners folder',
+  $$insert into public.files
+      (owner_id, title, category, storage_path, original_name, mime_type,
+       size_bytes, kind)
+    values (auth.uid(), 'Somebody elses object', 'EXHIBIT',
+            '44444444-4444-4444-4444-444444444444/theirs.png', 'theirs.png',
+            'image/png', 10, 'image')$$);
 
 select odtest.allowed('an ordinary upload still goes through',
   $$insert into public.files
       (owner_id, title, category, storage_path, original_name, mime_type,
        size_bytes, kind)
-    values (auth.uid(), 'Ordinary', 'EXHIBIT', 'p/ok.png', 'ok.png',
+    values (auth.uid(), 'Ordinary', 'EXHIBIT',
+            auth.uid()::text || '/ok.png', 'ok.png',
             'image/png', 4096, 'image')$$);
+
+-- ---------------------------------------------------------------------------
+-- The per-member storage cap. Null means no cap, which is what a department
+-- re-running the schema file gets, so the cap is set here to test it at all.
+-- ---------------------------------------------------------------------------
+select odtest.as_owner();
+update public.settings set max_member_storage_mb = 1 where id;
+select odtest.as_user('22222222-2222-2222-2222-222222222222');
+
+select odtest.denied('a member cannot upload past their storage cap',
+  $$insert into public.files
+      (owner_id, title, category, storage_path, original_name, mime_type,
+       size_bytes, kind)
+    values (auth.uid(), 'Too big', 'EXHIBIT',
+            auth.uid()::text || '/huge.png', 'huge.png',
+            'image/png', 2097152, 'image')$$);
+
+select odtest.allowed('a member CAN still upload under the cap',
+  $$insert into public.files
+      (owner_id, title, category, storage_path, original_name, mime_type,
+       size_bytes, kind)
+    values (auth.uid(), 'Small enough', 'EXHIBIT',
+            auth.uid()::text || '/small.png', 'small.png',
+            'image/png', 1024, 'image')$$);
+
+select odtest.as_owner();
+update public.settings set max_member_storage_mb = null where id;
+select odtest.as_user('22222222-2222-2222-2222-222222222222');
+
+-- One view per person per hour, rather than one per reload. The member has
+-- already been counted on file 1 in section 4, so a second call must not move
+-- the counter -- and the counter is read back as owner because a member may
+-- not read the table it lives in past their own row.
+select public.increment_view('aaaaaaaa-0000-0000-0000-000000000001');
+select public.increment_view('aaaaaaaa-0000-0000-0000-000000000001');
+select public.increment_view('aaaaaaaa-0000-0000-0000-000000000001');
+
+-- An id that is not a file at all used to update nothing and now has a foreign
+-- key under it, so it has to be turned away before the insert rather than by it.
+select public.increment_view('aaaaaaaa-0000-0000-0000-00000000dead');
+
+select odtest.as_owner();
+
+select odtest.equals('three reloads count as one view',
+  $$select view_count::text from public.files
+     where id = 'aaaaaaaa-0000-0000-0000-000000000001'$$, '1');
+
+select odtest.as_user('22222222-2222-2222-2222-222222222222');
+
+select odtest.equals('nobody can read who looked at what',
+  $$select count(*)::text from public.file_views$$, '0');
 
 select odtest.denied('a report cannot carry an invented reason',
   $$insert into public.reports (file_id, reporter_id, reason)
