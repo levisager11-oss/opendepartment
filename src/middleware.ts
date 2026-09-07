@@ -85,8 +85,35 @@ async function tenantMiddleware(request: NextRequest) {
   // guessing here.
   if (!dept) return response;
 
+  /**
+   * One address per department, in the department's own spelling.
+   *
+   * A slug is stored lower case and resolve_department() lower-cases what it
+   * is asked, so /d/MyDept resolves perfectly well -- and then breaks, because
+   * the two halves of the session disagree about where the cookie lives. The
+   * cookie is named and pathed from the slug: this middleware and the browser
+   * client take it from the URL (`od-MyDept` at `/d/MyDept`), while every
+   * server client takes it from the resolved row (`od-mydept` at `/d/mydept`).
+   * Cookie paths are matched case-sensitively, so the two never meet.
+   *
+   * The visible symptom was a redirect loop rather than a mere sign-in
+   * failure: the middleware saw the cookie and bounced /login to /vault, and
+   * requireMember() did not and bounced /vault back to /login, until the
+   * browser gave up.
+   *
+   * Redirecting to the canonical spelling fixes it at the only place that can:
+   * everything downstream then agrees, because there is only one spelling
+   * left. 308 rather than 307 -- this is a permanent fact about the address,
+   * and the method is worth preserving for a POST that arrives mis-cased.
+   */
+  if (slug !== dept.slug) {
+    const canonical = request.nextUrl.clone();
+    canonical.pathname = [`/d/${dept.slug}`, ...rest].join("/");
+    return NextResponse.redirect(canonical, 308);
+  }
+
   const supabase = createServerClient(dept.supabase_url, dept.anon_key, {
-    cookieOptions: tenantCookieConfig(slug),
+    cookieOptions: tenantCookieConfig(dept.slug),
     cookies: {
       getAll() {
         return request.cookies.getAll();
@@ -99,7 +126,7 @@ async function tenantMiddleware(request: NextRequest) {
         cookiesToSet.forEach(({ name, value, options }) =>
           response.cookies.set(name, value, {
             ...options,
-            path: `/d/${slug}`,
+            path: `/d/${dept.slug}`,
           })
         );
       },
@@ -115,7 +142,7 @@ async function tenantMiddleware(request: NextRequest) {
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
-    url.pathname = `/d/${slug}/login`;
+    url.pathname = `/d/${dept.slug}/login`;
     url.searchParams.set("next", request.nextUrl.pathname);
     return NextResponse.redirect(url);
   }
@@ -123,7 +150,7 @@ async function tenantMiddleware(request: NextRequest) {
   // A member landing on the front door or the login page wants the archive.
   if (user && (head === "" || head === "login")) {
     const url = request.nextUrl.clone();
-    url.pathname = `/d/${slug}/vault`;
+    url.pathname = `/d/${dept.slug}/vault`;
     url.search = "";
     return NextResponse.redirect(url);
   }

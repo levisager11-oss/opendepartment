@@ -38,19 +38,26 @@ insert into auth.users (id, email) values
   ('11111111-1111-1111-1111-111111111111', 'admin@example.test'),
   ('22222222-2222-2222-2222-222222222222', 'member@example.test'),
   ('33333333-3333-3333-3333-333333333333', 'banned@example.test'),
-  ('44444444-4444-4444-4444-444444444444', 'other@example.test');
+  ('44444444-4444-4444-4444-444444444444', 'other@example.test'),
+  ('55555555-5555-5555-5555-555555555555', 'rogue@example.test');
 
+-- 5 is the one that matters below: an administrator who has since been
+-- banned. Banning is the only lever one administrator has over another that
+-- does not need the other to cooperate, so it has to take the rights away and
+-- not merely the interface.
 insert into public.profiles (id, username, is_admin, is_banned) values
   ('11111111-1111-1111-1111-111111111111', 'theadmin', true,  false),
   ('22222222-2222-2222-2222-222222222222', 'amember',  false, false),
   ('33333333-3333-3333-3333-333333333333', 'banished', false, true),
-  ('44444444-4444-4444-4444-444444444444', 'somebody', false, false);
+  ('44444444-4444-4444-4444-444444444444', 'somebody', false, false),
+  ('55555555-5555-5555-5555-555555555555', 'therogue', true,  true);
 
 insert into public.user_emails (user_id, email) values
   ('11111111-1111-1111-1111-111111111111', 'admin@example.test'),
   ('22222222-2222-2222-2222-222222222222', 'member@example.test'),
   ('33333333-3333-3333-3333-333333333333', 'banned@example.test'),
-  ('44444444-4444-4444-4444-444444444444', 'other@example.test');
+  ('44444444-4444-4444-4444-444444444444', 'other@example.test'),
+  ('55555555-5555-5555-5555-555555555555', 'rogue@example.test');
 
 insert into public.files
   (id, owner_id, title, category, storage_path, original_name, mime_type,
@@ -163,7 +170,25 @@ select odtest.allowed('admin CAN still ban a member',
       '44444444-4444-4444-4444-444444444444', 'is_banned', true)$$);
 
 select odtest.equals('admin CAN read every members e-mail address',
-  $$select count(*)::text from public.user_emails$$, '4');
+  $$select count(*)::text from public.user_emails$$, '5');
+
+-- A code may carry grants_admin, so a guessable one is not a weak password --
+-- it is an unauthenticated route to every member's e-mail address. The screen
+-- mints nine characters out of a 32-letter alphabet; nothing stopped an
+-- administrator typing something else into the field, and `invites` is
+-- admin-writable over PostgREST either way.
+select odtest.denied('admin cannot mint a guessable invite code',
+  $$insert into public.invites (code, grants_admin) values ('PARTY', true)$$);
+
+-- handle_new_user() upper-cases the code it is handed before looking it up, so
+-- a lower-case code is one nobody can ever redeem.
+select odtest.denied('admin cannot mint a code nobody could redeem',
+  $$insert into public.invites (code) values ('lower-case-code')$$);
+
+select odtest.allowed('admin CAN still mint a proper invite code',
+  $$insert into public.invites (code, grants_admin)
+    values ('XKJ-4MN-7PQ', false)$$);
+
 select odtest.as_owner();
 
 -- ===========================================================================
@@ -209,6 +234,69 @@ select odtest.as_owner();
 select odtest.equals('banned member cannot inflate a view counter',
   $$select view_count::text from public.files
      where id = 'aaaaaaaa-0000-0000-0000-000000000001'$$, '0');
+
+-- ===========================================================================
+--  4b. A BANNED ADMINISTRATOR
+--
+--  is_admin() used to read the is_admin column alone, so banning an
+--  administrator took away the interface and nothing else: requireMember()
+--  sends them to /access-denied, but the department's anon key is in the page
+--  source of its own front door and their session is still valid, so every
+--  admin RPC remained one HTTP call away. A banned administrator could go on
+--  reading every member's e-mail address, deleting other people's documents,
+--  and banning whoever had just banned them.
+--
+--  These run as user 5, who is is_admin AND is_banned.
+-- ===========================================================================
+select odtest.as_user('55555555-5555-5555-5555-555555555555');
+
+select odtest.equals('a ban reaches is_admin()',
+  $$select public.is_admin()::text$$, 'false');
+
+select odtest.denied('a banned admin cannot list members or their e-mails',
+  $$select * from public.admin_list_members()$$);
+
+select odtest.denied('a banned admin cannot look up a file owners e-mail',
+  $$select public.admin_file_owner_email(
+      'aaaaaaaa-0000-0000-0000-000000000001')$$);
+
+select odtest.denied('a banned admin cannot delete somebody elses document',
+  $$select public.delete_file('aaaaaaaa-0000-0000-0000-000000000001')$$);
+
+select odtest.denied('a banned admin cannot ban the person who banned them',
+  $$select public.admin_set_flag(
+      '11111111-1111-1111-1111-111111111111', 'is_banned', true)$$);
+
+select odtest.denied('a banned admin cannot promote an accomplice',
+  $$select public.admin_set_flag(
+      '44444444-4444-4444-4444-444444444444', 'is_admin', true)$$);
+
+select odtest.touches_nothing('a banned admin cannot rebrand the department',
+  $$update public.settings set department_name = 'Mine now' where id$$);
+
+select odtest.denied('a banned admin cannot mint an invite code',
+  $$insert into public.invites (code, grants_admin)
+    values ('BACKDOOR-CODE', true)$$);
+
+select odtest.equals('a banned admin reads no audit log',
+  $$select count(*)::text from public.audit_log$$, '0');
+
+select odtest.denied('a banned admin cannot rename themselves',
+  $$select public.claim_username('notarogue')$$);
+
+select odtest.as_owner();
+
+-- ...and the department still has a working administrator. A fence that
+-- locked out the un-banned one too would be a different bug.
+select odtest.as_user('11111111-1111-1111-1111-111111111111');
+
+select odtest.equals('an un-banned administrator is still an administrator',
+  $$select public.is_admin()::text$$, 'true');
+
+select odtest.allowed('an un-banned administrator can still list members',
+  $$select * from public.admin_list_members()$$);
+
+select odtest.as_owner();
 
 -- ===========================================================================
 --  5. A SIGNED-OUT VISITOR

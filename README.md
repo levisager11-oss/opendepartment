@@ -162,8 +162,25 @@ demo members (password `demopass123`) so scores are not all from one person.
    in. The wizard makes this a step rather than a footnote: either switch off
    "Confirm email" (right answer for a class — people join with invite codes
    instead) or connect your own SMTP.
-5. Pastes back the project URL and anon key. We probe the project, confirm the
-   schema is installed and unclaimed, then register the slug.
+5. Pastes back the project URL and anon key -- or just the key. The connect
+   step takes a paste of anything with those values in it (the two on their
+   own, a `.env` block, the whole "Project API keys" card with its headings
+   still attached) and pulls them out; a legacy anon key names its own project
+   in its payload, so pasting it alone fills in the URL too. We probe the
+   project, confirm the schema is installed and unclaimed, then register the
+   slug.
+
+The wizard also asks, in step 1, who runs the department. That answer is what
+the department's own imprint, terms and privacy pages say, and the wizard used
+to leave it null -- so every department created through it published three
+legal pages that could not name anybody. Both fields are optional and editable
+later under Administration.
+
+Progress is kept in `sessionStorage` for the length of the sitting. The connect
+step needs an OpenDepartment account, creating one can send you to your inbox
+and back, and coming back to an empty form *after* running the SQL against a
+real project was the worst moment in the flow: the project is claimed by then,
+so starting over does not work either.
 
 **The first account to sign up becomes the administrator.** There is no seed
 file to edit and no support ticket to file.
@@ -261,7 +278,7 @@ the create-a-department flow run end to end on the live deployment).
 - The storage bucket's `file_size_limit` follows `settings.max_upload_mb`: a
   trigger resizes the bucket when the cap changes, so the settings screen can
   offer the whole range instead of stopping at a number frozen in the schema
-- **A SQL security suite** (`npm run test:rls`), 95 assertions over both
+- **A SQL security suite** (`npm run test:rls`), 116 assertions over both
   schemas. See below
 
 Not built yet:
@@ -289,6 +306,8 @@ Builds a throwaway PostgreSQL cluster, shims the parts of Supabase the schemas
 depend on, applies both `db/*.sql` files twice, and checks that a member cannot
 promote themselves, that an administrator cannot un-claim their own department
 or put arbitrary text where CSS is rendered, that a banned member cannot write,
+that a banned *administrator* is no longer an administrator, that a
+`service_role` key cannot be registered or swapped in later,
 that a signed-out visitor reaches only the two functions the front door needs,
 that the invite door admits and refuses the right people, and that a suspended
 department cannot delist its way out of a suspension. No Supabase project, no
@@ -298,8 +317,9 @@ Applying each schema twice is the point of a separate step: re-running these
 files is the documented upgrade path below, so idempotency fails the suite
 rather than somebody's SQL editor.
 
-The suite was written against the *unfixed* schema first and reports 12
-failures there. A test that cannot fail is not evidence.
+The suite was written against the *unfixed* schema first and reports failures
+there -- 12 for the round that added the column fences, and another 16 for the
+round that added the banned-administrator and secret-key assertions. A test that cannot fail is not evidence.
 [db/test/README.md](db/test/README.md) has the rest.
 
 ## Upgrading a deployment that already exists
@@ -315,7 +335,38 @@ row level* live in those files, so:
   themselves. The wizard hands out the current file, so departments created
   from here on are fine.
 
-The current round of fixes adds, to the tenant schema: a column fence on
+**This round's tenant fix is the urgent one.** `is_admin()` read the
+`is_admin` column and nothing else, so banning an administrator took away the
+interface and left every power intact: `requireMember()` sends them to
+`/access-denied`, but the department's anon key is printed on its own front
+door and their session is still valid, so `admin_list_members()` (every
+member's e-mail address), `delete_file()` and `admin_set_flag()` all remained
+one HTTP call away. A banned administrator could read the whole membership,
+delete other people's documents, and ban whoever had just banned them. Banning
+is the only lever one administrator has over another that does not need the
+other to cooperate, so it has to be the one that lands. Until a department
+re-runs the file, the right order there is **demote first, then ban**.
+
+The control-plane fix is smaller but the same shape. Refusing a `service_role`
+key lived only in `/api/setup/probe`, and the probe is not the only door into
+that column: `register_department()` is granted to `authenticated` and callable
+straight over PostgREST, and `anon_key` is in the operator's own UPDATE grant,
+so a department registered with a proper key could be repointed at a secret one
+afterwards with the probe never running. OpenDepartment would then print a
+master key to that project in the page source of its front door. There is now a
+CHECK constraint on the column, catching both key generations. It is added
+`NOT VALID`; to audit the rows already in a directory:
+
+```sql
+alter table public.departments validate constraint departments_key_not_secret;
+```
+
+The current round of fixes also adds, to the tenant schema: `is_active_member()`
+on `claim_username()`, a shape constraint on invite codes (a code may carry
+`grants_admin`, so a guessable one is not a weak password but an
+unauthenticated route to every member's e-mail address), a `for update` on the
+settings read in `handle_new_user()` so two signups in the same instant cannot
+both found the department, a column fence on
 `settings` (an administrator could set `claimed` back to false, which makes the
 next signup found the department again — no invite code, instant
 administrator), CHECK constraints on `accent`, `max_upload_mb` and

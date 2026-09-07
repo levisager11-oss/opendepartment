@@ -67,11 +67,17 @@ export function AdminInvites({ invites }: { invites: InviteEntry[] }) {
     setBusy(false);
 
     if (insertError) {
-      setError(
+      // 23514 is the shape constraint in db/tenant-schema.sql. A code may be
+      // marked as granting administrator rights, so a short one is not a weak
+      // password -- it is a guessable route to every member's e-mail address.
+      // The constraint is the rule; this is only the sentence that explains it.
+      const message =
         insertError.code === "23505"
           ? t("invite.duplicate")
-          : t("common.error")
-      );
+          : insertError.code === "23514"
+            ? t("invite.tooShort")
+            : t("common.error");
+      setError(message);
       return;
     }
 
@@ -199,6 +205,7 @@ export function AdminInvites({ invites }: { invites: InviteEntry[] }) {
                 className="field typewriter"
                 value={code}
                 onChange={(e) => setCode(e.target.value.toUpperCase())}
+                minLength={8}
                 spellCheck={false}
               />
               <button

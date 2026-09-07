@@ -83,6 +83,8 @@ export const dictionary = {
     "invite.notePlaceholder": "e.g. handed out in the group chat",
     "invite.regenerate": "Generate a new code",
     "invite.duplicate": "That code already exists.",
+    "invite.tooShort":
+      "Too short, or not in capitals. Use at least eight characters -- a code can grant administrator rights, so a guessable one hands out more than access.",
     "invite.status": "Status",
     "invite.active": "Active",
     "invite.none": "No invite codes yet. Create one and share the link.",
@@ -221,8 +223,33 @@ export const dictionary = {
       "Use the anon key, never the service_role key. OpenDepartment does not need it and will refuse it.",
     "setup.serviceKeyRejected":
       "That looks like a service_role key. Paste the anon / publishable key instead.",
+    "setup.redirectTitle": "Do not skip this one",
     "setup.redirectNote":
-      "One more thing in Supabase: under Authentication, URL Configuration, add this to your Redirect URLs.",
+      "In Supabase, under Authentication, URL Configuration, add this to your Redirect URLs. Without it every confirmation and password-reset link in your department lands on an error page.",
+    "setup.copyCallback": "Copy this address",
+    "setup.operator": "Who runs this department",
+    "setup.operatorHelp":
+      "Shown on your department's own imprint, terms and privacy pages. You can leave these blank and fill them in later under Administration -- but those pages exist either way, and an imprint that names nobody is not an imprint.",
+    "setup.operatorName": "Your name or organisation",
+    "setup.operatorNamePlaceholder": "Alex Muster",
+    "setup.operatorContact": "Contact address",
+    "setup.paste": "Paste from Supabase",
+    "setup.pastePlaceholder":
+      "Paste your project URL and anon key here -- together, separately, or as a whole .env block.",
+    "setup.pasteHelp":
+      "Anything with a Supabase URL or key in it will do. A legacy anon key names its own project, so pasting the key alone usually fills in both fields.",
+    "setup.pasteFound": "Found it -- check the two fields below.",
+    "setup.pasteDerived":
+      "Found the key, and worked out the project URL from it. Check both below.",
+    "setup.pasteNothing":
+      "No Supabase URL or key in that. Paste the values from Project Settings, API.",
+    "setup.openSqlEditor": "Open the SQL editor",
+    "setup.openApiSettings": "Open Project Settings, API",
+    "setup.downloadSql": "Download it as a file instead",
+    "setup.copyFailed":
+      "Your browser would not let the page use the clipboard. Download the file instead, or select the SQL above by hand.",
+    "setup.probeFailed":
+      "Could not reach OpenDepartment to run the check. Your answers are kept -- try again in a moment.",
     "setup.verify": "Verify and create",
     "setup.verifying": "Checking your project...",
     "setup.schemaMissing":
@@ -581,6 +608,8 @@ export const dictionary = {
     "invite.notePlaceholder": "z. B. im Gruppenchat verteilt",
     "invite.regenerate": "Neuen Code erzeugen",
     "invite.duplicate": "Diesen Code gibt es bereits.",
+    "invite.tooShort":
+      "Zu kurz oder nicht in Grossbuchstaben. Mindestens acht Zeichen -- ein Code kann Administratorrechte vergeben, ein erratbarer gibt also mehr her als nur Zugang.",
     "invite.status": "Status",
     "invite.active": "Aktiv",
     "invite.none":
@@ -721,8 +750,33 @@ export const dictionary = {
       "Verwenden Sie den Anon-Key, niemals den service_role-Key. OpenDepartment benötigt ihn nicht und weist ihn ab.",
     "setup.serviceKeyRejected":
       "Das sieht nach einem service_role-Key aus. Fügen Sie stattdessen den Anon- / Publishable-Key ein.",
+    "setup.redirectTitle": "Diesen Schritt bitte nicht überspringen",
     "setup.redirectNote":
-      "Noch etwas in Supabase: Fügen Sie unter Authentication, URL Configuration diese Adresse zu den Redirect URLs hinzu.",
+      "In Supabase unter Authentication, URL Configuration diese Adresse zu den Redirect URLs hinzufügen. Ohne sie landet in Ihrem Departement jeder Bestätigungs- und Passwort-Link auf einer Fehlerseite.",
+    "setup.copyCallback": "Adresse kopieren",
+    "setup.operator": "Wer dieses Departement betreibt",
+    "setup.operatorHelp":
+      "Erscheint im Impressum sowie auf den AGB- und Datenschutzseiten Ihres Departements. Sie können die Felder leer lassen und später unter Administration ergänzen -- die Seiten gibt es trotzdem, und ein Impressum ohne Namen ist keines.",
+    "setup.operatorName": "Ihr Name oder Ihre Organisation",
+    "setup.operatorNamePlaceholder": "Alex Muster",
+    "setup.operatorContact": "Kontaktadresse",
+    "setup.paste": "Aus Supabase einfügen",
+    "setup.pastePlaceholder":
+      "Projekt-URL und Anon-Key hier einfügen -- zusammen, einzeln oder als ganzer .env-Block.",
+    "setup.pasteHelp":
+      "Alles, worin eine Supabase-URL oder ein Schlüssel vorkommt, genügt. Ein klassischer Anon-Key nennt sein eigenes Projekt, deshalb füllt der Schlüssel allein meist beide Felder.",
+    "setup.pasteFound": "Gefunden -- bitte die beiden Felder unten prüfen.",
+    "setup.pasteDerived":
+      "Schlüssel gefunden und die Projekt-URL daraus abgeleitet. Bitte beides unten prüfen.",
+    "setup.pasteNothing":
+      "Darin steckt weder eine Supabase-URL noch ein Schlüssel. Bitte die Werte aus Project Settings, API einfügen.",
+    "setup.openSqlEditor": "SQL-Editor öffnen",
+    "setup.openApiSettings": "Project Settings, API öffnen",
+    "setup.downloadSql": "Stattdessen als Datei herunterladen",
+    "setup.copyFailed":
+      "Ihr Browser hat der Seite den Zugriff auf die Zwischenablage verweigert. Laden Sie die Datei herunter oder markieren Sie das SQL oben von Hand.",
+    "setup.probeFailed":
+      "OpenDepartment war für die Prüfung nicht erreichbar. Ihre Eingaben bleiben erhalten -- bitte gleich noch einmal versuchen.",
     "setup.verify": "Prüfen und erstellen",
     "setup.verifying": "Ihr Projekt wird geprüft...",
     "setup.schemaMissing":

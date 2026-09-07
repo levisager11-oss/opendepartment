@@ -121,6 +121,32 @@ create table if not exists public.invites (
 );
 
 -- ---------------------------------------------------------------------------
+-- What a code has to look like.
+--
+-- Two rules, both of which were previously only true because the admin screen
+-- happened to generate codes that way -- and `invites` is admin-writable over
+-- PostgREST, so "the form does it" is not a rule.
+--
+--   LENGTH. The generator mints nine characters out of a 32-letter alphabet,
+--   which is fine. Nothing stopped an administrator typing PARTY into the
+--   field instead, and a code may carry `grants_admin` -- so a guessable one
+--   is not a weak password, it is an unauthenticated route to reading every
+--   member's e-mail address.
+--
+--   CASE. handle_new_user() upper-cases the code it is handed before looking
+--   it up, so a code stored in lower case can never be redeemed by anybody.
+--   The screen upper-cases on the way in; the column now says so.
+--
+-- NOT VALID, like the constraints on `files` below: a department re-running
+-- this file keeps the codes it has already handed out.
+-- ---------------------------------------------------------------------------
+alter table public.invites drop constraint if exists invites_code_shape;
+alter table public.invites
+  add constraint invites_code_shape check (
+    char_length(code) between 8 and 64 and code = upper(code)
+  ) not valid;
+
+-- ---------------------------------------------------------------------------
 -- 2. PROFILES -- public identity. Deliberately carries NO e-mail address, so
 --    that a hand-crafted API call from a member cannot leak one.
 -- ---------------------------------------------------------------------------
@@ -317,9 +343,26 @@ create index if not exists audit_created_idx on public.audit_log (created_at des
 --  HELPERS
 -- ===========================================================================
 
+-- A ban has to reach administrators too.
+--
+-- This used to read `is_admin` alone, which meant banning a rogue
+-- administrator took away the interface and nothing else: requireMember() in
+-- the app sends them to /access-denied, but the department's anon key and
+-- their still-valid session are all it takes to call the RPCs directly. A
+-- banned administrator could go on reading every member's e-mail address
+-- through admin_list_members(), deleting other people's documents, and
+-- banning whoever had just banned them.
+--
+-- Banning is the only lever an administrator has against another
+-- administrator that does not depend on the other one cooperating, so it has
+-- to be the one that lands. `and not is_banned` is the whole fix; every
+-- privileged path already routes through this function.
 create or replace function public.is_admin()
 returns boolean language sql stable security definer set search_path = public as $fn$
-  select coalesce((select is_admin from public.profiles where id = auth.uid()), false);
+  select coalesce(
+    (select p.is_admin and not p.is_banned
+       from public.profiles p where p.id = auth.uid()),
+    false);
 $fn$;
 
 create or replace function public.is_active_member()
@@ -350,9 +393,13 @@ declare
   inv         public.invites%rowtype;
   make_admin  boolean := false;
 begin
+  -- FOR UPDATE for the same reason the invite lookup below has it: two people
+  -- signing up in the same instant both read `claimed = false` and both found
+  -- the department, and the second administrator is one nobody chose. The lock
+  -- makes the loser of the race read the row the winner already claimed.
   select not s.claimed, s.open_join
     into unclaimed, open_door
-    from public.settings s where s.id;
+    from public.settings s where s.id for update;
 
   if unclaimed then
     -- The first account through the door founds the department.
@@ -503,6 +550,10 @@ create or replace function public.claim_username(desired text)
 returns text language plpgsql security definer set search_path = public as $fn$
 declare clean text := trim(desired);
 begin
+  -- Every other member RPC checks this. Without it a banned member could go on
+  -- renaming themselves -- and the name is the one thing of theirs that the
+  -- members who can still read the archive see.
+  if not public.is_active_member() then raise exception 'NOT_A_MEMBER'; end if;
   if clean !~ '^[A-Za-z0-9_-]{3,20}$' then raise exception 'USERNAME_INVALID'; end if;
   if exists (select 1 from public.profiles p
               where lower(p.username) = lower(clean) and p.id <> auth.uid()) then

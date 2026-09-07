@@ -8,6 +8,10 @@ import {
   createControlBrowserClient,
 } from "@/lib/control/browser";
 import { ControlAuthPanel } from "./ControlAuthPanel";
+import {
+  looksLikeSecretKey,
+  parseSupabaseCredentials,
+} from "@/lib/setup/credentials";
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6;
 
@@ -34,11 +38,15 @@ function personalize(
     subjectLabel: string;
     docket: string;
     openJoin: boolean;
+    operatorName: string;
+    operatorContact: string;
   }
 ): string {
   const name = opts.name.trim() || "The Department";
   const subject = opts.subjectLabel.trim() || "Case";
   const docket = opts.docket.trim().toUpperCase() || "CF";
+  const operatorName = opts.operatorName.trim();
+  const operatorContact = opts.operatorContact.trim();
 
   return `${schema}
 -- ---------------------------------------------------------------------------
@@ -49,17 +57,55 @@ function personalize(
       ? "you chose a public department, so anybody may\n--  create an account. Invite codes still work -- they are how somebody\n--  arrives as an administrator."
       : "you chose an unlisted department, so an invite\n--  code is required to sign up. Change it here or under Administration."
   }
+--
+--  operator_name and operator_contact are what your department's own imprint,
+--  terms and privacy pages say. They were previously left null by the wizard,
+--  which meant every new department published three legal pages that could not
+--  name anybody -- and the imprint is the page a stranger reads precisely to
+--  find out who to complain to. Both are editable later under Administration.
 -- ---------------------------------------------------------------------------
 update public.settings set
-  department_name = ${q(name)},
-  subject_label   = ${q(subject)},
-  docket_prefix   = ${q(docket)},
-  seal_top        = ${q(name.toUpperCase())},
-  seal_bottom     = ${q("OFFICIAL USE ONLY")},
-  open_join       = ${opts.openJoin}
+  department_name  = ${q(name)},
+  subject_label    = ${q(subject)},
+  docket_prefix    = ${q(docket)},
+  seal_top         = ${q(name.toUpperCase())},
+  seal_bottom      = ${q("OFFICIAL USE ONLY")},
+  operator_name    = ${operatorName ? q(operatorName) : "operator_name"},
+  operator_contact = ${operatorContact ? q(operatorContact) : "operator_contact"},
+  open_join        = ${opts.openJoin}
 where id;
 `;
 }
+
+/**
+ * Everything the wizard would be sorry to lose to a reload.
+ *
+ * Losing it was easy and expensive: the connect step needs an OpenDepartment
+ * account, creating one can send you to your inbox and back, and returning to
+ * an empty form after you have already run the SQL against a real project is
+ * the worst moment in the whole flow -- the project is now claimed, so
+ * starting over does not work either.
+ *
+ * sessionStorage rather than localStorage: this is one sitting, not a saved
+ * document. Nothing here is secret -- the anon key is published on the
+ * department's own front door -- but it is still not worth leaving behind on a
+ * shared machine after the tab closes.
+ */
+const DRAFT_KEY = "od.setup.draft.v1";
+
+type Draft = {
+  name: string;
+  slug: string;
+  slugTouched: boolean;
+  subjectLabel: string;
+  docket: string;
+  visibility: "unlisted" | "public";
+  operatorName: string;
+  operatorContact: string;
+  url: string;
+  anonKey: string;
+  step: Step;
+};
 
 export function SetupWizard({
   schemaSql,
@@ -83,14 +129,75 @@ export function SetupWizard({
   const [visibility, setVisibility] = useState<"unlisted" | "public">(
     "unlisted"
   );
+  // Who answers for this department. Written into the SQL, and from there into
+  // the department's own imprint, terms and privacy pages.
+  const [operatorName, setOperatorName] = useState("");
+  const [operatorContact, setOperatorContact] = useState("");
 
   // --- step 3 / 4 -----------------------------------------------------
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
+  const [callbackCopied, setCallbackCopied] = useState(false);
   const [url, setUrl] = useState("");
   const [anonKey, setAnonKey] = useState("");
+  const [pasted, setPasted] = useState("");
+  const [pasteNote, setPasteNote] = useState<string | null>(null);
+  const [pasteOk, setPasteOk] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  /** Nothing is written back until the saved draft has been read. */
+  const [restored, setRestored] = useState(false);
+
+  /**
+   * Restore a draft left by an earlier visit to this page.
+   *
+   * Read in an effect rather than in a useState initialiser: sessionStorage
+   * does not exist during the server render, and seeding state from it would
+   * make the first client render disagree with the HTML that was sent.
+   */
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const draft = JSON.parse(raw) as Partial<Draft>;
+        if (draft.name) setName(draft.name);
+        if (draft.slug) setSlug(draft.slug);
+        if (draft.slugTouched) setSlugTouched(true);
+        if (draft.subjectLabel) setSubjectLabel(draft.subjectLabel);
+        if (draft.docket) setDocket(draft.docket);
+        if (draft.visibility) setVisibility(draft.visibility);
+        if (draft.operatorName) setOperatorName(draft.operatorName);
+        if (draft.operatorContact) setOperatorContact(draft.operatorContact);
+        if (draft.url) setUrl(draft.url);
+        if (draft.anonKey) setAnonKey(draft.anonKey);
+        // Never restore straight onto the done screen: step 6 is a claim about
+        // a department that exists, and a stale draft is not evidence of one.
+        if (draft.step && draft.step >= 1 && draft.step <= 5) {
+          setStep(draft.step as Step);
+        }
+      }
+    } catch {
+      // Private mode, or a draft written by an older version of this page.
+      // Either way an empty form is the right fallback.
+    }
+    setRestored(true);
+  }, []);
+
+  /** ...and keep it current. */
+  useEffect(() => {
+    if (!restored) return;
+    try {
+      const draft: Draft = {
+        name, slug, slugTouched, subjectLabel, docket, visibility,
+        operatorName, operatorContact, url, anonKey, step,
+      };
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    } catch {
+      // Storage full or refused. The wizard still works; it just forgets.
+    }
+  }, [restored, name, slug, slugTouched, subjectLabel, docket, visibility,
+      operatorName, operatorContact, url, anonKey, step]);
 
   /** Only the connect step needs an account, so the check waits until then. */
   useEffect(() => {
@@ -102,7 +209,9 @@ export function SetupWizard({
 
   /** Auto-derive the address from the name until the user edits it directly. */
   useEffect(() => {
-    if (slugTouched) return;
+    // Before the draft is read `name` is still empty, and deriving from it
+    // would blank a restored slug on the first render after the restore.
+    if (!restored || slugTouched) return;
     setSlug(
       name
         .toLowerCase()
@@ -139,13 +248,82 @@ export function SetupWizard({
     subjectLabel,
     docket,
     openJoin: visibility === "public",
+    operatorName,
+    operatorContact,
   });
 
+  /**
+   * The clipboard can refuse: an insecure origin, a browser that wants a
+   * user gesture it does not think it got, a permission the person declined.
+   * It used to reject into nothing, so the button said "Copy SQL" forever and
+   * the paste that followed was whatever had been on the clipboard before.
+   * The download below is the way out that does not need permission.
+   */
   const copySql = useCallback(async () => {
-    await navigator.clipboard.writeText(fullSql);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
+    try {
+      await navigator.clipboard.writeText(fullSql);
+      setCopied(true);
+      setCopyFailed(false);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      setCopyFailed(true);
+    }
   }, [fullSql]);
+
+  const downloadSql = useCallback(() => {
+    const blob = new Blob([fullSql], { type: "application/sql" });
+    const href = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = href;
+    link.download = `${slug || "department"}-schema.sql`;
+    link.click();
+    URL.revokeObjectURL(href);
+  }, [fullSql, slug]);
+
+  const callbackUrl = `${origin}/d/${slug || "your-slug"}/auth/callback`;
+
+  const copyCallback = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(callbackUrl);
+      setCallbackCopied(true);
+      setTimeout(() => setCallbackCopied(false), 2500);
+    } catch {
+      // The address is on screen and selectable; nothing more to say.
+    }
+  }, [callbackUrl]);
+
+  /**
+   * Take a project URL and a key out of whatever was pasted.
+   *
+   * Both values live in different corners of the Supabase dashboard, and a
+   * legacy anon key already names its own project in its payload -- so in the
+   * common case pasting the key alone fills in both fields.
+   */
+  function acceptPaste(text: string) {
+    const parsed = parseSupabaseCredentials(text);
+
+    if (!parsed.url && !parsed.key) {
+      setPasteOk(false);
+      setPasteNote(t("setup.pasteNothing"));
+      return;
+    }
+    if (parsed.key && looksLikeSecretKey(parsed.key)) {
+      // Say so here rather than after a round trip. The server refuses it too,
+      // and so does a CHECK constraint in the control plane -- but the person
+      // holding a secret key on their clipboard should hear about it now.
+      setPasteOk(false);
+      setPasteNote(t("setup.serviceKeyRejected"));
+      return;
+    }
+
+    if (parsed.url) setUrl(parsed.url);
+    if (parsed.key) setAnonKey(parsed.key);
+    setError(null);
+    setPasteOk(true);
+    setPasteNote(
+      parsed.derivedUrl ? t("setup.pasteDerived") : t("setup.pasteFound")
+    );
+  }
 
   async function verifyAndCreate() {
     setBusy(true);
@@ -154,11 +332,26 @@ export function SetupWizard({
     const cleanUrl = url.trim().replace(/\/+$/, "");
 
     // 1. Does their project answer, and is the schema in place?
-    const probe = await fetch("/api/setup/probe", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ url: cleanUrl, key: anonKey.trim() }),
-    }).then((r) => r.json());
+    //
+    // Wrapped, because this used to be the one call in the wizard that could
+    // leave it stuck: a dropped connection, or any response that is not JSON
+    // (a proxy error page, a cold-start 500), rejected into nothing at all --
+    // `busy` stayed true, the button stayed disabled reading "Checking your
+    // project...", and the only way on was a reload, which at that point threw
+    // the form away too.
+    let probe: { ok?: boolean; error?: string; claimed?: boolean };
+    try {
+      const response = await fetch("/api/setup/probe", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url: cleanUrl, key: anonKey.trim() }),
+      });
+      probe = await response.json();
+    } catch {
+      setError(t("setup.probeFailed"));
+      setBusy(false);
+      return;
+    }
 
     if (!probe.ok) {
       const map: Record<string, string> = {
@@ -177,7 +370,9 @@ export function SetupWizard({
         RATE_LIMITED: t("setup.rateLimited"),
       };
       if (probe.error === "NOT_SIGNED_IN") setSignedIn(false);
-      setError(map[probe.error] ?? t("common.error"));
+      setError(
+        (probe.error ? map[probe.error] : undefined) ?? t("common.error")
+      );
       setBusy(false);
       return;
     }
@@ -223,6 +418,15 @@ export function SetupWizard({
 
       setError(t("common.error"));
       return;
+    }
+
+    // The department exists now, so the draft has nothing left to protect --
+    // and leaving it behind would offer to re-run a wizard whose slug is taken
+    // and whose project is claimed.
+    try {
+      sessionStorage.removeItem(DRAFT_KEY);
+    } catch {
+      // Nothing to clean up.
     }
 
     setBusy(false);
@@ -351,6 +555,40 @@ export function SetupWizard({
             ))}
           </fieldset>
 
+          {/* Who answers for this archive.
+
+              Not decoration and not a nicety: these two values are the whole
+              content of the department's imprint, and the footer has linked to
+              that page since before it existed. The wizard never asked, so
+              every department created through it published an imprint that
+              could not name anybody -- which is the one page a stranger opens
+              specifically to find out who to complain to. Optional here
+              because a department can be finished later under Administration;
+              asked here because almost nobody goes back. */}
+          <fieldset className="border-t border-paper-300 pt-5">
+            <legend className="sr-only">{t("setup.operator")}</legend>
+            <p className="mb-1 text-sm font-semibold text-ink-900">
+              {t("setup.operator")}
+            </p>
+            <p className="mb-4 text-xs text-ink-500">
+              {t("setup.operatorHelp")}
+            </p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field
+                label={t("setup.operatorName")}
+                value={operatorName}
+                onChange={setOperatorName}
+                placeholder={t("setup.operatorNamePlaceholder")}
+              />
+              <Field
+                label={t("setup.operatorContact")}
+                value={operatorContact}
+                onChange={setOperatorContact}
+                placeholder="name@example.com"
+              />
+            </div>
+          </fieldset>
+
           <Next disabled={!canLeaveStep1} onClick={() => setStep(2)} />
         </div>
       )}
@@ -398,6 +636,33 @@ export function SetupWizard({
               {copied ? t("setup.sqlCopied") : t("setup.copySql")}
             </button>
           </div>
+
+          {/* The clipboard is not always available -- an insecure origin, or a
+              browser that declined. Saying so, and offering the file instead,
+              beats a button that quietly did nothing. */}
+          <div className="flex flex-wrap items-center gap-3">
+            <a
+              href="https://supabase.com/dashboard/project/_/sql/new"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-sm btn-primary"
+            >
+              {t("setup.openSqlEditor")} ↗
+            </a>
+            <button
+              type="button"
+              onClick={downloadSql}
+              className="cursor-pointer text-xs text-gov-800 underline underline-offset-2"
+            >
+              {t("setup.downloadSql")}
+            </button>
+          </div>
+
+          {copyFailed && (
+            <p role="alert" className="notice notice-error text-xs">
+              {t("setup.copyFailed")}
+            </p>
+          )}
 
           <Nav onBack={() => setStep(2)} onNext={() => setStep(4)} nextLabel={t("setup.sqlDone")} />
         </div>
@@ -456,6 +721,58 @@ export function SetupWizard({
             {t("setup.credsIntro")}
           </p>
 
+          {/* One box, because in the common case one paste is all this needs.
+
+              The two values live in different corners of the dashboard, and a
+              legacy anon key already names its own project in its payload --
+              so pasting the key fills in the URL as well. The fields below stay
+              editable: the current sb_publishable_ keys are opaque and name
+              nothing, and a project on .supabase.in cannot be rebuilt from a
+              project reference either. */}
+          <div>
+            <label className="label" htmlFor="setup-paste">
+              {t("setup.paste")}
+            </label>
+            <textarea
+              id="setup-paste"
+              className="field typewriter min-h-20 resize-y text-xs"
+              placeholder={t("setup.pastePlaceholder")}
+              spellCheck={false}
+              value={pasted}
+              // onChange rather than onPaste alone: a paste on a phone
+              // keyboard, or through an IME, does not always arrive as a paste
+              // event. The length floor is what keeps this from complaining
+              // once per keystroke at somebody who is typing the URL out by
+              // hand -- nothing shorter than this can hold a key or a URL.
+              onChange={(e) => {
+                const text = e.target.value;
+                setPasted(text);
+                if (text.trim().length >= 20) acceptPaste(text);
+                else setPasteNote(null);
+              }}
+            />
+            <p className="mt-1 text-xs text-ink-500">{t("setup.pasteHelp")}</p>
+            {pasteNote && (
+              <p
+                role="status"
+                className={`mt-1 text-xs ${
+                  pasteOk ? "text-stamp-green" : "text-stamp-red"
+                }`}
+              >
+                {pasteNote}
+              </p>
+            )}
+          </div>
+
+          <a
+            href="https://supabase.com/dashboard/project/_/settings/api"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block text-xs text-gov-800 underline underline-offset-2"
+          >
+            {t("setup.openApiSettings")} ↗
+          </a>
+
           <Field
             label={t("setup.url")}
             value={url}
@@ -472,11 +789,26 @@ export function SetupWizard({
             mono
           />
 
+          {/* Not a footnote. A redirect URL that is not on the allowlist means
+              every confirmation link and every password reset in this
+              department lands on an error page instead of signing anybody in,
+              and the failure surfaces days later as "the invite link is
+              broken". Copyable, because retyping it is where it goes wrong. */}
           <div className="border-l-4 border-gov-700 bg-gov-100/40 p-3">
-            <p className="mb-1 text-xs text-ink-700">{t("setup.redirectNote")}</p>
+            <p className="mb-1 text-xs font-bold text-ink-900">
+              {t("setup.redirectTitle")}
+            </p>
+            <p className="mb-2 text-xs text-ink-700">{t("setup.redirectNote")}</p>
             <code className="typewriter block break-all text-xs text-ink-900">
-              {origin}/d/{slug || "your-slug"}/auth/callback
+              {callbackUrl}
             </code>
+            <button
+              type="button"
+              onClick={copyCallback}
+              className="mt-2 cursor-pointer text-xs text-gov-800 underline underline-offset-2"
+            >
+              {callbackCopied ? t("setup.sqlCopied") : t("setup.copyCallback")}
+            </button>
           </div>
 
           {/* Registering a slug writes to the control plane, so this step --
@@ -492,7 +824,7 @@ export function SetupWizard({
                 {t("setup.noControlPlaneBody")}
               </p>
               <code className="typewriter mt-2 block break-all text-xs text-ink-900">
-                DEV_DEPARTMENTS={"{"}&quot;{slug || "test"}&quot;:{"{"}
+                STATIC_DEPARTMENTS={"{"}&quot;{slug || "test"}&quot;:{"{"}
                 &quot;url&quot;:&quot;{url || "https://YOURREF.supabase.co"}
                 &quot;,&quot;key&quot;:&quot;{anonKey ? "…" : "YOUR_ANON_KEY"}
                 &quot;{"}}"}

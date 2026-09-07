@@ -85,6 +85,70 @@ create index if not exists departments_operator_idx on public.departments (opera
 create index if not exists departments_public_idx
   on public.departments (created_at desc) where visibility = 'public' and status = 'active';
 
+-- ---------------------------------------------------------------------------
+-- The anon key is served to every visitor of /d/<slug>. It has to be a key
+-- that is safe to serve.
+--
+-- Refusing a service_role key lived only in /api/setup/probe, and the probe is
+-- not the only door into this column: register_department() is granted to
+-- `authenticated` and callable straight over PostgREST, and `anon_key` is in
+-- the operator's own UPDATE grant, so a registered department can be repointed
+-- at a secret key afterwards without the probe ever running. Either way
+-- OpenDepartment would then print a master key to that project in the page
+-- source of its front door, for everybody, forever.
+--
+-- Same rule as everywhere else in this codebase: a check the UI performs is
+-- decoration unless the database performs it too.
+--
+-- Supabase has two key generations and both need catching:
+--   legacy   a JWT whose payload carries role "service_role"
+--   current  an opaque string prefixed "sb_secret_"
+--
+-- Anything that does not decode is left alone rather than refused. A key we
+-- cannot read is not thereby a secret one, and the probe already fails safely
+-- on a key that simply does not work.
+-- ---------------------------------------------------------------------------
+create or replace function public.looks_like_secret_key(key text)
+returns boolean language plpgsql immutable set search_path = public as $fn$
+declare payload text; body text;
+begin
+  if key is null then return false; end if;
+  if left(key, 10) = 'sb_secret_' then return true; end if;
+
+  -- The middle segment of a JWT, base64url encoded.
+  payload := split_part(key, '.', 2);
+  if payload = '' then return false; end if;
+
+  payload := translate(payload, '-_', '+/');
+  payload := payload || repeat('=', (4 - length(payload) % 4) % 4);
+
+  begin
+    body := convert_from(decode(payload, 'base64'), 'utf8');
+  exception when others then
+    return false;    -- not a JWT payload; nothing to conclude from it
+  end;
+
+  return body ~ '"role"\s*:\s*"service_role"';
+end; $fn$;
+
+-- Callable, unlike the other internals below, because it HAS to be: the check
+-- constraint under it runs as whoever is doing the UPDATE, and a role without
+-- EXECUTE on the function gets "permission denied" instead of a saved row.
+-- Nothing leaks by it -- it answers a question about a string the caller
+-- already holds, which is the same thing the setup probe answers out loud.
+grant execute on function public.looks_like_secret_key(text) to anon, authenticated;
+
+-- NOT VALID: a directory that already holds such a row is a live incident
+-- rather than something to fix by refusing to re-run this file. Every INSERT
+-- and UPDATE from here on is checked. To audit the rows already there:
+--
+--   alter table public.departments validate constraint departments_key_not_secret;
+--
+alter table public.departments drop constraint if exists departments_key_not_secret;
+alter table public.departments
+  add constraint departments_key_not_secret
+  check (not public.looks_like_secret_key(anon_key)) not valid;
+
 -- Slugs that must never be handed out, because they collide with app routes
 -- or invite impersonation.
 -- RLS on with no policy is deliberate here: deny-all. Nothing reads this over
@@ -255,6 +319,13 @@ begin
   end if;
 
   if not public.slug_available(clean) then raise exception 'SLUG_UNAVAILABLE'; end if;
+
+  -- The constraint on the column would catch this anyway; raising here gives
+  -- the wizard the same named error it already knows how to explain, instead
+  -- of a check-constraint violation it would have to translate.
+  if public.looks_like_secret_key(trim(key)) then
+    raise exception 'SECRET_KEY';
+  end if;
 
   insert into public.departments
     (slug, operator_id, supabase_url, anon_key, display_name, tagline, visibility)
