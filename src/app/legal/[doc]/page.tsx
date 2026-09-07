@@ -7,6 +7,21 @@ import { pageMetadata } from "@/lib/seo";
 
 const DOCS: LegalDoc[] = ["terms", "privacy"];
 
+/**
+ * Rendered per request, for two reasons that arrived together.
+ *
+ * The page picks its language from a cookie and Accept-Language, and a
+ * prerendered copy was picked at build time with neither -- so a German
+ * visitor was served English and the language toggle was the only way out.
+ *
+ * And the Content Security Policy now carries a per-request nonce. HTML held
+ * in a build-time cache would carry whatever nonce that build had, which is
+ * not the one in the header the middleware sets, so its scripts would be
+ * refused. Everything else in the app was already dynamic; these two pages
+ * were the exception.
+ */
+export const dynamic = "force-dynamic";
+
 export function generateStaticParams() {
   return DOCS.map((doc) => ({ doc }));
 }

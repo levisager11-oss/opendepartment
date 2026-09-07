@@ -278,16 +278,22 @@ the create-a-department flow run end to end on the live deployment).
 - The storage bucket's `file_size_limit` follows `settings.max_upload_mb`: a
   trigger resizes the bucket when the cap changes, so the settings screen can
   offer the whole range instead of stopping at a number frozen in the schema
-- **A SQL security suite** (`npm run test:rls`), 116 assertions over both
+- **A nonce-based CSP.** The policy is built per request in the middleware
+  rather than declared in `next.config.ts`, because a header declared there is
+  one fixed string and a fixed string cannot carry a nonce — which is why
+  `script-src` used to say `'unsafe-inline'`, the one directive an XSS
+  actually cares about. It now carries a per-request nonce and
+  `'strict-dynamic'`, so nothing runs unless it carries that nonce or was
+  loaded by something that did. Verified in a browser: an injected
+  `<script>` in the served HTML is refused, and every page still hydrates
+  with no violations. `style-src` keeps `'unsafe-inline'` and says why — the
+  accent reaches the page as a style *attribute*, which no nonce can cover,
+  and that value is fenced by a CHECK constraint instead
+- **A SQL security suite** (`npm run test:rls`), 121 assertions over both
   schemas. See below
 
 Not built yet:
 
-- A nonce-based CSP. The policy in `next.config.ts` still carries
-  `'unsafe-inline'` for scripts, because Next injects inline bootstrap and
-  threading a per-request nonce through the middleware is a change worth
-  making on its own. What is in place — `frame-ancestors`, `base-uri`,
-  `form-action`, a closed `connect-src` — is real; an XSS backstop it is not
 - Rate limiting that survives more than one serverless instance. The limiter
   on the setup probe is in-memory and therefore per-instance
 
@@ -360,6 +366,12 @@ CHECK constraint on the column, catching both key generations. It is added
 ```sql
 alter table public.departments validate constraint departments_key_not_secret;
 ```
+
+This round also adds a **per-member storage cap**
+(`settings.max_member_storage_mb`, null for none), an **orphan sweep** on the
+administration screen for objects whose document row is gone, **one view per
+person per hour** instead of one per reload, and a fence tying
+`files.storage_path` to the folder its owner may actually write to.
 
 The current round of fixes also adds, to the tenant schema: `is_active_member()`
 on `claim_username()`, a shape constraint on invite codes (a code may carry

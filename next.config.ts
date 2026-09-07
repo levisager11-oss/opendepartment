@@ -1,44 +1,22 @@
 import type { NextConfig } from "next";
 
 /**
- * Content Security Policy.
+ * The Content Security Policy is NOT here any more.
  *
- * The wildcards are not laziness: which Supabase project a page talks to is
- * decided per request by the slug, so the origin an exhibit loads from is not
- * knowable at build time. `*.supabase.co` / `.in` is the same closed set the
- * setup probe pins to and the same one the control plane's `supabase_url`
- * CHECK constraint allows, so the policy is exactly as wide as the product is.
+ * A header declared in this file is one fixed string for every request, and a
+ * fixed string cannot carry a nonce -- which is why script-src used to say
+ * `'unsafe-inline'`, the one directive an XSS actually cares about. It is
+ * built per request in src/middleware.ts now, with a nonce and
+ * `'strict-dynamic'`, and set on both the request (so Next stamps the nonce
+ * onto its own bootstrap scripts) and the response.
  *
- * `object-src` has to include those hosts too: a PDF exhibit renders through
- * <object data={signedUrl}> in FileViewer, and the default of `default-src`
- * would blank it.
+ * Deliberately not declared in both places: two Content-Security-Policy
+ * headers are INTERSECTED rather than merged, so a permissive one here would
+ * not loosen the policy but would quietly make it much harder to reason about.
  *
- * Honest about `'unsafe-inline'` in script-src: Next injects inline bootstrap
- * scripts, and threading a per-request nonce through middleware that already
- * branches four ways is a change worth making on its own rather than smuggled
- * in beside a header list. So this policy is not an XSS backstop. What it does
- * buy is real: `frame-ancestors` closes clickjacking on the administration
- * screen, `base-uri` and `form-action` close two redirect tricks, and
- * `connect-src` means an injection cannot quietly post anywhere it likes.
+ * The headers below are per-request-invariant, so they stay. They also reach
+ * static assets, which the middleware matcher skips.
  */
-const SUPABASE = "https://*.supabase.co https://*.supabase.in";
-
-const csp = [
-  `default-src 'self'`,
-  `script-src 'self' 'unsafe-inline' https://storage.ko-fi.com`,
-  `style-src 'self' 'unsafe-inline'`,
-  `img-src 'self' data: blob: ${SUPABASE} https://storage.ko-fi.com https://cdn.ko-fi.com`,
-  `media-src 'self' blob: ${SUPABASE}`,
-  `object-src 'self' ${SUPABASE}`,
-  `frame-src 'self' ${SUPABASE}`,
-  `connect-src 'self' ${SUPABASE}`,
-  `font-src 'self' data:`,
-  `form-action 'self'`,
-  `base-uri 'self'`,
-  `frame-ancestors 'none'`,
-  `upgrade-insecure-requests`,
-].join("; ");
-
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   eslint: { ignoreDuringBuilds: true },
@@ -47,9 +25,8 @@ const nextConfig: NextConfig = {
       {
         source: "/:path*",
         headers: [
-          { key: "Content-Security-Policy", value: csp },
-          // Belt and braces with frame-ancestors above, for anything that
-          // still reads the older header.
+          // Belt and braces with frame-ancestors in the policy the
+          // middleware sets, for anything that still reads the older header.
           { key: "X-Frame-Options", value: "DENY" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           // Keeps the slug out of the Referer sent to a third party. A
