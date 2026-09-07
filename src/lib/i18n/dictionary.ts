@@ -230,6 +230,35 @@ export const dictionary = {
       "These are archives whose owners chose to be listed. Most departments are unlisted and reachable only by invitation.",
 
     // --- setup wizard ---------------------------------------------------
+    // --- one-click setup (only when this deployment registered an OAuth app)
+    "setup.autoTitle": "Let OpenDepartment set it up for you",
+    "setup.autoBody":
+      "Connect your Supabase account and we will create the project, install the schema, switch off e-mail confirmation and allow your department's sign-in address -- the next three steps, done. You still own the project; it is created in your own Supabase organisation.",
+    "setup.autoTrust":
+      "You will be asked to authorise OpenDepartment on Supabase. The access token that comes back is kept encrypted in your own browser, never in our database, and is deleted the moment setup finishes. It is used for exactly one thing: creating this project and putting the schema in it.",
+    "setup.autoConnect": "Connect Supabase",
+    "setup.autoNeedsAccount":
+      "You will be asked to sign in to OpenDepartment first.",
+    "setup.autoOrg": "Which Supabase organisation",
+    "setup.autoGo": "Create my project",
+    "setup.autoResume": "Carry on where it stopped",
+    "setup.autoPatience":
+      "Creating a Supabase project takes a minute or two. Leave this tab open.",
+    "setup.autoConfigured":
+      "E-mail confirmation is off and your sign-in address is already allowed -- both were set on your project during setup. Nothing to do in the Supabase dashboard.",
+    "setup.manualTitle": "Or do it yourself",
+    "setup.oauthFailed":
+      "That did not complete. Nothing was created, and you can either try again or set the project up by hand below.",
+    "setup.oauthExpired":
+      "The Supabase authorisation has expired. Connect again to carry on.",
+    "setup.noOrganisation":
+      "That Supabase account has no organisation to create a project in. Make one in the Supabase dashboard and try again.",
+    "setup.stillStarting":
+      "Your project was created and is still starting up. Wait a moment and press the button again -- it will carry on with the same project rather than making another.",
+    "setup.schemaFailedAuto":
+      "The project was created, but the schema did not install. Open it in the Supabase dashboard and paste the SQL from the next step by hand.",
+    "setup.provisionCreating": "Creating your project...",
+
     "setup.title": "Create a department",
     "setup.step": "Step {n} of {total}",
     "setup.step1": "Name it",
@@ -809,6 +838,35 @@ export const dictionary = {
       "Dies sind Archive, deren Administration eine Listung gewählt hat. Die meisten Departemente sind nicht gelistet und nur auf Einladung erreichbar.",
 
     // --- setup wizard ---------------------------------------------------
+    // --- Ein-Klick-Einrichtung (nur mit registrierter OAuth-App) ---------
+    "setup.autoTitle": "OpenDepartment richtet es für Sie ein",
+    "setup.autoBody":
+      "Verbinden Sie Ihr Supabase-Konto, und wir legen das Projekt an, installieren das Schema, schalten die E-Mail-Bestätigung ab und tragen die Anmeldeadresse Ihres Departements ein -- die nächsten drei Schritte, erledigt. Das Projekt gehört weiterhin Ihnen; es entsteht in Ihrer eigenen Supabase-Organisation.",
+    "setup.autoTrust":
+      "Sie werden bei Supabase um eine Freigabe für OpenDepartment gebeten. Das Zugriffstoken bleibt verschlüsselt in Ihrem eigenen Browser, nie in unserer Datenbank, und wird gelöscht, sobald die Einrichtung fertig ist. Es dient genau einem Zweck: dieses Projekt anzulegen und das Schema hineinzuschreiben.",
+    "setup.autoConnect": "Supabase verbinden",
+    "setup.autoNeedsAccount":
+      "Sie werden zuerst nach einer Anmeldung bei OpenDepartment gefragt.",
+    "setup.autoOrg": "Welche Supabase-Organisation",
+    "setup.autoGo": "Projekt anlegen",
+    "setup.autoResume": "Dort weitermachen, wo es aufgehört hat",
+    "setup.autoPatience":
+      "Ein Supabase-Projekt anzulegen dauert ein bis zwei Minuten. Lassen Sie diesen Tab offen.",
+    "setup.autoConfigured":
+      "Die E-Mail-Bestätigung ist aus und Ihre Anmeldeadresse ist bereits freigegeben -- beides wurde bei der Einrichtung gesetzt. Im Supabase-Dashboard ist nichts zu tun.",
+    "setup.manualTitle": "Oder selber machen",
+    "setup.oauthFailed":
+      "Das wurde nicht abgeschlossen. Es wurde nichts angelegt; Sie können es erneut versuchen oder das Projekt unten von Hand einrichten.",
+    "setup.oauthExpired":
+      "Die Supabase-Freigabe ist abgelaufen. Bitte erneut verbinden.",
+    "setup.noOrganisation":
+      "Dieses Supabase-Konto hat keine Organisation, in der ein Projekt entstehen könnte. Legen Sie im Supabase-Dashboard eine an und versuchen Sie es erneut.",
+    "setup.stillStarting":
+      "Ihr Projekt wurde angelegt und startet noch. Warten Sie einen Moment und drücken Sie die Schaltfläche erneut -- es wird mit demselben Projekt weitergemacht, kein zweites angelegt.",
+    "setup.schemaFailedAuto":
+      "Das Projekt wurde angelegt, das Schema aber nicht installiert. Öffnen Sie es im Supabase-Dashboard und fügen Sie das SQL aus dem nächsten Schritt von Hand ein.",
+    "setup.provisionCreating": "Ihr Projekt wird angelegt...",
+
     "setup.title": "Departement erstellen",
     "setup.step": "Schritt {n} von {total}",
     "setup.step1": "Benennen",

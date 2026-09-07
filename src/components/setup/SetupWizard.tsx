@@ -7,6 +7,7 @@ import {
   CONTROL_READY,
   createControlBrowserClient,
 } from "@/lib/control/browser";
+import { Spinner } from "@/components/Spinner";
 import { ControlAuthPanel } from "./ControlAuthPanel";
 import {
   looksLikeSecretKey,
@@ -105,6 +106,11 @@ type Draft = {
   url: string;
   anonKey: string;
   step: Step;
+  /**
+   * A project this wizard already created. Kept so that a reload after the
+   * automatic path started cannot lead to a second one on somebody's account.
+   */
+  projectRef: string;
 };
 
 export function SetupWizard({
@@ -149,6 +155,24 @@ export function SetupWizard({
   /** Nothing is written back until the saved draft has been read. */
   const [restored, setRestored] = useState(false);
 
+  // --- one-click setup ------------------------------------------------
+  /**
+   * null while unknown. `available` is whether this deployment registered a
+   * Supabase OAuth app at all; `connected` is whether this browser is holding
+   * a token for it. Neither can be answered on the client -- the client id is
+   * not public and the token cookie is httpOnly, which is the point of both.
+   */
+  const [oauth, setOauth] = useState<{
+    available: boolean;
+    connected: boolean;
+    organizations?: Array<{ id: string; name: string }>;
+  } | null>(null);
+  const [org, setOrg] = useState("");
+  const [provisioning, setProvisioning] = useState(false);
+  const [provisionStep, setProvisionStep] = useState<string | null>(null);
+  const [projectRef, setProjectRef] = useState("");
+  const [authAutoConfigured, setAuthAutoConfigured] = useState(false);
+
   /**
    * Restore a draft left by an earlier visit to this page.
    *
@@ -171,6 +195,7 @@ export function SetupWizard({
         if (draft.operatorContact) setOperatorContact(draft.operatorContact);
         if (draft.url) setUrl(draft.url);
         if (draft.anonKey) setAnonKey(draft.anonKey);
+        if (draft.projectRef) setProjectRef(draft.projectRef);
         // Never restore straight onto the done screen: step 6 is a claim about
         // a department that exists, and a stale draft is not evidence of one.
         if (draft.step && draft.step >= 1 && draft.step <= 5) {
@@ -190,14 +215,60 @@ export function SetupWizard({
     try {
       const draft: Draft = {
         name, slug, slugTouched, subjectLabel, docket, visibility,
-        operatorName, operatorContact, url, anonKey, step,
+        operatorName, operatorContact, url, anonKey, step, projectRef,
       };
       sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
     } catch {
       // Storage full or refused. The wizard still works; it just forgets.
     }
   }, [restored, name, slug, slugTouched, subjectLabel, docket, visibility,
-      operatorName, operatorContact, url, anonKey, step]);
+      operatorName, operatorContact, url, anonKey, step, projectRef]);
+
+  /**
+   * What the one-click path can do here, asked once the wizard is past naming.
+   *
+   * Re-asked whenever the account state changes, because "connected" is a
+   * property of a cookie that the OAuth round trip sets and provisioning
+   * clears -- not something this component can track on its own.
+   */
+  const refreshOauth = useCallback(async () => {
+    try {
+      const status = await fetch("/api/setup/oauth/status").then((r) => r.json());
+      setOauth(status);
+      // Functional update, and `org` is deliberately not a dependency: reading
+      // it here would give this callback a new identity every time it set the
+      // value, and the effect below would fetch a second time to learn nothing.
+      if (status.organizations?.length) {
+        setOrg((current) => current || status.organizations[0].id);
+      }
+    } catch {
+      setOauth({ available: false, connected: false });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (step < 2) return;
+    void refreshOauth();
+  }, [step, signedIn, refreshOauth]);
+
+  /**
+   * The OAuth callback sends people back here with a verdict in the query
+   * string, because it cannot render into a wizard whose state lives in this
+   * tab. Read once, then taken out of the address bar so a reload does not
+   * show a stale complaint.
+   */
+  useEffect(() => {
+    if (!restored) return;
+    const verdict = new URLSearchParams(window.location.search).get("oauth");
+    if (!verdict) return;
+
+    if (verdict !== "ok") {
+      setError(t("setup.oauthFailed"));
+    }
+    // The automatic path only makes sense from the Supabase step onwards.
+    setStep((current) => (current < 2 ? 2 : current));
+    window.history.replaceState({}, "", "/new");
+  }, [restored, t]);
 
   /** Only the connect step needs an account, so the check waits until then. */
   useEffect(() => {
@@ -323,6 +394,85 @@ export function SetupWizard({
     setPasteNote(
       parsed.derivedUrl ? t("setup.pasteDerived") : t("setup.pasteFound")
     );
+  }
+
+  /**
+   * Create the project, run the schema, and configure auth -- in one call.
+   *
+   * This is the manual middle of this wizard (create a project, wait, paste
+   * SQL, turn off e-mail confirmation, allow the callback URL, copy two values
+   * back) done against a token the person authorised. What it does NOT do is
+   * register the department: that still happens from this browser under their
+   * own control-plane session, with the same per-account cap, exactly as the
+   * manual path does.
+   */
+  async function provision() {
+    setProvisioning(true);
+    setError(null);
+    setProvisionStep(t("setup.provisionCreating"));
+
+    let result: {
+      ok?: boolean;
+      error?: string;
+      detail?: string;
+      ref?: string;
+      url?: string;
+      key?: string;
+      authConfigured?: boolean;
+    };
+
+    try {
+      result = await fetch("/api/setup/provision", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim() || "OpenDepartment",
+          slug,
+          org,
+          sql: fullSql,
+          // Sent only when resuming: the server creates nothing if it is set,
+          // so a retry cannot leave a second project on somebody's account.
+          ref: projectRef || undefined,
+        }),
+      }).then((r) => r.json());
+    } catch {
+      setProvisioning(false);
+      setProvisionStep(null);
+      setError(t("setup.probeFailed"));
+      return;
+    }
+
+    // Remember the project even when the request failed after creating it.
+    if (result.ref) setProjectRef(result.ref);
+    setProvisioning(false);
+    setProvisionStep(null);
+
+    if (!result.ok) {
+      const map: Record<string, string> = {
+        NOT_CONNECTED: t("setup.oauthExpired"),
+        NOT_SIGNED_IN: t("setup.signInFirst"),
+        RATE_LIMITED: t("setup.rateLimited"),
+        NO_ORGANISATION: t("setup.noOrganisation"),
+        STILL_STARTING: t("setup.stillStarting"),
+        SCHEMA_FAILED: t("setup.schemaFailedAuto"),
+      };
+      setError(
+        (result.error ? map[result.error] : undefined) ??
+          result.detail ??
+          t("common.error")
+      );
+      // A project that exists but was not ready yet leaves the token in place,
+      // so the same button resumes rather than starting again.
+      if (result.url) setUrl(result.url);
+      void refreshOauth();
+      return;
+    }
+
+    setUrl(result.url ?? "");
+    setAnonKey(result.key ?? "");
+    setAuthAutoConfigured(Boolean(result.authConfigured));
+    void refreshOauth();
+    setStep(5);
   }
 
   async function verifyAndCreate() {
@@ -595,11 +745,103 @@ export function SetupWizard({
 
       {/* ---------------------------------------------------------------- */}
       {step === 2 && (
-        <div className="paper space-y-4 p-5 sm:p-6">
+        <div className="paper space-y-5 p-5 sm:p-6">
           <p className="text-base text-ink-900">{t("setup.supabaseIntro")}</p>
-          <p className="text-sm leading-relaxed text-ink-700">
-            {t("setup.supabaseSteps")}
-          </p>
+
+          {/* The automatic path, when this deployment has registered a
+              Supabase OAuth app. It replaces the whole manual middle of this
+              wizard -- create a project, wait for it, paste the SQL, turn off
+              e-mail confirmation, allow the callback URL, copy two values back
+              -- with one button. The manual path stays below it, because it is
+              the only one that works when the deployment has no OAuth app, and
+              because some people would simply rather not authorise anything. */}
+          {oauth?.available && (
+            <div className="border-l-4 border-stamp-green bg-stamp-green/5 p-4">
+              <p className="mb-1 text-sm font-bold text-ink-900">
+                {t("setup.autoTitle")}
+              </p>
+              <p className="mb-3 text-sm leading-relaxed text-ink-700">
+                {t("setup.autoBody")}
+              </p>
+
+              {!oauth.connected ? (
+                <>
+                  <p className="mb-3 text-xs leading-relaxed text-ink-500">
+                    {t("setup.autoTrust")}
+                  </p>
+                  <a
+                    href="/api/setup/oauth/start"
+                    className="btn btn-primary"
+                  >
+                    {t("setup.autoConnect")} ↗
+                  </a>
+                  {!signedIn && (
+                    <p className="mt-2 text-xs text-ink-500">
+                      {t("setup.autoNeedsAccount")}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <>
+                  {(oauth.organizations?.length ?? 0) > 1 && (
+                    <div className="mb-3">
+                      <label className="label" htmlFor="setup-org">
+                        {t("setup.autoOrg")}
+                      </label>
+                      <select
+                        id="setup-org"
+                        className="field"
+                        value={org}
+                        onChange={(e) => setOrg(e.target.value)}
+                      >
+                        {oauth.organizations?.map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={provision}
+                    disabled={provisioning}
+                    aria-busy={provisioning}
+                    className="btn btn-primary"
+                  >
+                    {provisioning && <Spinner />}
+                    {provisioning
+                      ? (provisionStep ?? t("setup.verifying"))
+                      : projectRef
+                        ? t("setup.autoResume")
+                        : t("setup.autoGo")}
+                  </button>
+                  {provisioning && (
+                    <p className="mt-2 text-xs text-ink-500">
+                      {t("setup.autoPatience")}
+                    </p>
+                  )}
+                </>
+              )}
+
+              {error && (
+                <p role="alert" className="notice notice-error mt-3 text-xs">
+                  {error}
+                </p>
+              )}
+            </div>
+          )}
+
+          <div>
+            <p className="mb-1 text-sm font-bold text-ink-900">
+              {oauth?.available ? t("setup.manualTitle") : ""}
+            </p>
+            <p className="text-sm leading-relaxed text-ink-700">
+              {t("setup.supabaseSteps")}
+            </p>
+          </div>
+
           <a
             href="https://supabase.com/dashboard/new"
             target="_blank"
@@ -789,6 +1031,14 @@ export function SetupWizard({
             mono
           />
 
+          {authAutoConfigured ? (
+            <div className="border-l-4 border-stamp-green bg-stamp-green/5 p-3">
+              <p className="text-xs leading-relaxed text-ink-700">
+                {t("setup.autoConfigured")}
+              </p>
+            </div>
+          ) : (
+          <>
           {/* Not a footnote. A redirect URL that is not on the allowlist means
               every confirmation link and every password reset in this
               department lands on an error page instead of signing anybody in,
@@ -810,6 +1060,8 @@ export function SetupWizard({
               {callbackCopied ? t("setup.sqlCopied") : t("setup.copyCallback")}
             </button>
           </div>
+          </>
+          )}
 
           {/* Registering a slug writes to the control plane, so this step --
               and only this step -- cannot work without one. Say that out loud:

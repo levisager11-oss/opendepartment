@@ -62,10 +62,21 @@ the tenant's own database, each re-checking `is_admin()` itself:
 | `admin.from("user_emails")` for one file | `admin_file_owner_email(id)` |
 | `admin` counts for the landing page | `department_stats()` |
 
-What OpenDepartment holds is a URL and an anon key — both public by design and
-useless without an account the tenant's own RLS admits. **We cannot read any
-department's contents**, which is a feature, not a limitation: it is also the
-honest answer when someone asks who can see their files.
+What OpenDepartment holds **at rest** is a URL and an anon key — both public by
+design and useless without an account the tenant's own RLS admits. **We cannot
+read any department's contents**, which is a feature, not a limitation: it is
+also the honest answer when someone asks who can see their files.
+
+One caveat, and it is a real one. If the deployment enables the optional
+[one-click setup](#one-click-setup-optional), OpenDepartment **does** handle a
+Supabase Management API token belonging to the person setting up — for the
+minutes it takes to create their project and install the schema. That token is
+never written to any database; it lives encrypted in an httpOnly cookie in
+their own browser and is deleted when provisioning finishes. But the server
+decrypts it on each request, which it must in order to use it. So the accurate
+claim is *never stored, never persistent, and scoped to setup* — not *never
+seen*. A deployment that does not want that property simply leaves the two
+environment variables unset, and the feature does not exist.
 
 The setup endpoint decodes the pasted key and **refuses a `service_role` JWT**
 outright rather than trusting the instruction not to paste one.
@@ -149,6 +160,44 @@ somebody registered through the wizard.
 To fill a department with something to look at, run `db/seed-demo.sql`: five
 subjects, twelve exhibits, comments, mixed votes, one open report, and three
 demo members (password `demopass123`) so scores are not all from one person.
+
+## One-click setup (optional)
+
+A department owner's real work is four steps in the Supabase dashboard: create
+a project, paste a schema, turn off e-mail confirmation, allow a callback URL.
+Three of those are steps people skip and then file a bug about.
+
+Register an OAuth app on Supabase and set `SUPABASE_OAUTH_CLIENT_ID` /
+`SUPABASE_OAUTH_CLIENT_SECRET`, and the wizard offers to do all four itself.
+The redirect URL to register is `https://YOUR-DEPLOYMENT/api/setup/oauth/callback`.
+
+```
+/api/setup/oauth/start      PKCE + state, both sealed; requires an account
+/api/setup/oauth/callback   exchanges the code, seals the token into a cookie
+/api/setup/oauth/status     what this deployment offers, and whether you are connected
+/api/setup/provision        create project → wait for health → run schema →
+                            read the anon key → configure auth → forget the token
+```
+
+What it deliberately does **not** do:
+
+- **It does not register the department.** That still happens from the browser
+  under the operator's own control-plane session, through
+  `register_department()` and its per-account cap, exactly as the manual path
+  does. The endpoint hands back a URL and an anon key; it does not decide who
+  they belong to.
+- **It does not keep the token.** Cleared on every exit except
+  `STILL_STARTING`, which is the one outcome a caller can continue from — and
+  a continuation sends back the project ref, so a retry can never leave a
+  second project on somebody's account.
+- **It does not keep the database password.** One is generated for project
+  creation and discarded. OpenDepartment never connects to a tenant's database
+  directly — everything goes through PostgREST with the anon key — so keeping
+  one would be keeping a credential for no reason.
+
+Leave both variables unset and none of this exists: the wizard does not offer
+it and every route above answers 503. **The manual path is unchanged either
+way**, and remains the only path on a deployment without an OAuth app.
 
 ## What an owner does
 
@@ -245,7 +294,14 @@ the create-a-department flow run end to end on the live deployment).
 - Marketing landing, `/directory`, `/legal/terms`, `/legal/privacy`,
   `/account`, `/account/login`
 - Five-step setup wizard: SSRF-pinned probing, service-key rejection, SQL
-  personalisation, and the e-mail step
+  personalisation, and the e-mail step. The connect step takes a paste of
+  anything with a project URL or key in it, the draft survives a reload, and
+  the operator's own name and contact are collected so a new department's
+  imprint is not blank
+- Optional one-click setup over a Supabase OAuth app (see above). Written
+  against the Management API reference; **not yet exercised against a live
+  Supabase OAuth app**, because that needs credentials this repository does
+  not have. Inert until those are set
 - Department: front door, `login`, `join` (invite redemption),
   `auth/callback`, `onboarding`, `access-denied`, `vault`, `upload`,
   `file/[id]`, `admin`

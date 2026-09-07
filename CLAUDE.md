@@ -135,6 +135,14 @@ overwritten otherwise.
   `src/app/account/*` — the platform level (register a department, browse
   the public directory, manage an OpenDepartment account). Guarded by
   `controlMiddleware`, not tenant auth.
+- `src/app/api/setup/oauth/*` and `src/app/api/setup/provision` — the optional
+  one-click path. Inert unless `SUPABASE_OAUTH_CLIENT_ID` /
+  `SUPABASE_OAUTH_CLIENT_SECRET` are set, and the manual wizard must keep
+  working without them. The Management API token never touches a database:
+  it is sealed (AES-256-GCM, key derived from the client secret) into an
+  httpOnly cookie scoped to `/api/setup` and cleared on every exit except the
+  resumable one. `provision` deliberately does not register the department —
+  that stays in the browser under `register_department()` and its cap.
 - `src/app/api/setup/probe` — server-side probe of a candidate Supabase
   project during onboarding. Pins the target to `*.supabase.co`/`.in`
   before fetching (SSRF guard) and rejects any `service_role`-shaped key
