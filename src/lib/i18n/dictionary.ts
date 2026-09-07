@@ -244,7 +244,7 @@ export const dictionary = {
     "setup.oauthExchange":
       "Supabase would not exchange the authorisation code. The usual cause is a mismatch between the OAuth app and this deployment -- check that its callback URL is exactly this site plus /api/setup/oauth/callback, and that the client ID and secret in the environment belong to that same app.",
     "setup.oauthScope":
-      "Supabase accepted the authorisation and then refused the first request ({status}). The OAuth app is most likely missing a permission: it needs Organizations read, Projects write, Database write, Secrets read and Auth write.",
+      "Supabase accepted the authorisation and then refused the first request ({status}). The OAuth app is most likely missing a permission: it needs Organizations read, Projects read and write, Database write, Secrets read and Auth write. After changing them, connect again -- an existing authorisation keeps the scopes it was granted.",
 
     "setup.autoTitle": "Let OpenDepartment set it up for you",
     "setup.autoBody":
@@ -264,6 +264,10 @@ export const dictionary = {
     "setup.manualTitle": "Or do it yourself",
     "setup.oauthFailed":
       "That did not complete. Nothing was created, and you can either try again or set the project up by hand below.",
+    "setup.oauthRefused":
+      "Supabase accepted the sign-in but refused the first request made with it -- the OAuth app is missing a permission. It needs Organizations read, Projects read and write, Database write, Secrets read, and Auth write. Change them in the Supabase dashboard, then connect again so a new authorisation picks them up.",
+    "setup.oauthUnreachable":
+      "Supabase could not be reached to confirm the connection. Try again in a moment, or set the project up by hand below.",
     "setup.oauthExpired":
       "The Supabase authorisation has expired. Connect again to carry on.",
     "setup.noOrganisation":
@@ -867,7 +871,7 @@ export const dictionary = {
     "setup.oauthExchange":
       "Supabase hat den Autorisierungscode nicht eingelöst. Meist passen OAuth-App und Installation nicht zusammen -- prüfen Sie, ob die Callback-URL exakt diese Website plus /api/setup/oauth/callback ist und ob Client-ID und Secret in der Umgebung zu genau dieser App gehören.",
     "setup.oauthScope":
-      "Supabase hat die Autorisierung angenommen und dann die erste Anfrage abgelehnt ({status}). Vermutlich fehlt der OAuth-App eine Berechtigung: nötig sind Organizations lesen, Projects schreiben, Database schreiben, Secrets lesen und Auth schreiben.",
+      "Supabase hat die Autorisierung angenommen und dann die erste Anfrage abgelehnt ({status}). Vermutlich fehlt der OAuth-App eine Berechtigung: nötig sind Organizations lesen, Projects lesen und schreiben, Database schreiben, Secrets lesen und Auth schreiben. Verbinden Sie danach erneut -- eine bestehende Freigabe behält die Berechtigungen, mit denen sie erteilt wurde.",
 
     "setup.autoTitle": "OpenDepartment richtet es für Sie ein",
     "setup.autoBody":
@@ -887,6 +891,10 @@ export const dictionary = {
     "setup.manualTitle": "Oder selber machen",
     "setup.oauthFailed":
       "Das wurde nicht abgeschlossen. Es wurde nichts angelegt; Sie können es erneut versuchen oder das Projekt unten von Hand einrichten.",
+    "setup.oauthRefused":
+      "Supabase hat die Anmeldung angenommen, die erste Anfrage damit aber abgelehnt -- der OAuth-App fehlt eine Berechtigung. Nötig sind Organizations lesen, Projects lesen und schreiben, Database schreiben, Secrets lesen und Auth schreiben. Ändern Sie das im Supabase-Dashboard und verbinden Sie danach erneut, damit eine neue Freigabe sie übernimmt.",
+    "setup.oauthUnreachable":
+      "Supabase war nicht erreichbar, um die Verbindung zu bestätigen. Versuchen Sie es gleich noch einmal oder richten Sie das Projekt unten von Hand ein.",
     "setup.oauthExpired":
       "Die Supabase-Freigabe ist abgelaufen. Bitte erneut verbinden.",
     "setup.noOrganisation":

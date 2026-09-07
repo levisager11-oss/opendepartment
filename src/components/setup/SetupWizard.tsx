@@ -167,6 +167,9 @@ export function SetupWizard({
     available: boolean;
     connected: boolean;
     organizations?: Array<{ id: string; name: string }>;
+    /** Why not connected, when the answer is more useful than "no". */
+    reason?: string;
+    detail?: string;
   } | null>(null);
   const [org, setOrg] = useState("");
   const [provisioning, setProvisioning] = useState(false);
@@ -253,6 +256,12 @@ export function SetupWizard({
         setOauthNote(
           t("setup.oauthScope", { status: String(status.status ?? "") }) +
             (status.detail ? ` (${status.detail})` : "")
+        );
+      } else if (status.reason === "api_unreachable") {
+        // Not a scope problem. Sending somebody to edit their OAuth app over a
+        // timeout or a 5xx is sending them to fix the wrong thing.
+        setOauthNote(
+          t("setup.oauthUnreachable") + (status.detail ? ` (${status.detail})` : "")
         );
       } else if (status.connected) {
         setOauthNote(null);
@@ -489,6 +498,7 @@ export function SetupWizard({
         NOT_SIGNED_IN: t("setup.signInFirst"),
         RATE_LIMITED: t("setup.rateLimited"),
         NO_ORGANISATION: t("setup.noOrganisation"),
+        API_REFUSED: t("setup.oauthRefused"),
         STILL_STARTING: t("setup.stillStarting"),
         SCHEMA_FAILED: t("setup.schemaFailedAuto"),
       };

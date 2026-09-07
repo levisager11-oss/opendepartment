@@ -39,12 +39,24 @@ export async function GET(request: NextRequest) {
   // what it looked like.
   const orgs = await listOrganizations(token);
   if (!orgs.ok) {
+    // This is the branch that used to make the whole feature look like it did
+    // nothing: the round trip succeeds, a token is sealed into the cookie, and
+    // then the very first call with it is refused -- so the wizard asked "am I
+    // connected?", heard "no", and redrew the same Connect button with no hint
+    // that anything had happened at all.
+    //
+    // 401/403 means the token is real and Supabase will not let it do this,
+    // which is what an OAuth app published without Organizations:Read looks
+    // like from here. Anything else -- a timeout, a 5xx, a DNS failure -- is
+    // not a scope problem, and telling somebody to go and edit their scopes
+    // over a network blip sends them to fix the wrong thing.
+    const refused = orgs.status === 401 || orgs.status === 403;
     return NextResponse.json({
       available: true,
       connected: false,
-      reason: "api_refused",
+      reason: refused ? "api_refused" : "api_unreachable",
       status: orgs.status,
-      detail: orgs.message.slice(0, 200),
+      detail: orgs.message.slice(0, 300),
     });
   }
 

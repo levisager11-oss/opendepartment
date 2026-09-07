@@ -40,7 +40,17 @@ export async function GET(request: NextRequest) {
   authorize.searchParams.set("client_id", process.env.SUPABASE_OAUTH_CLIENT_ID!);
   authorize.searchParams.set("redirect_uri", redirectUri);
   authorize.searchParams.set("response_type", "code");
-  authorize.searchParams.set("scope", "all");
+  // No `scope` parameter, deliberately.
+  //
+  // Supabase marks it deprecated: an OAuth app's scopes are fixed when the app
+  // is published in the dashboard, and the authorize endpoint takes them from
+  // there. The value this used to send -- `scope=all` -- is not a member of the
+  // granular vocabulary Supabase actually uses (`organizations:read`,
+  // `projects:write`, ...), so asking for it narrowed the grant to the empty
+  // intersection instead of widening it: the code exchanged cleanly and every
+  // Management API call the token was then used for came back 403. Omitting the
+  // parameter is the documented way to get exactly the scopes the app was
+  // published with, which is what README's table asks the operator to set.
   authorize.searchParams.set("state", state);
   authorize.searchParams.set("code_challenge", challenge);
   authorize.searchParams.set("code_challenge_method", "S256");
