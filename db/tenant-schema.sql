@@ -61,6 +61,16 @@ insert into public.settings (id) values (true) on conflict (id) do nothing;
 alter table public.settings
   add column if not exists open_join boolean not null default false;
 
+-- How much one member may keep in the bucket, in megabytes. Null means no cap,
+-- which is what every existing department gets when it re-runs this file.
+--
+-- The per-file limit was the only ceiling there was, so thirty members with a
+-- 25 MB cap could put 750 MB into a free tier that holds one gigabyte -- and
+-- one member could do it alone. The department's own administrator is the
+-- person who finds out, by way of uploads that stop working for everybody.
+alter table public.settings
+  add column if not exists max_member_storage_mb integer;
+
 -- ---------------------------------------------------------------------------
 -- Value constraints on the settings row.
 --
@@ -94,6 +104,17 @@ alter table public.settings drop constraint if exists settings_upload_range;
 alter table public.settings
   add constraint settings_upload_range check (max_upload_mb between 1 and 50);
 
+update public.settings
+   set max_member_storage_mb = least(greatest(max_member_storage_mb, 1), 100000)
+ where max_member_storage_mb is not null;
+
+alter table public.settings drop constraint if exists settings_member_quota_range;
+alter table public.settings
+  add constraint settings_member_quota_range check (
+    max_member_storage_mb is null
+    or max_member_storage_mb between 1 and 100000
+  );
+
 alter table public.settings drop constraint if exists settings_categories_present;
 alter table public.settings
   add constraint settings_categories_present check (cardinality(categories) > 0);
@@ -119,6 +140,32 @@ create table if not exists public.invites (
   created_by   uuid,
   created_at   timestamptz not null default now()
 );
+
+-- ---------------------------------------------------------------------------
+-- What a code has to look like.
+--
+-- Two rules, both of which were previously only true because the admin screen
+-- happened to generate codes that way -- and `invites` is admin-writable over
+-- PostgREST, so "the form does it" is not a rule.
+--
+--   LENGTH. The generator mints nine characters out of a 32-letter alphabet,
+--   which is fine. Nothing stopped an administrator typing PARTY into the
+--   field instead, and a code may carry `grants_admin` -- so a guessable one
+--   is not a weak password, it is an unauthenticated route to reading every
+--   member's e-mail address.
+--
+--   CASE. handle_new_user() upper-cases the code it is handed before looking
+--   it up, so a code stored in lower case can never be redeemed by anybody.
+--   The screen upper-cases on the way in; the column now says so.
+--
+-- NOT VALID, like the constraints on `files` below: a department re-running
+-- this file keeps the codes it has already handed out.
+-- ---------------------------------------------------------------------------
+alter table public.invites drop constraint if exists invites_code_shape;
+alter table public.invites
+  add constraint invites_code_shape check (
+    char_length(code) between 8 and 64 and code = upper(code)
+  ) not valid;
 
 -- ---------------------------------------------------------------------------
 -- 2. PROFILES -- public identity. Deliberately carries NO e-mail address, so
@@ -223,6 +270,18 @@ alter table public.files
   add constraint files_size_sane
   check (size_bytes between 0 and 52428800) not valid;
 
+-- The storage policy fences an upload into a folder named after the uploader,
+-- but nothing said the ROW had to point at a path in that folder. A member
+-- could file a row claiming somebody else's object -- and delete_file(), which
+-- an owner may call on their own row, hands back the path it finds there.
+-- Storage RLS would still refuse the object deletion, so this is defence in
+-- depth rather than a hole; it is also one line, and it makes the two halves
+-- of an upload agree by construction instead of by convention.
+alter table public.files drop constraint if exists files_path_is_owners;
+alter table public.files
+  add constraint files_path_is_owners
+  check (split_part(storage_path, '/', 1) = owner_id::text) not valid;
+
 alter table public.files drop constraint if exists files_text_lengths;
 alter table public.files
   add constraint files_text_lengths check (
@@ -317,9 +376,26 @@ create index if not exists audit_created_idx on public.audit_log (created_at des
 --  HELPERS
 -- ===========================================================================
 
+-- A ban has to reach administrators too.
+--
+-- This used to read `is_admin` alone, which meant banning a rogue
+-- administrator took away the interface and nothing else: requireMember() in
+-- the app sends them to /access-denied, but the department's anon key and
+-- their still-valid session are all it takes to call the RPCs directly. A
+-- banned administrator could go on reading every member's e-mail address
+-- through admin_list_members(), deleting other people's documents, and
+-- banning whoever had just banned them.
+--
+-- Banning is the only lever an administrator has against another
+-- administrator that does not depend on the other one cooperating, so it has
+-- to be the one that lands. `and not is_banned` is the whole fix; every
+-- privileged path already routes through this function.
 create or replace function public.is_admin()
 returns boolean language sql stable security definer set search_path = public as $fn$
-  select coalesce((select is_admin from public.profiles where id = auth.uid()), false);
+  select coalesce(
+    (select p.is_admin and not p.is_banned
+       from public.profiles p where p.id = auth.uid()),
+    false);
 $fn$;
 
 create or replace function public.is_active_member()
@@ -350,9 +426,13 @@ declare
   inv         public.invites%rowtype;
   make_admin  boolean := false;
 begin
+  -- FOR UPDATE for the same reason the invite lookup below has it: two people
+  -- signing up in the same instant both read `claimed = false` and both found
+  -- the department, and the second administrator is one nobody chose. The lock
+  -- makes the loser of the race read the row the winner already claimed.
   select not s.claimed, s.open_join
     into unclaimed, open_door
-    from public.settings s where s.id;
+    from public.settings s where s.id for update;
 
   if unclaimed then
     -- The first account through the door founds the department.
@@ -457,6 +537,44 @@ drop trigger if exists reports_changed on public.reports;
 create trigger reports_changed after insert or update or delete on public.reports
   for each row execute function public.refresh_file_reports();
 
+-- ---------------------------------------------------------------------------
+-- The per-member storage cap.
+--
+-- A trigger rather than a policy, because a policy cannot express "the sum of
+-- what you already have, plus this". It runs as the table owner, so it sees
+-- every member's rows regardless of who is inserting.
+--
+-- Honest about what it measures: `size_bytes` is what the browser said, the
+-- same caveat the constraint above already carries. A member who understates
+-- it is understating their own usage, and the bucket's own file_size_limit
+-- still caps each individual object -- so this bounds the ordinary case, which
+-- is the one that fills a free tier by accident.
+-- ---------------------------------------------------------------------------
+create or replace function public.enforce_member_quota()
+returns trigger language plpgsql security definer set search_path = public as $fn$
+declare cap_mb integer; used bigint;
+begin
+  select s.max_member_storage_mb into cap_mb from public.settings s where s.id;
+  if cap_mb is null then return new; end if;
+
+  select coalesce(sum(f.size_bytes), 0) into used
+    from public.files f where f.owner_id = new.owner_id;
+
+  if used + new.size_bytes > cap_mb::bigint * 1024 * 1024 then
+    raise exception 'QUOTA_EXCEEDED'
+      using hint = 'This account has reached the storage limit for this department.';
+  end if;
+
+  return new;
+end; $fn$;
+
+revoke execute on function public.enforce_member_quota() from anon, authenticated, public;
+
+drop trigger if exists files_quota_check on public.files;
+create trigger files_quota_check
+  before insert on public.files
+  for each row execute function public.enforce_member_quota();
+
 -- ===========================================================================
 --  MEMBER RPCs
 -- ===========================================================================
@@ -467,11 +585,48 @@ create trigger reports_changed after insert or update or delete on public.report
 -- was enough to drive unbounded writes into the owner's database. The
 -- membership check is what every other member RPC already does; the revoke is
 -- what stops a signed-out caller reaching it at all.
+--
+-- It also counted every reload. A counter that a member can drive by holding
+-- F5 is not a number anybody should sort by, and each press is a write into
+-- the owner's database. What is worth counting is people, so the visit is
+-- recorded per person and the counter only moves when that person has not
+-- been here in the last hour.
+create table if not exists public.file_views (
+  file_id   uuid not null references public.files(id) on delete cascade,
+  user_id   uuid not null references public.profiles(id) on delete cascade,
+  last_seen timestamptz not null default now(),
+  primary key (file_id, user_id)
+);
+
+-- RLS on with no policy: deny-all. Nothing reads this over the API -- who
+-- looked at what is exactly the sort of thing a members-readable table should
+-- not be able to answer. increment_view() reaches it as security definer.
+alter table public.file_views enable row level security;
+
 create or replace function public.increment_view(target uuid)
 returns void language plpgsql security definer set search_path = public as $fn$
+declare counted boolean;
 begin
   if not public.is_active_member() then return; end if;
-  update public.files set view_count = view_count + 1 where id = target;
+
+  -- A page can be opened with any id at all. Without this the insert below
+  -- raises a foreign key violation where the old version quietly updated
+  -- nothing, and the file page would 500 instead of rendering its 404.
+  if not exists (select 1 from public.files f where f.id = target) then
+    return;
+  end if;
+
+  insert into public.file_views (file_id, user_id, last_seen)
+  values (target, auth.uid(), now())
+  on conflict (file_id, user_id) do update
+     set last_seen = now()
+   where public.file_views.last_seen < now() - interval '1 hour'
+  returning true into counted;
+
+  -- Null when the ON CONFLICT clause matched nothing: they were already here.
+  if counted then
+    update public.files set view_count = view_count + 1 where id = target;
+  end if;
 end; $fn$;
 
 revoke execute on function public.increment_view(uuid) from anon, public;
@@ -503,6 +658,10 @@ create or replace function public.claim_username(desired text)
 returns text language plpgsql security definer set search_path = public as $fn$
 declare clean text := trim(desired);
 begin
+  -- Every other member RPC checks this. Without it a banned member could go on
+  -- renaming themselves -- and the name is the one thing of theirs that the
+  -- members who can still read the archive see.
+  if not public.is_active_member() then raise exception 'NOT_A_MEMBER'; end if;
   if clean !~ '^[A-Za-z0-9_-]{3,20}$' then raise exception 'USERNAME_INVALID'; end if;
   if exists (select 1 from public.profiles p
               where lower(p.username) = lower(clean) and p.id <> auth.uid()) then
@@ -581,6 +740,64 @@ begin
   values (auth.uid(), 'member.' || flag, target::text, jsonb_build_object('value', value));
 end; $fn$;
 
+-- ---------------------------------------------------------------------------
+-- Objects in the bucket that no longer have a row.
+--
+-- delete_file() removes the row and hands the path back for the caller to
+-- delete the object, which is two steps -- and a browser that is closed, loses
+-- its connection or is simply killed between them leaves the object behind.
+-- Nothing in the app can see it after that, and it still counts against the
+-- owner's storage. This is how they find out.
+--
+-- Listing only. Deleting the row out of storage.objects would drop the
+-- metadata and leave the bytes where they are; the object has to go through
+-- the storage API, which an administrator's own session is already allowed to
+-- call. Same division of labour as delete_file().
+--
+-- Wrapped, because storage.objects belongs to supabase_storage_admin: on a
+-- project where this function's owner cannot read it, an administration screen
+-- should render without this panel rather than not render.
+-- ---------------------------------------------------------------------------
+create or replace function public.admin_orphaned_objects()
+returns table (path text, size_bytes bigint, created_at timestamptz)
+language plpgsql security definer set search_path = public as $fn$
+begin
+  if not public.is_admin() then raise exception 'NOT_ADMIN'; end if;
+
+  begin
+    return query
+      select o.name::text,
+             coalesce((o.metadata ->> 'size')::bigint, 0),
+             o.created_at
+        from storage.objects o
+       where o.bucket_id = 'department-files'
+         and not exists (
+           select 1 from public.files f where f.storage_path = o.name
+         )
+       order by o.created_at
+       limit 500;
+  exception when others then
+    raise warning 'could not read storage.objects: %', sqlerrm;
+    return;
+  end;
+end; $fn$;
+
+-- What each member is keeping, for the same screen. Counts rows rather than
+-- objects, which is what the quota above is enforced against.
+create or replace function public.admin_storage_usage()
+returns table (owner_id uuid, username text, files bigint, bytes bigint)
+language plpgsql security definer set search_path = public as $fn$
+begin
+  if not public.is_admin() then raise exception 'NOT_ADMIN'; end if;
+  return query
+    select p.id, p.username, count(f.id), coalesce(sum(f.size_bytes), 0)::bigint
+      from public.profiles p
+      left join public.files f on f.owner_id = p.id
+     group by p.id, p.username
+     having count(f.id) > 0
+     order by coalesce(sum(f.size_bytes), 0) desc;
+end; $fn$;
+
 -- Counters for the department's front door. Returns only totals -- never
 -- titles, never names.
 create or replace function public.department_stats()
@@ -656,7 +873,8 @@ create policy settings_admin_write on public.settings
 revoke update on public.settings from anon, authenticated;
 grant  update (department_name, tagline, subject_label, docket_prefix,
                seal_top, seal_bottom, accent, categories, max_upload_mb,
-               operator_name, operator_contact, open_join)
+               max_member_storage_mb, operator_name, operator_contact,
+               open_join)
   on public.settings to authenticated;
 
 -- INVITES: admins only. The signup trigger reads them as security definer.

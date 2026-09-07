@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n/provider";
 import { useTenant, useTenantClient } from "@/lib/tenant/context";
 import { KindIcon } from "@/components/KindIcon";
+import { scrubImage } from "@/lib/tenant/scrub";
 import {
   ACCEPTED_MIME,
   STORAGE_BUCKET,
@@ -53,9 +54,14 @@ export function UploadForm({
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** What happened to the picture's metadata, so the form can say. */
+  const [scrubNote, setScrubNote] = useState<"stripped" | "unsupported" | null>(
+    null
+  );
 
-  function chooseFile(next: File | null) {
+  async function chooseFile(next: File | null) {
     setError(null);
+    setScrubNote(null);
     if (!next) return;
 
     if (!ACCEPTED_MIME[next.type]) {
@@ -67,12 +73,22 @@ export function UploadForm({
       return;
     }
 
-    setFile(next);
-    if (!title) setTitle(next.name.replace(/\.[^.]+$/, ""));
+    // A phone photograph says where it was taken, when, and on what. This
+    // archive's subject is often the people in it, so that has to come off
+    // before the bytes leave the browser -- afterwards they are in the
+    // department owner's bucket and it is too late. Losslessly: the segments
+    // are removed from the container, the pixels are not touched.
+    const scrubbed = await scrubImage(next);
+    const chosen = scrubbed.file;
+    if (scrubbed.scrubbed) setScrubNote("stripped");
+    else if (scrubbed.unsupported) setScrubNote("unsupported");
+
+    setFile(chosen);
+    if (!title) setTitle(chosen.name.replace(/\.[^.]+$/, ""));
 
     if (preview) URL.revokeObjectURL(preview);
     setPreview(
-      next.type.startsWith("image/") ? URL.createObjectURL(next) : null
+      chosen.type.startsWith("image/") ? URL.createObjectURL(chosen) : null
     );
   }
 
@@ -86,6 +102,7 @@ export function UploadForm({
     if (preview) URL.revokeObjectURL(preview);
     setPreview(null);
     setError(null);
+    setScrubNote(null);
     if (inputRef.current) inputRef.current.value = "";
   }
 
@@ -138,23 +155,38 @@ export function UploadForm({
 
       if (insertError) {
         // Do not leave an orphaned object behind if the row could not be made.
+        // This covers the storage quota too: the cap is a trigger on this
+        // INSERT, so a refusal arrives here with the object already uploaded,
+        // and without this the upload would spend the allowance it was
+        // refused for.
         await supabase.storage.from(STORAGE_BUCKET).remove([path]);
         throw insertError;
       }
 
       if (picked.size) {
-        await supabase.from("file_subjects").insert(
-          Array.from(picked).map((subject_id) => ({
-            file_id: row.id,
-            subject_id,
-          }))
-        );
+        // Checked, unlike before. A refusal here left the document filed under
+        // nothing at all while the form reported success, so the subjects the
+        // person picked quietly did not happen and only they would notice.
+        const { error: subjectError } = await supabase
+          .from("file_subjects")
+          .insert(
+            Array.from(picked).map((subject_id) => ({
+              file_id: row.id,
+              subject_id,
+            }))
+          );
+        if (subjectError) throw subjectError;
       }
 
       router.push(href(`file/${row.id}`));
       router.refresh();
-    } catch {
-      setError(t("upload.errorGeneric"));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "";
+      setError(
+        message.includes("QUOTA_EXCEEDED")
+          ? t("upload.errorQuota")
+          : t("upload.errorGeneric")
+      );
       setBusy(false);
     }
   }
@@ -254,6 +286,21 @@ export function UploadForm({
           </>
         )}
       </div>
+
+      {scrubNote && (
+        <p
+          role="status"
+          className={`notice text-xs ${
+            scrubNote === "stripped" ? "notice-ok" : "notice-error"
+          }`}
+        >
+          {t(
+            scrubNote === "stripped"
+              ? "upload.metadataStripped"
+              : "upload.metadataUnsupported"
+          )}
+        </p>
+      )}
 
       {/* metadata */}
       <div className="paper p-5">

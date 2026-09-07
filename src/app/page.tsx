@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import Link from "next/link";
 import { Seal } from "@/components/Seal";
 import {
@@ -47,11 +48,20 @@ const JSON_LD = {
   ],
 };
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  // The Content Security Policy carries a per-request nonce, and Next stamps
+  // it onto the script tags it emits itself -- but not onto one written by
+  // hand. A JSON-LD block is data rather than code and is never executed, so
+  // nothing here would break; browsers differ on whether they refuse the
+  // element anyway, and a structured-data block that some of them drop is
+  // worse than useless. The middleware puts the nonce on this header.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
     <>
       <script
         type="application/ld+json"
+        nonce={nonce}
         // Values are our own constants, not user input.
         dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
       />

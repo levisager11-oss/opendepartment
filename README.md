@@ -62,10 +62,21 @@ the tenant's own database, each re-checking `is_admin()` itself:
 | `admin.from("user_emails")` for one file | `admin_file_owner_email(id)` |
 | `admin` counts for the landing page | `department_stats()` |
 
-What OpenDepartment holds is a URL and an anon key — both public by design and
-useless without an account the tenant's own RLS admits. **We cannot read any
-department's contents**, which is a feature, not a limitation: it is also the
-honest answer when someone asks who can see their files.
+What OpenDepartment holds **at rest** is a URL and an anon key — both public by
+design and useless without an account the tenant's own RLS admits. **We cannot
+read any department's contents**, which is a feature, not a limitation: it is
+also the honest answer when someone asks who can see their files.
+
+One caveat, and it is a real one. If the deployment enables the optional
+[one-click setup](#one-click-setup-optional), OpenDepartment **does** handle a
+Supabase Management API token belonging to the person setting up — for the
+minutes it takes to create their project and install the schema. That token is
+never written to any database; it lives encrypted in an httpOnly cookie in
+their own browser and is deleted when provisioning finishes. But the server
+decrypts it on each request, which it must in order to use it. So the accurate
+claim is *never stored, never persistent, and scoped to setup* — not *never
+seen*. A deployment that does not want that property simply leaves the two
+environment variables unset, and the feature does not exist.
 
 The setup endpoint decodes the pasted key and **refuses a `service_role` JWT**
 outright rather than trusting the instruction not to paste one.
@@ -150,6 +161,59 @@ To fill a department with something to look at, run `db/seed-demo.sql`: five
 subjects, twelve exhibits, comments, mixed votes, one open report, and three
 demo members (password `demopass123`) so scores are not all from one person.
 
+## One-click setup (optional)
+
+A department owner's real work is four steps in the Supabase dashboard: create
+a project, paste a schema, turn off e-mail confirmation, allow a callback URL.
+Three of those are steps people skip and then file a bug about.
+
+Register an OAuth app on Supabase and set `SUPABASE_OAUTH_CLIENT_ID` /
+`SUPABASE_OAUTH_CLIENT_SECRET`, and the wizard offers to do all four itself.
+The redirect URL to register is `https://YOUR-DEPLOYMENT/api/setup/oauth/callback`.
+
+```
+/api/setup/oauth/start      PKCE + state, both sealed; requires an account
+/api/setup/oauth/callback   exchanges the code, seals the token into a cookie
+/api/setup/oauth/status     what this deployment offers, and whether you are connected
+/api/setup/provision        create project → wait for health → run schema →
+                            read the anon key → configure auth → forget the token
+```
+
+**Scopes to grant the OAuth app**, and nothing else — one per call the code
+actually makes:
+
+| Scope | Access | Why |
+| --- | --- | --- |
+| Organizations | Read | `GET /v1/organizations`, to know where to put the project |
+| Projects | Write | `POST /v1/projects`, and `GET /v1/projects/{ref}/health` to wait for it |
+| Database | Write | `POST /v1/projects/{ref}/database/query`, to install the schema |
+| Secrets | Read | `GET /v1/projects/{ref}/api-keys`, to read the anon key back |
+| Auth | Write | `PATCH /v1/projects/{ref}/config/auth`, the e-mail and callback step |
+
+Everything else stays at **No access**. The consent screen shows this list to
+every department owner, so a scope granted here and never used is a permission
+they are asked for and a reason not to click the button.
+
+What it deliberately does **not** do:
+
+- **It does not register the department.** That still happens from the browser
+  under the operator's own control-plane session, through
+  `register_department()` and its per-account cap, exactly as the manual path
+  does. The endpoint hands back a URL and an anon key; it does not decide who
+  they belong to.
+- **It does not keep the token.** Cleared on every exit except
+  `STILL_STARTING`, which is the one outcome a caller can continue from — and
+  a continuation sends back the project ref, so a retry can never leave a
+  second project on somebody's account.
+- **It does not keep the database password.** One is generated for project
+  creation and discarded. OpenDepartment never connects to a tenant's database
+  directly — everything goes through PostgREST with the anon key — so keeping
+  one would be keeping a credential for no reason.
+
+Leave both variables unset and none of this exists: the wizard does not offer
+it and every route above answers 503. **The manual path is unchanged either
+way**, and remains the only path on a deployment without an OAuth app.
+
 ## What an owner does
 
 1. Names the department, picks an address and a docket prefix.
@@ -162,8 +226,25 @@ demo members (password `demopass123`) so scores are not all from one person.
    in. The wizard makes this a step rather than a footnote: either switch off
    "Confirm email" (right answer for a class — people join with invite codes
    instead) or connect your own SMTP.
-5. Pastes back the project URL and anon key. We probe the project, confirm the
-   schema is installed and unclaimed, then register the slug.
+5. Pastes back the project URL and anon key -- or just the key. The connect
+   step takes a paste of anything with those values in it (the two on their
+   own, a `.env` block, the whole "Project API keys" card with its headings
+   still attached) and pulls them out; a legacy anon key names its own project
+   in its payload, so pasting it alone fills in the URL too. We probe the
+   project, confirm the schema is installed and unclaimed, then register the
+   slug.
+
+The wizard also asks, in step 1, who runs the department. That answer is what
+the department's own imprint, terms and privacy pages say, and the wizard used
+to leave it null -- so every department created through it published three
+legal pages that could not name anybody. Both fields are optional and editable
+later under Administration.
+
+Progress is kept in `sessionStorage` for the length of the sitting. The connect
+step needs an OpenDepartment account, creating one can send you to your inbox
+and back, and coming back to an empty form *after* running the SQL against a
+real project was the worst moment in the flow: the project is claimed by then,
+so starting over does not work either.
 
 **The first account to sign up becomes the administrator.** There is no seed
 file to edit and no support ticket to file.
@@ -228,7 +309,14 @@ the create-a-department flow run end to end on the live deployment).
 - Marketing landing, `/directory`, `/legal/terms`, `/legal/privacy`,
   `/account`, `/account/login`
 - Five-step setup wizard: SSRF-pinned probing, service-key rejection, SQL
-  personalisation, and the e-mail step
+  personalisation, and the e-mail step. The connect step takes a paste of
+  anything with a project URL or key in it, the draft survives a reload, and
+  the operator's own name and contact are collected so a new department's
+  imprint is not blank
+- Optional one-click setup over a Supabase OAuth app (see above). Written
+  against the Management API reference; **not yet exercised against a live
+  Supabase OAuth app**, because that needs credentials this repository does
+  not have. Inert until those are set
 - Department: front door, `login`, `join` (invite redemption),
   `auth/callback`, `onboarding`, `access-denied`, `vault`, `upload`,
   `file/[id]`, `admin`
@@ -261,16 +349,22 @@ the create-a-department flow run end to end on the live deployment).
 - The storage bucket's `file_size_limit` follows `settings.max_upload_mb`: a
   trigger resizes the bucket when the cap changes, so the settings screen can
   offer the whole range instead of stopping at a number frozen in the schema
-- **A SQL security suite** (`npm run test:rls`), 95 assertions over both
+- **A nonce-based CSP.** The policy is built per request in the middleware
+  rather than declared in `next.config.ts`, because a header declared there is
+  one fixed string and a fixed string cannot carry a nonce — which is why
+  `script-src` used to say `'unsafe-inline'`, the one directive an XSS
+  actually cares about. It now carries a per-request nonce and
+  `'strict-dynamic'`, so nothing runs unless it carries that nonce or was
+  loaded by something that did. Verified in a browser: an injected
+  `<script>` in the served HTML is refused, and every page still hydrates
+  with no violations. `style-src` keeps `'unsafe-inline'` and says why — the
+  accent reaches the page as a style *attribute*, which no nonce can cover,
+  and that value is fenced by a CHECK constraint instead
+- **A SQL security suite** (`npm run test:rls`), 127 assertions over both
   schemas. See below
 
 Not built yet:
 
-- A nonce-based CSP. The policy in `next.config.ts` still carries
-  `'unsafe-inline'` for scripts, because Next injects inline bootstrap and
-  threading a per-request nonce through the middleware is a change worth
-  making on its own. What is in place — `frame-ancestors`, `base-uri`,
-  `form-action`, a closed `connect-src` — is real; an XSS backstop it is not
 - Rate limiting that survives more than one serverless instance. The limiter
   on the setup probe is in-memory and therefore per-instance
 
@@ -289,6 +383,8 @@ Builds a throwaway PostgreSQL cluster, shims the parts of Supabase the schemas
 depend on, applies both `db/*.sql` files twice, and checks that a member cannot
 promote themselves, that an administrator cannot un-claim their own department
 or put arbitrary text where CSS is rendered, that a banned member cannot write,
+that a banned *administrator* is no longer an administrator, that a
+`service_role` key cannot be registered or swapped in later,
 that a signed-out visitor reaches only the two functions the front door needs,
 that the invite door admits and refuses the right people, and that a suspended
 department cannot delist its way out of a suspension. No Supabase project, no
@@ -298,8 +394,9 @@ Applying each schema twice is the point of a separate step: re-running these
 files is the documented upgrade path below, so idempotency fails the suite
 rather than somebody's SQL editor.
 
-The suite was written against the *unfixed* schema first and reports 12
-failures there. A test that cannot fail is not evidence.
+The suite was written against the *unfixed* schema first and reports failures
+there -- 12 for the round that added the column fences, and another 16 for the
+round that added the banned-administrator and secret-key assertions. A test that cannot fail is not evidence.
 [db/test/README.md](db/test/README.md) has the rest.
 
 ## Upgrading a deployment that already exists
@@ -315,7 +412,44 @@ row level* live in those files, so:
   themselves. The wizard hands out the current file, so departments created
   from here on are fine.
 
-The current round of fixes adds, to the tenant schema: a column fence on
+**This round's tenant fix is the urgent one.** `is_admin()` read the
+`is_admin` column and nothing else, so banning an administrator took away the
+interface and left every power intact: `requireMember()` sends them to
+`/access-denied`, but the department's anon key is printed on its own front
+door and their session is still valid, so `admin_list_members()` (every
+member's e-mail address), `delete_file()` and `admin_set_flag()` all remained
+one HTTP call away. A banned administrator could read the whole membership,
+delete other people's documents, and ban whoever had just banned them. Banning
+is the only lever one administrator has over another that does not need the
+other to cooperate, so it has to be the one that lands. Until a department
+re-runs the file, the right order there is **demote first, then ban**.
+
+The control-plane fix is smaller but the same shape. Refusing a `service_role`
+key lived only in `/api/setup/probe`, and the probe is not the only door into
+that column: `register_department()` is granted to `authenticated` and callable
+straight over PostgREST, and `anon_key` is in the operator's own UPDATE grant,
+so a department registered with a proper key could be repointed at a secret one
+afterwards with the probe never running. OpenDepartment would then print a
+master key to that project in the page source of its front door. There is now a
+CHECK constraint on the column, catching both key generations. It is added
+`NOT VALID`; to audit the rows already in a directory:
+
+```sql
+alter table public.departments validate constraint departments_key_not_secret;
+```
+
+This round also adds a **per-member storage cap**
+(`settings.max_member_storage_mb`, null for none), an **orphan sweep** on the
+administration screen for objects whose document row is gone, **one view per
+person per hour** instead of one per reload, and a fence tying
+`files.storage_path` to the folder its owner may actually write to.
+
+The current round of fixes also adds, to the tenant schema: `is_active_member()`
+on `claim_username()`, a shape constraint on invite codes (a code may carry
+`grants_admin`, so a guessable one is not a weak password but an
+unauthenticated route to every member's e-mail address), a `for update` on the
+settings read in `handle_new_user()` so two signups in the same instant cannot
+both found the department, a column fence on
 `settings` (an administrator could set `claimed` back to false, which makes the
 next signup found the department again — no invite code, instant
 administrator), CHECK constraints on `accent`, `max_upload_mb` and
@@ -335,9 +469,23 @@ has not re-run the file yet still cannot have CSS injected through it.
 Each department names its own operator in its settings and its footer says so.
 That is deliberate: the person who creates an archive about their classmates is
 the one responsible for it, and the interface should not let them forget it.
-There is currently no platform-level "report this department" link — it was
-removed deliberately. The `abuse_reports` table and its insert policy still
-exist in the control plane if you want to reinstate one later, and the per-file
-report feature inside each department is unaffected. Setting a department's
+`/report` is the platform-level takedown path, linked from the marketing
+footer and from every department's own footer with the slug prefilled. It is
+distinct from the per-file report inside a department, which goes to that
+department's own administrator — the wrong address when the administrator is
+the problem.
+
+It takes no account, on purpose: the person who needs it is a stranger who has
+just been shown something about themselves, and asking them to register with
+the platform they are complaining about is asking them not to bother. What
+stands in for an account is `report_department()`, a `security definer`
+function that is now the only way into `abuse_reports` — the table used to
+carry an open `with check (true)` insert policy for `anon`, which bounded how
+big each row could be and not at all how many there could be. The function
+requires the slug to name a department that actually resolves, collapses a
+repeat from the same address, and stops one archive's queue growing past
+twenty-five open reports, which is well past the point where it still tells
+whoever reads it anything. Whether a report was filed, deduplicated or dropped
+against that cap is not distinguishable from outside. Setting a department's
 `status` to `suspended` stops its slug resolving without touching a single row
 of their data — which stays entirely theirs, in their own project.

@@ -62,6 +62,35 @@ select odtest.denied('a department row cannot be inserted directly',
     values ('sneaky-dept', auth.uid(), 'https://hhhhhhhhhhhh.supabase.co',
             'k', 'Sneaky')$$);
 
+-- register_department() is granted to `authenticated` and reachable straight
+-- over PostgREST, so the wizard's own refusal is not the last word on what
+-- lands in this column. Run as the second operator: the first has spent its
+-- cap, and a cap refusal would pass this assertion for the wrong reason.
+select odtest.as_user('bbbb2222-0000-0000-0000-000000000002');
+
+select odtest.denied('a service_role key cannot be registered',
+  $$select public.register_department('secret-dept',
+      'https://jjjjjjjjjjjj.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFiY2RlZmdoaWprbCIsInJvbGUiOiJzZXJ2aWNlX3JvbGUiLCJpYXQiOjEsImV4cCI6Mn0.c2lnbmF0dXJlLW5vdC1jaGVja2VkLWhlcmU', 'Secrets')$$);
+
+select odtest.denied('an sb_secret_ key cannot be registered',
+  $$select public.register_department('secret-dept-2',
+      'https://kkkkkkkkkkkk.supabase.co',
+      'sb_secret_ZmFrZWtleQ', 'Secrets')$$);
+
+select odtest.allowed('a proper anon key CAN be registered',
+  $$select public.register_department('proper-dept',
+      'https://llllllllllll.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFiY2RlZmdoaWprbCIsInJvbGUiOiJhbm9uIiwiaWF0IjoxLCJleHAiOjJ9.c2lnbmF0dXJlLW5vdC1jaGVja2VkLWhlcmU', 'Proper')$$);
+
+-- ...and taken away again. Section 4 below counts what this operator owns, and
+-- a fixture left lying around here would make that assertion pass or fail for
+-- a reason that has nothing to do with what it is testing.
+delete from public.departments where slug = 'proper-dept';
+
+-- Back to the first operator for the rest of this section.
+select odtest.as_user('aaaa1111-0000-0000-0000-000000000001');
+
 -- ===========================================================================
 --  2. WHAT AN OPERATOR MAY CHANGE ABOUT THEIR OWN ROW
 -- ===========================================================================
@@ -76,6 +105,32 @@ select odtest.allowed('an operator can repoint their department at a new project
 
 select odtest.denied('an operator cannot repoint it off Supabase',
   $$update public.departments set supabase_url = 'https://evil.example.com'
+     where slug = 'first-dept'$$);
+
+-- ---------------------------------------------------------------------------
+-- ...nor repoint it at a SECRET key.
+--
+-- Refusing a service_role key used to live only in /api/setup/probe, and the
+-- probe is not the only door into this column: `anon_key` is in the operator's
+-- own UPDATE grant, so a department registered with a proper key could be
+-- swapped over to a secret one afterwards with the probe never running. What
+-- OpenDepartment does with this column is print it in the page source of the
+-- department's front door.
+--
+-- Both key generations, because Supabase has two of them.
+-- ---------------------------------------------------------------------------
+select odtest.denied('an operator cannot swap in a legacy service_role JWT',
+  $$update public.departments
+       set anon_key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFiY2RlZmdoaWprbCIsInJvbGUiOiJzZXJ2aWNlX3JvbGUiLCJpYXQiOjEsImV4cCI6Mn0.c2lnbmF0dXJlLW5vdC1jaGVja2VkLWhlcmU'
+     where slug = 'first-dept'$$);
+
+select odtest.denied('an operator cannot swap in an sb_secret_ key',
+  $$update public.departments set anon_key = 'sb_secret_ZmFrZWtleQ'
+     where slug = 'first-dept'$$);
+
+select odtest.allowed('an operator CAN still swap in a proper anon key',
+  $$update public.departments
+       set anon_key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFiY2RlZmdoaWprbCIsInJvbGUiOiJhbm9uIiwiaWF0IjoxLCJleHAiOjJ9.c2lnbmF0dXJlLW5vdC1jaGVja2VkLWhlcmU'
      where slug = 'first-dept'$$);
 
 select odtest.denied('an operator cannot lift their own suspension',
@@ -162,15 +217,55 @@ select odtest.equals('a reserved slug reads as unavailable',
 
 -- Filing an abuse report needs no account; reading them back is nobody's.
 select odtest.allowed('anon CAN file an abuse report',
+  $$select public.report_department('first-dept', 'impersonation',
+      'They are using our name.', 'someone@example.test')$$);
+
+-- The table used to take an anonymous INSERT with `with check (true)`, which
+-- bounded how big each row was and not how many there could be.
+select odtest.denied('anon cannot write the report table directly',
   $$insert into public.abuse_reports (slug, reason)
     values ('first-dept', 'impersonation')$$);
+
+select odtest.denied('a report must name a department that exists',
+  $$select public.report_department('no-such-dept', 'spam')$$);
 
 select odtest.denied('an abuse report cannot be unbounded',
   $$insert into public.abuse_reports (slug, reason, details)
     values ('first-dept', 'spam', repeat('x', 5000))$$);
 
+-- ...and the function bounds the same thing rather than raising, because a
+-- caller who pasted an essay wants the report filed, not a validation error.
+select odtest.allowed('the function trims an over-long report instead',
+  $$select public.report_department('first-dept', 'spam',
+      repeat('x', 9000), 'verbose@example.test')$$);
+
 select odtest.equals('nobody can read abuse reports back',
   $$select count(*)::text from public.abuse_reports$$, '0');
+
+-- Saying the same thing twice is one report, and a queue for one department
+-- cannot be filled past the point where it still tells anybody anything.
+select odtest.allowed('a repeated report is accepted quietly',
+  $$select public.report_department('first-dept', 'impersonation',
+      'Saying it again.', 'someone@example.test')$$);
+
+do $flood$ begin
+  for i in 1..60 loop
+    perform public.report_department('first-dept', 'spam', 'flood ' || i,
+                                     'flood' || i || '@example.test');
+  end loop;
+end $flood$;
+
+select odtest.as_owner();
+
+select odtest.equals('one person saying it twice is one report',
+  $$select count(*)::text from public.abuse_reports
+     where reporter_email = 'someone@example.test'$$, '1');
+
+select odtest.equals('a departments open queue is bounded',
+  $$select (count(*) <= 25)::text from public.abuse_reports
+     where slug = 'first-dept' and status = 'open'$$, 'true');
+
+select odtest.as_anon();
 
 -- ===========================================================================
 --  RESULTS

@@ -40,6 +40,36 @@ export const dictionary = {
       ", and I understand that I am responsible for everything in the departments I create.",
     "account.acceptRequired":
       "Please accept the terms and the privacy notice to create an account.",
+    // --- the platform's own takedown path -------------------------------
+    "abuse.link": "Report a department",
+    "abuse.title": "Report a department",
+    "abuse.intro":
+      "This goes to whoever runs OpenDepartment, not to the department's own administrator -- use it when the administrator is the problem. Suspending a department stops its address working; its data stays in its owner's own Supabase project and is not touched. To report a single document to the people who run that archive, use the report button on the document itself.",
+    "abuse.which": "Which department",
+    "abuse.whichHelp":
+      "The address, or the part after /d/. Pasting the whole link works too.",
+    "abuse.reason": "What is wrong",
+    "abuse.reason.illegal": "Illegal content",
+    "abuse.reason.personal": "Personal information about a real person",
+    "abuse.reason.harassment": "Targeted harassment",
+    "abuse.reason.sexual": "Sexual content involving a real person",
+    "abuse.reason.impersonation": "Impersonating a real organisation",
+    "abuse.reason.copyright": "Copyright",
+    "abuse.reason.other": "Something else",
+    "abuse.details": "What should we know?",
+    "abuse.detailsPlaceholder":
+      "What is on the page, and who it is about. Links help.",
+    "abuse.contact": "Your e-mail (optional)",
+    "abuse.contactHelp":
+      "Only so we can come back to you. Leave it empty to report anonymously.",
+    "abuse.submit": "Send the report",
+    "abuse.slugRequired": "Please say which department this is about.",
+    "abuse.unknownSlug":
+      "No department resolves at that address. Check the spelling, or paste the link.",
+    "abuse.sent": "Report received",
+    "abuse.sentBody":
+      "Somebody will read it. If you left an address we may come back to you; either way the department is not told who filed this.",
+
     "admin.tab.invites": "Invites",
     "admin.tab.settings": "Settings",
 
@@ -66,6 +96,22 @@ export const dictionary = {
     "settings.categoriesHint":
       "One per line, in the order they should appear. Existing documents keep the category they were filed under even if you remove it here.",
     "settings.categoriesEmpty": "Keep at least one category.",
+    "settings.memberQuota": "Storage per member",
+    "settings.memberQuotaHint":
+      "Megabytes one member may keep in total. Leave empty for no limit. A free Supabase project holds about a gigabyte, and the per-file limit above does not stop one person filling it.",
+    "settings.memberQuotaNone": "No limit",
+    "settings.quotaInvalid":
+      "Storage per member must be a whole number of megabytes, or empty for no limit.",
+    "settings.storage": "Storage",
+    "settings.orphans": "Objects with no document",
+    "settings.orphansHint":
+      "Deleting a document removes its row and then its file, which is two steps. A browser closed in between leaves the file behind: nothing in the archive can see it, and it still counts against your Supabase storage.",
+    "settings.orphansNone": "Nothing left behind.",
+    "settings.orphansPurge": "Delete these files",
+    "settings.orphansPurged": "Removed {n} file(s).",
+    "settings.orphansUnavailable":
+      "Could not read the storage listing. Re-run db/tenant-schema.sql in your project if you have not since this was added.",
+    "settings.usage": "What each member is keeping",
     "settings.upload": "Largest upload",
     "settings.uploadHint":
       "Megabytes, up to {cap}. Your storage bucket is resized to match when you save.",
@@ -83,6 +129,8 @@ export const dictionary = {
     "invite.notePlaceholder": "e.g. handed out in the group chat",
     "invite.regenerate": "Generate a new code",
     "invite.duplicate": "That code already exists.",
+    "invite.tooShort":
+      "Too short, or not in capitals. Use at least eight characters -- a code can grant administrator rights, so a guessable one hands out more than access.",
     "invite.status": "Status",
     "invite.active": "Active",
     "invite.none": "No invite codes yet. Create one and share the link.",
@@ -182,6 +230,35 @@ export const dictionary = {
       "These are archives whose owners chose to be listed. Most departments are unlisted and reachable only by invitation.",
 
     // --- setup wizard ---------------------------------------------------
+    // --- one-click setup (only when this deployment registered an OAuth app)
+    "setup.autoTitle": "Let OpenDepartment set it up for you",
+    "setup.autoBody":
+      "Connect your Supabase account and we will create the project, install the schema, switch off e-mail confirmation and allow your department's sign-in address -- the next three steps, done. You still own the project; it is created in your own Supabase organisation.",
+    "setup.autoTrust":
+      "You will be asked to authorise OpenDepartment on Supabase. The access token that comes back is kept encrypted in your own browser, never in our database, and is deleted the moment setup finishes. It is used for exactly one thing: creating this project and putting the schema in it.",
+    "setup.autoConnect": "Connect Supabase",
+    "setup.autoNeedsAccount":
+      "You will be asked to sign in to OpenDepartment first.",
+    "setup.autoOrg": "Which Supabase organisation",
+    "setup.autoGo": "Create my project",
+    "setup.autoResume": "Carry on where it stopped",
+    "setup.autoPatience":
+      "Creating a Supabase project takes a minute or two. Leave this tab open.",
+    "setup.autoConfigured":
+      "E-mail confirmation is off and your sign-in address is already allowed -- both were set on your project during setup. Nothing to do in the Supabase dashboard.",
+    "setup.manualTitle": "Or do it yourself",
+    "setup.oauthFailed":
+      "That did not complete. Nothing was created, and you can either try again or set the project up by hand below.",
+    "setup.oauthExpired":
+      "The Supabase authorisation has expired. Connect again to carry on.",
+    "setup.noOrganisation":
+      "That Supabase account has no organisation to create a project in. Make one in the Supabase dashboard and try again.",
+    "setup.stillStarting":
+      "Your project was created and is still starting up. Wait a moment and press the button again -- it will carry on with the same project rather than making another.",
+    "setup.schemaFailedAuto":
+      "The project was created, but the schema did not install. Open it in the Supabase dashboard and paste the SQL from the next step by hand.",
+    "setup.provisionCreating": "Creating your project...",
+
     "setup.title": "Create a department",
     "setup.step": "Step {n} of {total}",
     "setup.step1": "Name it",
@@ -221,8 +298,33 @@ export const dictionary = {
       "Use the anon key, never the service_role key. OpenDepartment does not need it and will refuse it.",
     "setup.serviceKeyRejected":
       "That looks like a service_role key. Paste the anon / publishable key instead.",
+    "setup.redirectTitle": "Do not skip this one",
     "setup.redirectNote":
-      "One more thing in Supabase: under Authentication, URL Configuration, add this to your Redirect URLs.",
+      "In Supabase, under Authentication, URL Configuration, add this to your Redirect URLs. Without it every confirmation and password-reset link in your department lands on an error page.",
+    "setup.copyCallback": "Copy this address",
+    "setup.operator": "Who runs this department",
+    "setup.operatorHelp":
+      "Shown on your department's own imprint, terms and privacy pages. You can leave these blank and fill them in later under Administration -- but those pages exist either way, and an imprint that names nobody is not an imprint.",
+    "setup.operatorName": "Your name or organisation",
+    "setup.operatorNamePlaceholder": "Alex Muster",
+    "setup.operatorContact": "Contact address",
+    "setup.paste": "Paste from Supabase",
+    "setup.pastePlaceholder":
+      "Paste your project URL and anon key here -- together, separately, or as a whole .env block.",
+    "setup.pasteHelp":
+      "Anything with a Supabase URL or key in it will do. A legacy anon key names its own project, so pasting the key alone usually fills in both fields.",
+    "setup.pasteFound": "Found it -- check the two fields below.",
+    "setup.pasteDerived":
+      "Found the key, and worked out the project URL from it. Check both below.",
+    "setup.pasteNothing":
+      "No Supabase URL or key in that. Paste the values from Project Settings, API.",
+    "setup.openSqlEditor": "Open the SQL editor",
+    "setup.openApiSettings": "Open Project Settings, API",
+    "setup.downloadSql": "Download it as a file instead",
+    "setup.copyFailed":
+      "Your browser would not let the page use the clipboard. Download the file instead, or select the SQL above by hand.",
+    "setup.probeFailed":
+      "Could not reach OpenDepartment to run the check. Your answers are kept -- try again in a moment.",
     "setup.verify": "Verify and create",
     "setup.verifying": "Checking your project...",
     "setup.schemaMissing":
@@ -262,7 +364,7 @@ export const dictionary = {
       "Reads the name and tagline from the department's own settings and updates its directory entry.",
     "account.delist": "Remove listing",
     "account.delistConfirm":
-      "Remove this department from OpenDepartment? Its address stops working. The data stays in your own Supabase project and is not touched.",
+      "Remove this department from OpenDepartment?\n\nThis cannot be undone. The address stops working permanently and becomes available for somebody else to register -- you cannot take it back, because your Supabase project has already been claimed and will be refused if you try to set it up again.\n\nYour data stays in your own Supabase project and is not touched.",
 
     // --- landing --------------------------------------------------------
     "landing.subtitle":
@@ -395,6 +497,12 @@ export const dictionary = {
     "upload.submitting": "Transmitting...",
     "upload.errorSize": "File exceeds the {mb} MB limit.",
     "upload.errorType": "That file type is not accepted.",
+    "upload.errorQuota":
+      "You have reached the storage limit for this department. Delete something you filed earlier, or ask an administrator to raise the limit.",
+    "upload.metadataStripped":
+      "Location and camera details were removed from this image before upload.",
+    "upload.metadataUnsupported":
+      "This image format cannot be cleaned in the browser, so it will be uploaded as it is -- including any location the camera recorded. Convert it to JPEG or PNG first if that matters.",
     "upload.errorTitle": "A document title is required.",
     "upload.errorNoFile": "Select a file first.",
     "upload.errorGeneric": "Upload failed. Please try again.",
@@ -537,6 +645,36 @@ export const dictionary = {
       " und verstehe, dass ich für alle Inhalte der von mir erstellten Departemente verantwortlich bin.",
     "account.acceptRequired":
       "Bitte akzeptieren Sie die Nutzungsbedingungen und die Datenschutzerklärung, um ein Konto zu erstellen.",
+    // --- Meldeweg der Plattform -----------------------------------------
+    "abuse.link": "Departement melden",
+    "abuse.title": "Departement melden",
+    "abuse.intro":
+      "Das geht an den Betreiber von OpenDepartment, nicht an die Administration des Departements -- nutzen Sie es, wenn die Administration das Problem ist. Eine Sperrung legt die Adresse still; die Daten bleiben im eigenen Supabase-Projekt der Betreiberin unangetastet. Um ein einzelnes Dokument den Leuten zu melden, die das Archiv führen, nutzen Sie die Meldefunktion beim Dokument selbst.",
+    "abuse.which": "Welches Departement",
+    "abuse.whichHelp":
+      "Die Adresse oder der Teil nach /d/. Der ganze Link geht auch.",
+    "abuse.reason": "Was ist das Problem",
+    "abuse.reason.illegal": "Rechtswidrige Inhalte",
+    "abuse.reason.personal": "Persönliche Daten einer realen Person",
+    "abuse.reason.harassment": "Gezielte Belästigung",
+    "abuse.reason.sexual": "Sexuelle Inhalte mit einer realen Person",
+    "abuse.reason.impersonation": "Vortäuschen einer realen Organisation",
+    "abuse.reason.copyright": "Urheberrecht",
+    "abuse.reason.other": "Etwas anderes",
+    "abuse.details": "Was sollten wir wissen?",
+    "abuse.detailsPlaceholder":
+      "Was auf der Seite steht und um wen es geht. Links helfen.",
+    "abuse.contact": "Ihre E-Mail (optional)",
+    "abuse.contactHelp":
+      "Nur für Rückfragen. Leer lassen, um anonym zu melden.",
+    "abuse.submit": "Meldung senden",
+    "abuse.slugRequired": "Bitte geben Sie an, um welches Departement es geht.",
+    "abuse.unknownSlug":
+      "Unter dieser Adresse gibt es kein Departement. Bitte Schreibweise prüfen oder den Link einfügen.",
+    "abuse.sent": "Meldung erhalten",
+    "abuse.sentBody":
+      "Jemand wird sie lesen. Wenn Sie eine Adresse hinterlassen haben, melden wir uns unter Umständen; dem Departement wird in keinem Fall mitgeteilt, wer die Meldung gemacht hat.",
+
     "admin.tab.invites": "Einladungen",
     "admin.tab.settings": "Einstellungen",
 
@@ -564,6 +702,22 @@ export const dictionary = {
     "settings.categoriesHint":
       "Eine pro Zeile, in der gewünschten Reihenfolge. Bestehende Dokumente behalten ihre Kategorie, auch wenn Sie sie hier entfernen.",
     "settings.categoriesEmpty": "Behalten Sie mindestens eine Kategorie.",
+    "settings.memberQuota": "Speicher pro Mitglied",
+    "settings.memberQuotaHint":
+      "Megabyte, die ein Mitglied insgesamt belegen darf. Leer lassen für kein Limit. Ein kostenloses Supabase-Projekt fasst etwa ein Gigabyte, und das Limit pro Datei hindert eine einzelne Person nicht daran, es zu füllen.",
+    "settings.memberQuotaNone": "Kein Limit",
+    "settings.quotaInvalid":
+      "Speicher pro Mitglied muss eine ganze Zahl in Megabyte sein oder leer für kein Limit.",
+    "settings.storage": "Speicher",
+    "settings.orphans": "Dateien ohne Dokument",
+    "settings.orphansHint":
+      "Beim Löschen eines Dokuments wird zuerst der Datensatz und dann die Datei entfernt -- zwei Schritte. Wird der Browser dazwischen geschlossen, bleibt die Datei liegen: im Archiv ist sie unsichtbar, Ihren Supabase-Speicher belegt sie trotzdem.",
+    "settings.orphansNone": "Nichts liegen geblieben.",
+    "settings.orphansPurge": "Diese Dateien löschen",
+    "settings.orphansPurged": "{n} Datei(en) entfernt.",
+    "settings.orphansUnavailable":
+      "Die Speicherliste konnte nicht gelesen werden. Führen Sie db/tenant-schema.sql in Ihrem Projekt erneut aus, falls seit dieser Neuerung noch nicht geschehen.",
+    "settings.usage": "Was die Mitglieder belegen",
     "settings.upload": "Grösster Upload",
     "settings.uploadHint":
       "Megabyte, höchstens {cap}. Ihr Storage-Bucket wird beim Speichern entsprechend angepasst.",
@@ -581,6 +735,8 @@ export const dictionary = {
     "invite.notePlaceholder": "z. B. im Gruppenchat verteilt",
     "invite.regenerate": "Neuen Code erzeugen",
     "invite.duplicate": "Diesen Code gibt es bereits.",
+    "invite.tooShort":
+      "Zu kurz oder nicht in Grossbuchstaben. Mindestens acht Zeichen -- ein Code kann Administratorrechte vergeben, ein erratbarer gibt also mehr her als nur Zugang.",
     "invite.status": "Status",
     "invite.active": "Aktiv",
     "invite.none":
@@ -682,6 +838,35 @@ export const dictionary = {
       "Dies sind Archive, deren Administration eine Listung gewählt hat. Die meisten Departemente sind nicht gelistet und nur auf Einladung erreichbar.",
 
     // --- setup wizard ---------------------------------------------------
+    // --- Ein-Klick-Einrichtung (nur mit registrierter OAuth-App) ---------
+    "setup.autoTitle": "OpenDepartment richtet es für Sie ein",
+    "setup.autoBody":
+      "Verbinden Sie Ihr Supabase-Konto, und wir legen das Projekt an, installieren das Schema, schalten die E-Mail-Bestätigung ab und tragen die Anmeldeadresse Ihres Departements ein -- die nächsten drei Schritte, erledigt. Das Projekt gehört weiterhin Ihnen; es entsteht in Ihrer eigenen Supabase-Organisation.",
+    "setup.autoTrust":
+      "Sie werden bei Supabase um eine Freigabe für OpenDepartment gebeten. Das Zugriffstoken bleibt verschlüsselt in Ihrem eigenen Browser, nie in unserer Datenbank, und wird gelöscht, sobald die Einrichtung fertig ist. Es dient genau einem Zweck: dieses Projekt anzulegen und das Schema hineinzuschreiben.",
+    "setup.autoConnect": "Supabase verbinden",
+    "setup.autoNeedsAccount":
+      "Sie werden zuerst nach einer Anmeldung bei OpenDepartment gefragt.",
+    "setup.autoOrg": "Welche Supabase-Organisation",
+    "setup.autoGo": "Projekt anlegen",
+    "setup.autoResume": "Dort weitermachen, wo es aufgehört hat",
+    "setup.autoPatience":
+      "Ein Supabase-Projekt anzulegen dauert ein bis zwei Minuten. Lassen Sie diesen Tab offen.",
+    "setup.autoConfigured":
+      "Die E-Mail-Bestätigung ist aus und Ihre Anmeldeadresse ist bereits freigegeben -- beides wurde bei der Einrichtung gesetzt. Im Supabase-Dashboard ist nichts zu tun.",
+    "setup.manualTitle": "Oder selber machen",
+    "setup.oauthFailed":
+      "Das wurde nicht abgeschlossen. Es wurde nichts angelegt; Sie können es erneut versuchen oder das Projekt unten von Hand einrichten.",
+    "setup.oauthExpired":
+      "Die Supabase-Freigabe ist abgelaufen. Bitte erneut verbinden.",
+    "setup.noOrganisation":
+      "Dieses Supabase-Konto hat keine Organisation, in der ein Projekt entstehen könnte. Legen Sie im Supabase-Dashboard eine an und versuchen Sie es erneut.",
+    "setup.stillStarting":
+      "Ihr Projekt wurde angelegt und startet noch. Warten Sie einen Moment und drücken Sie die Schaltfläche erneut -- es wird mit demselben Projekt weitergemacht, kein zweites angelegt.",
+    "setup.schemaFailedAuto":
+      "Das Projekt wurde angelegt, das Schema aber nicht installiert. Öffnen Sie es im Supabase-Dashboard und fügen Sie das SQL aus dem nächsten Schritt von Hand ein.",
+    "setup.provisionCreating": "Ihr Projekt wird angelegt...",
+
     "setup.title": "Departement erstellen",
     "setup.step": "Schritt {n} von {total}",
     "setup.step1": "Benennen",
@@ -721,8 +906,33 @@ export const dictionary = {
       "Verwenden Sie den Anon-Key, niemals den service_role-Key. OpenDepartment benötigt ihn nicht und weist ihn ab.",
     "setup.serviceKeyRejected":
       "Das sieht nach einem service_role-Key aus. Fügen Sie stattdessen den Anon- / Publishable-Key ein.",
+    "setup.redirectTitle": "Diesen Schritt bitte nicht überspringen",
     "setup.redirectNote":
-      "Noch etwas in Supabase: Fügen Sie unter Authentication, URL Configuration diese Adresse zu den Redirect URLs hinzu.",
+      "In Supabase unter Authentication, URL Configuration diese Adresse zu den Redirect URLs hinzufügen. Ohne sie landet in Ihrem Departement jeder Bestätigungs- und Passwort-Link auf einer Fehlerseite.",
+    "setup.copyCallback": "Adresse kopieren",
+    "setup.operator": "Wer dieses Departement betreibt",
+    "setup.operatorHelp":
+      "Erscheint im Impressum sowie auf den AGB- und Datenschutzseiten Ihres Departements. Sie können die Felder leer lassen und später unter Administration ergänzen -- die Seiten gibt es trotzdem, und ein Impressum ohne Namen ist keines.",
+    "setup.operatorName": "Ihr Name oder Ihre Organisation",
+    "setup.operatorNamePlaceholder": "Alex Muster",
+    "setup.operatorContact": "Kontaktadresse",
+    "setup.paste": "Aus Supabase einfügen",
+    "setup.pastePlaceholder":
+      "Projekt-URL und Anon-Key hier einfügen -- zusammen, einzeln oder als ganzer .env-Block.",
+    "setup.pasteHelp":
+      "Alles, worin eine Supabase-URL oder ein Schlüssel vorkommt, genügt. Ein klassischer Anon-Key nennt sein eigenes Projekt, deshalb füllt der Schlüssel allein meist beide Felder.",
+    "setup.pasteFound": "Gefunden -- bitte die beiden Felder unten prüfen.",
+    "setup.pasteDerived":
+      "Schlüssel gefunden und die Projekt-URL daraus abgeleitet. Bitte beides unten prüfen.",
+    "setup.pasteNothing":
+      "Darin steckt weder eine Supabase-URL noch ein Schlüssel. Bitte die Werte aus Project Settings, API einfügen.",
+    "setup.openSqlEditor": "SQL-Editor öffnen",
+    "setup.openApiSettings": "Project Settings, API öffnen",
+    "setup.downloadSql": "Stattdessen als Datei herunterladen",
+    "setup.copyFailed":
+      "Ihr Browser hat der Seite den Zugriff auf die Zwischenablage verweigert. Laden Sie die Datei herunter oder markieren Sie das SQL oben von Hand.",
+    "setup.probeFailed":
+      "OpenDepartment war für die Prüfung nicht erreichbar. Ihre Eingaben bleiben erhalten -- bitte gleich noch einmal versuchen.",
     "setup.verify": "Prüfen und erstellen",
     "setup.verifying": "Ihr Projekt wird geprüft...",
     "setup.schemaMissing":
@@ -762,7 +972,7 @@ export const dictionary = {
       "Liest Name und Untertitel aus den Einstellungen des Departements und aktualisiert den Verzeichniseintrag.",
     "account.delist": "Eintrag entfernen",
     "account.delistConfirm":
-      "Dieses Departement von OpenDepartment entfernen? Die Adresse funktioniert dann nicht mehr. Die Daten bleiben in Ihrem eigenen Supabase-Projekt unangetastet.",
+      "Dieses Departement von OpenDepartment entfernen?\n\nDas lässt sich nicht rückgängig machen. Die Adresse funktioniert dauerhaft nicht mehr und kann von jemand anderem registriert werden -- Sie bekommen sie nicht zurück, denn Ihr Supabase-Projekt gilt bereits als beansprucht und wird bei einer erneuten Einrichtung abgewiesen.\n\nIhre Daten bleiben in Ihrem eigenen Supabase-Projekt unangetastet.",
 
     // --- landing --------------------------------------------------------
     "landing.subtitle":
@@ -898,6 +1108,12 @@ export const dictionary = {
     "upload.submitting": "Wird übermittelt...",
     "upload.errorSize": "Die Datei überschreitet das Limit von {mb} MB.",
     "upload.errorType": "Dieser Dateityp wird nicht akzeptiert.",
+    "upload.errorQuota":
+      "Sie haben das Speicherlimit dieses Departements erreicht. Löschen Sie etwas Früheres oder bitten Sie eine Administratorin, das Limit zu erhöhen.",
+    "upload.metadataStripped":
+      "Standort- und Kameradaten wurden vor dem Hochladen aus diesem Bild entfernt.",
+    "upload.metadataUnsupported":
+      "Dieses Bildformat lässt sich im Browser nicht bereinigen und wird unverändert hochgeladen -- samt allfälligem Standort aus der Kamera. Wandeln Sie es vorher in JPEG oder PNG um, falls das eine Rolle spielt.",
     "upload.errorTitle": "Ein Dokumenttitel ist erforderlich.",
     "upload.errorNoFile": "Wählen Sie zuerst eine Datei aus.",
     "upload.errorGeneric":

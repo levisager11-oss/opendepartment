@@ -76,6 +76,8 @@ export type DepartmentSettings = {
   accent: string;
   categories: string[];
   max_upload_mb: number;
+  /** Null means no per-member cap, which is what every department starts with. */
+  max_member_storage_mb: number | null;
   operator_name: string | null;
   operator_contact: string | null;
 };

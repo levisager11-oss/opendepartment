@@ -53,6 +53,18 @@ export function DeptFooter() {
           <Link href={href("legal/imprint")} className="py-1 hover:text-white hover:underline sm:py-0">
             {t("legal.imprint")}
           </Link>
+          {/* Deliberately a link OUT of the department, to the platform.
+              The report button on a document goes to this department's own
+              administrator, which is the wrong address when the administrator
+              is what somebody wants to complain about. The slug is prefilled
+              because a person who is upset should not have to work out what
+              this archive is called. */}
+          <Link
+            href={`/report?slug=${encodeURIComponent(slug)}`}
+            className="py-1 hover:text-white hover:underline sm:py-0"
+          >
+            {t("abuse.link")}
+          </Link>
         </nav>
       </div>
 
