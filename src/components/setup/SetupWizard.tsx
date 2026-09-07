@@ -8,6 +8,7 @@ import {
   createControlBrowserClient,
 } from "@/lib/control/browser";
 import { Spinner } from "@/components/Spinner";
+import type { TranslationKey } from "@/lib/i18n/dictionary";
 import { ControlAuthPanel } from "./ControlAuthPanel";
 import {
   looksLikeSecretKey,
@@ -174,6 +175,16 @@ export function SetupWizard({
   const [provisioning, setProvisioning] = useState(false);
   const [provisionStep, setProvisionStep] = useState<string | null>(null);
   const [projectRef, setProjectRef] = useState("");
+  /**
+   * Why the automatic path is not currently usable, in words.
+   *
+   * Kept apart from `error` because it has to render whether or not the OAuth
+   * panel does. The panel is behind `oauth?.available`, which is null until a
+   * fetch completes -- so on the very paint after coming back from Supabase,
+   * the one moment this matters most, there was nowhere for a message to go
+   * and the failure looked like nothing having happened at all.
+   */
+  const [oauthNote, setOauthNote] = useState<string | null>(null);
   const [authAutoConfigured, setAuthAutoConfigured] = useState(false);
 
   /**
@@ -238,6 +249,23 @@ export function SetupWizard({
     try {
       const status = await fetch("/api/setup/oauth/status").then((r) => r.json());
       setOauth(status);
+
+      // A token that exchanged and is then refused by the very first call is
+      // an OAuth app missing a scope, not a connection that did not happen.
+      if (status.reason === "api_refused") {
+        setOauthNote(
+          t("setup.oauthScope", { status: String(status.status ?? "") }) +
+            (status.detail ? ` (${status.detail})` : "")
+        );
+      } else if (status.reason === "api_unreachable") {
+        // Not a scope problem. Sending somebody to edit their OAuth app over a
+        // timeout or a 5xx is sending them to fix the wrong thing.
+        setOauthNote(
+          t("setup.oauthUnreachable") + (status.detail ? ` (${status.detail})` : "")
+        );
+      } else if (status.connected) {
+        setOauthNote(null);
+      }
       // Functional update, and `org` is deliberately not a dependency: reading
       // it here would give this callback a new identity every time it set the
       // value, and the effect below would fetch a second time to learn nothing.
@@ -247,31 +275,12 @@ export function SetupWizard({
     } catch {
       setOauth({ available: false, connected: false });
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (step < 2) return;
     void refreshOauth();
   }, [step, signedIn, refreshOauth]);
-
-  /**
-   * A token that Supabase will not accept is the one failure that looks like
-   * success: the authorisation completed, so nothing complained, and the wizard
-   * simply went on offering the button that had just been pressed. Say it.
-   */
-  useEffect(() => {
-    if (!oauth || oauth.connected || !oauth.reason) return;
-    setError(
-      [
-        oauth.reason === "api_refused"
-          ? t("setup.oauthRefused")
-          : t("setup.oauthUnreachable"),
-        oauth.detail,
-      ]
-        .filter(Boolean)
-        .join(" ")
-    );
-  }, [oauth, t]);
 
   /**
    * The OAuth callback sends people back here with a verdict in the query
@@ -286,19 +295,19 @@ export function SetupWizard({
     if (!verdict) return;
 
     if (verdict !== "ok") {
-      // Each of these is a different thing to do about it, so each says a
-      // different thing. `detail` is Supabase's own words when it gave any.
-      const map: Record<string, string> = {
-        declined: t("setup.oauthDeclined"),
-        state: t("setup.oauthState"),
-        expired: t("setup.oauthTimedOut"),
-        session: t("setup.oauthSession"),
-        exchange: t("setup.oauthExchange"),
-        unavailable: t("setup.oauthUnavailable"),
+      // Each of these is a different thing to go and fix, so each says which.
+      const reasons: Record<string, TranslationKey> = {
+        unavailable: "setup.oauthNotConfigured",
+        declined: "setup.oauthDeclined",
+        state: "setup.oauthState",
+        expired: "setup.oauthExpiredFlow",
+        session: "setup.oauthSession",
+        exchange: "setup.oauthExchange",
       };
       const detail = params.get("detail");
-      setError(
-        [map[verdict] ?? t("setup.oauthFailed"), detail].filter(Boolean).join(" ")
+      setOauthNote(
+        t(reasons[verdict] ?? "setup.oauthFailed") +
+          (detail ? ` (${detail})` : "")
       );
     }
     // The automatic path only makes sense from the Supabase step onwards.
@@ -784,6 +793,16 @@ export function SetupWizard({
       {step === 2 && (
         <div className="paper space-y-5 p-5 sm:p-6">
           <p className="text-base text-ink-900">{t("setup.supabaseIntro")}</p>
+
+          {/* Outside the panel below, deliberately: that one only renders once
+              a fetch has said the feature exists, and the moment a message
+              matters most is the paint right after coming back from Supabase,
+              before any of that has happened. */}
+          {oauthNote && (
+            <p role="alert" className="notice notice-error text-xs">
+              {oauthNote}
+            </p>
+          )}
 
           {/* The automatic path, when this deployment has registered a
               Supabase OAuth app. It replaces the whole manual middle of this

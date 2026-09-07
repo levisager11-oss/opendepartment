@@ -103,6 +103,11 @@ export async function exchangeCode(opts: {
   // is safe to hand back to the browser.
   const text = await response.text();
   if (!response.ok) {
+    // The body carries the OAuth error code (invalid_grant, invalid_client,
+    // redirect_uri_mismatch...), which is the whole diagnosis: those are
+    // different problems wearing the same HTTP status, so reducing them to a
+    // number is how this failure became unreadable from the outside.
+    // `error_description` first, because it is the one written for a person.
     let detail = text.slice(0, 300);
     try {
       const parsed = JSON.parse(text) as {
@@ -110,9 +115,9 @@ export async function exchangeCode(opts: {
         error?: string;
         message?: string;
       };
-      detail = parsed.error_description ?? parsed.message ?? parsed.error ?? detail;
+      detail = parsed.error_description ?? parsed.error ?? parsed.message ?? detail;
     } catch {
-      /* keep the trimmed body */
+      /* not JSON; the trimmed body is all there is */
     }
     return { ok: false, message: `${response.status}: ${detail}` };
   }
