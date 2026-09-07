@@ -21,12 +21,32 @@ export async function GET(request: NextRequest) {
   if (!user) return NextResponse.json({ available: true, connected: false });
 
   const token = unseal(request.cookies.get(TOKEN_COOKIE)?.value);
-  if (!token) return NextResponse.json({ available: true, connected: false });
+  if (!token) {
+    return NextResponse.json({
+      available: true,
+      connected: false,
+      reason: "no_token",
+    });
+  }
 
   // A token that no longer works is not a connection. Listing organisations is
   // the cheapest call that proves it, and the wizard needs them anyway.
+  //
+  // Reporting WHY matters more here than anywhere else in this flow: a token
+  // that exchanged perfectly and is then refused by the first call is an
+  // OAuth app missing the Organizations scope, and without the status number
+  // that is indistinguishable from never having connected at all -- which is
+  // what it looked like.
   const orgs = await listOrganizations(token);
-  if (!orgs.ok) return NextResponse.json({ available: true, connected: false });
+  if (!orgs.ok) {
+    return NextResponse.json({
+      available: true,
+      connected: false,
+      reason: "api_refused",
+      status: orgs.status,
+      detail: orgs.message.slice(0, 200),
+    });
+  }
 
   return NextResponse.json({
     available: true,

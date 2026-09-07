@@ -89,7 +89,21 @@ export async function exchangeCode(opts: {
   }
 
   if (!response.ok) {
-    return { ok: false, message: `Supabase refused the code (${response.status}).` };
+    // The body carries the OAuth error code (invalid_grant, invalid_client,
+    // redirect_uri_mismatch...), which is the whole diagnosis. Throwing it
+    // away and reporting a status number was how this failure became
+    // unreadable from the outside.
+    let detail = "";
+    try {
+      const body = (await response.json()) as { error?: string; message?: string };
+      detail = body.error ?? body.message ?? "";
+    } catch {
+      /* not JSON; the status is all there is */
+    }
+    return {
+      ok: false,
+      message: `${response.status}${detail ? ` ${detail}` : ""}`,
+    };
   }
 
   const body = (await response.json()) as { access_token?: string };
