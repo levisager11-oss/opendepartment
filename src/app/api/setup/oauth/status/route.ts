@@ -50,11 +50,20 @@ export async function GET(request: NextRequest) {
     // like from here. Anything else -- a timeout, a 5xx, a DNS failure -- is
     // not a scope problem, and telling somebody to go and edit their scopes
     // over a network blip sends them to fix the wrong thing.
-    const refused = orgs.status === 401 || orgs.status === 403;
+    // 401 and 403 are different failures with different fixes. A token that has
+    // simply aged out (Supabase issues them for an hour) is the ordinary case
+    // when a tab has been left open, and telling that person to go and edit
+    // their OAuth app's scopes sends them to change something that is correct.
+    const reason =
+      orgs.status === 401
+        ? "expired"
+        : orgs.status === 403
+          ? "api_refused"
+          : "api_unreachable";
     return NextResponse.json({
       available: true,
       connected: false,
-      reason: refused ? "api_refused" : "api_unreachable",
+      reason,
       status: orgs.status,
       detail: orgs.message.slice(0, 300),
     });

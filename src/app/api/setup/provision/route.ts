@@ -119,19 +119,14 @@ export async function POST(request: NextRequest) {
     }
   } else {
     const orgs = await listOrganizations(token);
-    // A 401/403 here is not "you have no organisations", it is "this token may
-    // not read them" -- almost always an OAuth app published without the
-    // Organizations:Read scope. Saying so is the difference between the owner
-    // fixing it in a minute and giving up.
+    // A refusal here is not "you have no organisations", it is "Supabase would
+    // not let this token read them". Which of the two refusals it is decides
+    // what the operator should go and do, so they are not merged: see refusal().
     if (!orgs.ok) {
       return finish(
-        NextResponse.json(
-          {
-            error: orgs.status === 401 || orgs.status === 403 ? "API_REFUSED" : "NO_ORGANISATION",
-            detail: orgs.message,
-          },
-          { status: 502 }
-        )
+        NextResponse.json(refusal("organizations", orgs.status, orgs.message), {
+          status: 502,
+        })
       );
     }
     if (orgs.data.length === 0) {
@@ -173,7 +168,7 @@ export async function POST(request: NextRequest) {
   // broken schema rather than a slow provisioner.
   const deadline = Date.now() + READY_TIMEOUT_MS;
   let ready = false;
-  let refused: string | null = null;
+  let refused: { status: number; message: string } | null = null;
   while (Date.now() < deadline) {
     await sleep(POLL_MS);
     const health = await projectHealth(token, ref);
@@ -182,7 +177,7 @@ export async function POST(request: NextRequest) {
     // only write gets 403 here forever, and polling it out to the timeout would
     // report "still starting" about a project that is already up.
     if (!health.ok && (health.status === 401 || health.status === 403)) {
-      refused = health.message;
+      refused = { status: health.status, message: health.message };
       break;
     }
     if (
@@ -197,10 +192,10 @@ export async function POST(request: NextRequest) {
   }
 
   if (refused) {
-    // The project exists, so the token stays: adding the scope and pressing the
-    // button again carries on with it rather than making a second one.
+    // The project exists, so the token stays: fixing whatever was refused and
+    // pressing the button again carries on with it rather than making a second.
     return NextResponse.json(
-      { error: "API_REFUSED", detail: refused, ref, url: projectUrl, resumable: true },
+      { ...refusal("health", refused.status, refused.message), ref, url: projectUrl, resumable: true },
       { status: 502 }
     );
   }
@@ -253,6 +248,33 @@ export async function POST(request: NextRequest) {
       authConfigured: auth.ok,
     })
   );
+}
+
+/**
+ * What to tell somebody whose token Supabase just turned down.
+ *
+ * 401 and 403 were previously reported as the same thing -- "your OAuth app is
+ * missing a permission" -- which is a confident diagnosis of a cause that was
+ * never checked, and it is wrong for 401. They are different failures with
+ * different fixes:
+ *
+ *   401  the token is not valid any more. Supabase access tokens last an hour,
+ *        and the wizard is a form somebody can sit on for longer than that, so
+ *        this is the ordinary outcome of leaving the tab open. Reconnecting
+ *        fixes it; editing scopes does not.
+ *   403  the token is valid and Supabase will not allow this particular call.
+ *        A missing scope is the usual cause but not the only one, so the
+ *        message says what was refused rather than asserting why.
+ *
+ * `detail` carries the operation, the status and Supabase's own words in both
+ * cases. Guessing is what made this bug take three passes; the next person
+ * gets the evidence instead.
+ */
+function refusal(op: string, status: number, message: string) {
+  return {
+    error: status === 401 ? "AUTH_EXPIRED" : "API_REFUSED",
+    detail: `${op}: ${status} ${message}`.slice(0, 300),
+  };
 }
 
 /**

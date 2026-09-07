@@ -217,6 +217,20 @@ from the code that asks for them:
 that tag, so reading the anon key is `Secrets → Read` rather than anything
 named after keys or projects.
 
+Each row above is the endpoint's own `x-oauth-scope`, read from
+https://api.supabase.com/api/v1-json — the OpenAPI description carries the
+required scope per operation, so this table can be re-derived rather than
+inferred from tag names:
+
+```
+GET   /v1/organizations                  organizations:read
+POST  /v1/projects                       projects:write
+GET   /v1/projects/{ref}/health          projects:read
+POST  /v1/projects/{ref}/database/query  database:write
+GET   /v1/projects/{ref}/api-keys        secrets:read
+PATCH /v1/projects/{ref}/config/auth     auth:write
+```
+
 What it deliberately does **not** do:
 
 - **It does not register the department.** That still happens from the browser
@@ -236,9 +250,15 @@ What it deliberately does **not** do:
 **When it does not work, it says so.** Every exit from the round trip names
 itself: the callback sends the wizard a reason (`declined`, `state`, `expired`,
 `session`, `exchange`, `unavailable`) plus whatever Supabase said, and
-`/oauth/status` distinguishes "no token" from `api_refused` — a token Supabase
-issued and then would not accept, which is what a missing scope looks like from
-here and the one failure that otherwise resembles success. Provisioning reports
+`/oauth/status` distinguishes "no token" from a token Supabase issued and then
+would not accept — the one failure that otherwise resembles success. A refusal
+is split by status, because 401 and 403 need opposite responses: **401** is an
+access token that has aged out (Supabase issues them for an hour, and this
+wizard is a form somebody can sit on for longer), fixed by connecting again and
+not by touching scopes; **403** is a token Supabase will not allow to make that
+particular call, where a missing scope is the usual cause. Every refusal
+carries the operation, the status and Supabase's own words to the screen rather
+than a guess about which of the two it was. Provisioning reports
 the same way: a 401/403 while waiting for the new project's health is reported
 as a refusal against the project it already made, rather than polled out to the
 timeout and reported as "still starting".

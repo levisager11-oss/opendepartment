@@ -252,7 +252,10 @@ export function SetupWizard({
 
       // A token that exchanged and is then refused by the very first call is
       // an OAuth app missing a scope, not a connection that did not happen.
-      if (status.reason === "api_refused") {
+      if (status.reason === "expired") {
+        // Aged out, not misconfigured. Connecting again is the whole fix.
+        setOauthNote(t("setup.oauthExpired"));
+      } else if (status.reason === "api_refused") {
         setOauthNote(
           t("setup.oauthScope", { status: String(status.status ?? "") }) +
             (status.detail ? ` (${status.detail})` : "")
@@ -498,14 +501,23 @@ export function SetupWizard({
         NOT_SIGNED_IN: t("setup.signInFirst"),
         RATE_LIMITED: t("setup.rateLimited"),
         NO_ORGANISATION: t("setup.noOrganisation"),
+        AUTH_EXPIRED: t("setup.oauthExpired"),
         API_REFUSED: t("setup.oauthRefused"),
         STILL_STARTING: t("setup.stillStarting"),
         SCHEMA_FAILED: t("setup.schemaFailedAuto"),
       };
+      // `detail` is APPENDED, never merely a fallback. It used to be reachable
+      // only when no mapped string existed, so on every failure this wizard had
+      // a name for, Supabase's own account of what went wrong was thrown away
+      // -- leaving a confident sentence about a cause nobody had checked. The
+      // sentence says what to try; the detail says what actually happened.
       setError(
-        (result.error ? map[result.error] : undefined) ??
-          result.detail ??
-          t("common.error")
+        [
+          (result.error ? map[result.error] : undefined) ?? t("common.error"),
+          result.detail,
+        ]
+          .filter(Boolean)
+          .join(" ")
       );
       // A project that exists but was not ready yet leaves the token in place,
       // so the same button resumes rather than starting again.
