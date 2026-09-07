@@ -252,10 +252,78 @@ revoke insert, update on public.departments from anon, authenticated;
 grant  update (display_name, tagline, visibility, supabase_url, anon_key)
   on public.departments to authenticated;
 
--- Anyone may file an abuse report; nobody may read them back.
+-- Nobody may read abuse reports back, and nobody INSERTs into this table
+-- directly any more.
+--
+-- `with check (true)` for anon is an unauthenticated write endpoint, and the
+-- length constraints above only bound how big each row is -- not how many.
+-- One script fills the control plane's free tier with reports about nothing,
+-- and the platform's only takedown path is buried under them.
+--
+-- Same shape as register_department(): no insert policy at all, and one
+-- `security definer` function that is the only door. What it adds is what a
+-- policy cannot express -- the slug has to be a real department, and a
+-- department can only have so many open complaints at once.
 drop policy if exists abuse_insert on public.abuse_reports;
-create policy abuse_insert on public.abuse_reports
-  for insert to anon, authenticated with check (true);
+
+/**
+ * File a complaint about a whole department.
+ *
+ * No account, on purpose: the person who needs this is a stranger who has
+ * just been shown something about themselves, and asking them to register
+ * first is asking them not to bother.
+ *
+ * Two bounds instead of an account. A report has to name a department that
+ * actually resolves -- so the table cannot be filled with rows about slugs
+ * that were never taken -- and a department can hold only so many OPEN
+ * reports at once. The cap is not a limit on how much wrong one department can
+ * do; it is the observation that the twenty-sixth open complaint about the
+ * same archive tells whoever reads these nothing the first twenty-five did
+ * not, while an unbounded queue tells them nothing at all.
+ *
+ * Returns quietly in the duplicate case rather than raising. Whether a
+ * specific complaint has already been filed is not something an anonymous
+ * caller should be able to ask, and the person filing it does not care.
+ */
+create or replace function public.report_department(
+  want_slug text, why text, detail text default null,
+  contact text default null
+) returns void
+language plpgsql security definer set search_path = public as $fn$
+declare clean text := lower(trim(want_slug)); open_count integer;
+begin
+  if not exists (
+    select 1 from public.departments d where d.slug = clean
+  ) then
+    raise exception 'NO_SUCH_DEPARTMENT';
+  end if;
+
+  select count(*) into open_count
+    from public.abuse_reports r
+   where r.slug = clean and r.status = 'open';
+
+  if open_count >= 25 then
+    -- Already answered, as far as this queue is concerned.
+    return;
+  end if;
+
+  -- The same person saying the same thing twice is one report.
+  if contact is not null and exists (
+    select 1 from public.abuse_reports r
+     where r.slug = clean
+       and r.reporter_email = lower(trim(contact))
+       and r.reason = why
+       and r.status = 'open'
+  ) then
+    return;
+  end if;
+
+  insert into public.abuse_reports (slug, reporter_email, reason, details)
+  values (clean,
+          nullif(lower(trim(coalesce(contact, ''))), ''),
+          left(trim(why), 60),
+          nullif(left(trim(coalesce(detail, '')), 4000), ''));
+end; $fn$;
 
 -- ---------------------------------------------------------------------------
 -- Resolution: the single read the app performs for every department page
@@ -353,3 +421,5 @@ grant execute on function public.public_directory(integer) to anon, authenticate
 grant execute on function public.slug_available(text)      to anon, authenticated;
 grant execute on function public.register_department(text, text, text, text, text, text)
   to authenticated;
+grant execute on function public.report_department(text, text, text, text)
+  to anon, authenticated;

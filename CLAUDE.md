@@ -27,7 +27,7 @@ The only tests are SQL. `npm run test:rls` builds a throwaway PostgreSQL
 cluster, applies a Supabase shim, applies both `db/*.sql` files **twice**
 (re-running them is the documented upgrade path, so idempotency is a tested
 property), and asserts the policies actually hold — 81 assertions against the
-tenant schema, 40 against the control plane. It needs a `postgres` server
+tenant schema, 46 against the control plane. It needs a `postgres` server
 binary and nothing else: no Supabase project, no network, no credentials. See
 [db/test/README.md](db/test/README.md) before adding a case; the two rules that
 matter are that a test must run as `anon`/`authenticated` rather than the table

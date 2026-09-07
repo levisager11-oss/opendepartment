@@ -289,7 +289,7 @@ the create-a-department flow run end to end on the live deployment).
   with no violations. `style-src` keeps `'unsafe-inline'` and says why — the
   accent reaches the page as a style *attribute*, which no nonce can cover,
   and that value is fenced by a CHECK constraint instead
-- **A SQL security suite** (`npm run test:rls`), 121 assertions over both
+- **A SQL security suite** (`npm run test:rls`), 127 assertions over both
   schemas. See below
 
 Not built yet:
@@ -398,9 +398,23 @@ has not re-run the file yet still cannot have CSS injected through it.
 Each department names its own operator in its settings and its footer says so.
 That is deliberate: the person who creates an archive about their classmates is
 the one responsible for it, and the interface should not let them forget it.
-There is currently no platform-level "report this department" link — it was
-removed deliberately. The `abuse_reports` table and its insert policy still
-exist in the control plane if you want to reinstate one later, and the per-file
-report feature inside each department is unaffected. Setting a department's
+`/report` is the platform-level takedown path, linked from the marketing
+footer and from every department's own footer with the slug prefilled. It is
+distinct from the per-file report inside a department, which goes to that
+department's own administrator — the wrong address when the administrator is
+the problem.
+
+It takes no account, on purpose: the person who needs it is a stranger who has
+just been shown something about themselves, and asking them to register with
+the platform they are complaining about is asking them not to bother. What
+stands in for an account is `report_department()`, a `security definer`
+function that is now the only way into `abuse_reports` — the table used to
+carry an open `with check (true)` insert policy for `anon`, which bounded how
+big each row could be and not at all how many there could be. The function
+requires the slug to name a department that actually resolves, collapses a
+repeat from the same address, and stops one archive's queue growing past
+twenty-five open reports, which is well past the point where it still tells
+whoever reads it anything. Whether a report was filed, deduplicated or dropped
+against that cap is not distinguishable from outside. Setting a department's
 `status` to `suspended` stops its slug resolving without touching a single row
 of their data — which stays entirely theirs, in their own project.

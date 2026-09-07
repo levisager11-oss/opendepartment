@@ -217,15 +217,55 @@ select odtest.equals('a reserved slug reads as unavailable',
 
 -- Filing an abuse report needs no account; reading them back is nobody's.
 select odtest.allowed('anon CAN file an abuse report',
+  $$select public.report_department('first-dept', 'impersonation',
+      'They are using our name.', 'someone@example.test')$$);
+
+-- The table used to take an anonymous INSERT with `with check (true)`, which
+-- bounded how big each row was and not how many there could be.
+select odtest.denied('anon cannot write the report table directly',
   $$insert into public.abuse_reports (slug, reason)
     values ('first-dept', 'impersonation')$$);
+
+select odtest.denied('a report must name a department that exists',
+  $$select public.report_department('no-such-dept', 'spam')$$);
 
 select odtest.denied('an abuse report cannot be unbounded',
   $$insert into public.abuse_reports (slug, reason, details)
     values ('first-dept', 'spam', repeat('x', 5000))$$);
 
+-- ...and the function bounds the same thing rather than raising, because a
+-- caller who pasted an essay wants the report filed, not a validation error.
+select odtest.allowed('the function trims an over-long report instead',
+  $$select public.report_department('first-dept', 'spam',
+      repeat('x', 9000), 'verbose@example.test')$$);
+
 select odtest.equals('nobody can read abuse reports back',
   $$select count(*)::text from public.abuse_reports$$, '0');
+
+-- Saying the same thing twice is one report, and a queue for one department
+-- cannot be filled past the point where it still tells anybody anything.
+select odtest.allowed('a repeated report is accepted quietly',
+  $$select public.report_department('first-dept', 'impersonation',
+      'Saying it again.', 'someone@example.test')$$);
+
+do $flood$ begin
+  for i in 1..60 loop
+    perform public.report_department('first-dept', 'spam', 'flood ' || i,
+                                     'flood' || i || '@example.test');
+  end loop;
+end $flood$;
+
+select odtest.as_owner();
+
+select odtest.equals('one person saying it twice is one report',
+  $$select count(*)::text from public.abuse_reports
+     where reporter_email = 'someone@example.test'$$, '1');
+
+select odtest.equals('a departments open queue is bounded',
+  $$select (count(*) <= 25)::text from public.abuse_reports
+     where slug = 'first-dept' and status = 'open'$$, 'true');
+
+select odtest.as_anon();
 
 -- ===========================================================================
 --  RESULTS

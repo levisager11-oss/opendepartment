@@ -40,6 +40,36 @@ export const dictionary = {
       ", and I understand that I am responsible for everything in the departments I create.",
     "account.acceptRequired":
       "Please accept the terms and the privacy notice to create an account.",
+    // --- the platform's own takedown path -------------------------------
+    "abuse.link": "Report a department",
+    "abuse.title": "Report a department",
+    "abuse.intro":
+      "This goes to whoever runs OpenDepartment, not to the department's own administrator -- use it when the administrator is the problem. Suspending a department stops its address working; its data stays in its owner's own Supabase project and is not touched. To report a single document to the people who run that archive, use the report button on the document itself.",
+    "abuse.which": "Which department",
+    "abuse.whichHelp":
+      "The address, or the part after /d/. Pasting the whole link works too.",
+    "abuse.reason": "What is wrong",
+    "abuse.reason.illegal": "Illegal content",
+    "abuse.reason.personal": "Personal information about a real person",
+    "abuse.reason.harassment": "Targeted harassment",
+    "abuse.reason.sexual": "Sexual content involving a real person",
+    "abuse.reason.impersonation": "Impersonating a real organisation",
+    "abuse.reason.copyright": "Copyright",
+    "abuse.reason.other": "Something else",
+    "abuse.details": "What should we know?",
+    "abuse.detailsPlaceholder":
+      "What is on the page, and who it is about. Links help.",
+    "abuse.contact": "Your e-mail (optional)",
+    "abuse.contactHelp":
+      "Only so we can come back to you. Leave it empty to report anonymously.",
+    "abuse.submit": "Send the report",
+    "abuse.slugRequired": "Please say which department this is about.",
+    "abuse.unknownSlug":
+      "No department resolves at that address. Check the spelling, or paste the link.",
+    "abuse.sent": "Report received",
+    "abuse.sentBody":
+      "Somebody will read it. If you left an address we may come back to you; either way the department is not told who filed this.",
+
     "admin.tab.invites": "Invites",
     "admin.tab.settings": "Settings",
 
@@ -586,6 +616,36 @@ export const dictionary = {
       " und verstehe, dass ich für alle Inhalte der von mir erstellten Departemente verantwortlich bin.",
     "account.acceptRequired":
       "Bitte akzeptieren Sie die Nutzungsbedingungen und die Datenschutzerklärung, um ein Konto zu erstellen.",
+    // --- Meldeweg der Plattform -----------------------------------------
+    "abuse.link": "Departement melden",
+    "abuse.title": "Departement melden",
+    "abuse.intro":
+      "Das geht an den Betreiber von OpenDepartment, nicht an die Administration des Departements -- nutzen Sie es, wenn die Administration das Problem ist. Eine Sperrung legt die Adresse still; die Daten bleiben im eigenen Supabase-Projekt der Betreiberin unangetastet. Um ein einzelnes Dokument den Leuten zu melden, die das Archiv führen, nutzen Sie die Meldefunktion beim Dokument selbst.",
+    "abuse.which": "Welches Departement",
+    "abuse.whichHelp":
+      "Die Adresse oder der Teil nach /d/. Der ganze Link geht auch.",
+    "abuse.reason": "Was ist das Problem",
+    "abuse.reason.illegal": "Rechtswidrige Inhalte",
+    "abuse.reason.personal": "Persönliche Daten einer realen Person",
+    "abuse.reason.harassment": "Gezielte Belästigung",
+    "abuse.reason.sexual": "Sexuelle Inhalte mit einer realen Person",
+    "abuse.reason.impersonation": "Vortäuschen einer realen Organisation",
+    "abuse.reason.copyright": "Urheberrecht",
+    "abuse.reason.other": "Etwas anderes",
+    "abuse.details": "Was sollten wir wissen?",
+    "abuse.detailsPlaceholder":
+      "Was auf der Seite steht und um wen es geht. Links helfen.",
+    "abuse.contact": "Ihre E-Mail (optional)",
+    "abuse.contactHelp":
+      "Nur für Rückfragen. Leer lassen, um anonym zu melden.",
+    "abuse.submit": "Meldung senden",
+    "abuse.slugRequired": "Bitte geben Sie an, um welches Departement es geht.",
+    "abuse.unknownSlug":
+      "Unter dieser Adresse gibt es kein Departement. Bitte Schreibweise prüfen oder den Link einfügen.",
+    "abuse.sent": "Meldung erhalten",
+    "abuse.sentBody":
+      "Jemand wird sie lesen. Wenn Sie eine Adresse hinterlassen haben, melden wir uns unter Umständen; dem Departement wird in keinem Fall mitgeteilt, wer die Meldung gemacht hat.",
+
     "admin.tab.invites": "Einladungen",
     "admin.tab.settings": "Einstellungen",
 
