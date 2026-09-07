@@ -96,6 +96,13 @@ export function getDeptLegalDoc(
             ],
           },
           {
+            heading: "Cookies",
+            body: [
+              `${name} setzt nur technisch notwendige Cookies: eines hält Sie in diesem Departement angemeldet und wird ausschliesslich an dessen Adresse gesendet, eines merkt sich die gewählte Sprache, eines den gelesenen Cookie-Hinweis.`,
+              "Es gibt keine Werbe-, Profiling- oder Drittanbieter-Tracking-Cookies.",
+            ],
+          },
+          {
             heading: "Ihre Rechte",
             body: [
               contact
@@ -190,6 +197,13 @@ export function getDeptLegalDoc(
           body: [
             "When you sign up: your e-mail address and a password hash. The address is visible to this department's administrators and to no other member.",
             "As you use it: the cover name you chose, the files you upload, your comments, votes and reports. Deletions and moderation actions are recorded in an audit log.",
+          ],
+        },
+        {
+          heading: "Cookies",
+          body: [
+            `${name} sets only the cookies it needs to work: one keeps you signed in to this department and is sent to this department's address alone, one remembers your chosen language, one remembers that you have read the cookie notice.`,
+            "There are no advertising, profiling or third-party tracking cookies.",
           ],
         },
         {

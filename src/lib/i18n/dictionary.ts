@@ -466,6 +466,14 @@ export const dictionary = {
     "legal.terms": "Terms of use",
     "legal.privacy": "Privacy notice",
     "legal.imprint": "Legal notice",
+    "cookies.title": "About the cookies here",
+    "cookies.body":
+      "This site sets only the cookies it needs to work: one that keeps you " +
+      "signed in, one that remembers your language, and one that remembers " +
+      "you have read this. There is no advertising or tracking cookie, and " +
+      "nothing here is shared with a third party.",
+    "cookies.more": "Read the privacy notice",
+    "cookies.ok": "Understood",
 
     // --- misc -----------------------------------------------------------
     "common.cancel": "Cancel",
@@ -962,6 +970,14 @@ export const dictionary = {
     "legal.terms": "Nutzungsbedingungen",
     "legal.privacy": "Datenschutzerklärung",
     "legal.imprint": "Impressum",
+    "cookies.title": "Zu den Cookies auf dieser Seite",
+    "cookies.body":
+      "Diese Seite setzt nur die Cookies, die für den Betrieb nötig sind: " +
+      "eines hält Sie angemeldet, eines merkt sich Ihre Sprache, eines merkt " +
+      "sich, dass Sie diesen Hinweis gelesen haben. Es gibt keine Werbe- oder " +
+      "Tracking-Cookies, und nichts davon wird an Dritte weitergegeben.",
+    "cookies.more": "Zur Datenschutzerklärung",
+    "cookies.ok": "Verstanden",
 
     // --- misc -----------------------------------------------------------
     "common.cancel": "Abbrechen",

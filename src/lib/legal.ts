@@ -115,7 +115,14 @@ export function getLegalDoc(
           ],
         },
         {
-          heading: "3. Ihre Rechte",
+          heading: "3. Cookies",
+          body: [
+            "Wir setzen ausschliesslich technisch notwendige Cookies: eines für Ihre Anmeldung am OpenDepartment-Konto (verwaltet durch Supabase Auth), eines für die gewählte Sprache und eines, das sich merkt, dass Sie den Cookie-Hinweis gelesen haben.",
+            "Es gibt keine Werbe-, Profiling- oder Drittanbieter-Tracking-Cookies. Die Zugriffsstatistik (Vercel Analytics) arbeitet ohne Cookies und ohne Personenbezug. Ein Departement, das Sie besuchen, setzt zusätzlich ein eigenes Sitzungs-Cookie, das nur an dieses Departement gesendet wird.",
+          ],
+        },
+        {
+          heading: "4. Ihre Rechte",
           body: [
             "Sie können Ihr Departement jederzeit aus dem Verzeichnis entfernen; damit sind alle bei uns gespeicherten Angaben dazu gelöscht. Für Auskunft oder Löschung Ihres OpenDepartment-Kontos wenden Sie sich an die untenstehende Adresse.",
             contact,
@@ -181,7 +188,14 @@ export function getLegalDoc(
         ],
       },
       {
-        heading: "3. Your rights",
+        heading: "3. Cookies",
+        body: [
+          "Only cookies the site cannot work without: one for your OpenDepartment account session (handled by Supabase Auth), one remembering your chosen language, and one remembering that you have read the cookie notice.",
+          "There are no advertising, profiling or third-party tracking cookies. The traffic statistics (Vercel Analytics) work without cookies and without identifying anyone. A department you visit sets its own session cookie in addition, and the browser sends it to that department only.",
+        ],
+      },
+      {
+        heading: "4. Your rights",
         body: [
           "You can remove your department from the directory at any time, which deletes everything we hold about it. For access to or deletion of your OpenDepartment account, write to the address below.",
           contact,
