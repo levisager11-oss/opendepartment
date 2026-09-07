@@ -34,14 +34,21 @@ export function deptLegalMetadata(doc: DeptLegalDoc) {
     const locale = await detectLocale();
     const { title, description } = getDeptLegalDoc(doc, locale, branding);
 
+    // Deliberately NOT following the department's visibility, unlike every
+    // other page under /d/<slug>. An imprint and a privacy notice exist so
+    // that somebody with a complaint can find who is answerable, and a
+    // document nobody can look up does not do that job. These three pages
+    // carry the operator's name and contact and nothing else -- no member
+    // list, no exhibit, no title of anything in the archive -- so indexing
+    // them tells a search engine who runs an archive, not what is in it.
+    //
+    // Stated explicitly rather than simply omitted: metadata from a page
+    // merges over its layout's field by field, so leaving `robots` out here
+    // would inherit the noindex the department layout emits for an unlisted
+    // archive -- which is exactly the rule these three pages opt out of.
     return {
       ...pageMetadata({ title, description, path: `/d/${slug}/legal/${doc}` }),
-      // These follow the department itself: an unlisted archive does not want
-      // its imprint turning up in a search for the operator's name.
-      robots:
-        dept.visibility === "public"
-          ? { index: true, follow: true }
-          : { index: false, follow: false },
+      robots: { index: true, follow: true },
     };
   };
 }

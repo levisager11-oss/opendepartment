@@ -3,6 +3,7 @@ import { Merriweather, Source_Sans_3, Special_Elite } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { I18nProvider } from "@/lib/i18n/provider";
+import { CookieNotice } from "@/components/CookieNotice";
 import { detectLocale } from "@/lib/i18n/detect";
 import { SITE_NAME, SITE_URL } from "@/lib/seo";
 
@@ -121,7 +122,13 @@ export default async function RootLayout({
       className={`${merriweather.variable} ${sourceSans.variable} ${specialElite.variable}`}
     >
       <body className="flex min-h-dvh flex-col">
-        <I18nProvider initialLocale={locale}>{children}</I18nProvider>
+        <I18nProvider initialLocale={locale}>
+          {children}
+          {/* Site-wide on purpose: the department shell is a separate tree,
+              and a notice that only appeared on the platform's own pages
+              would miss most of the people reading anything. */}
+          <CookieNotice />
+        </I18nProvider>
         <Analytics />
       </body>
     </html>
