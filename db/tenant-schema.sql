@@ -53,6 +53,16 @@ create table if not exists public.settings (
 
 insert into public.settings (id) values (true) on conflict (id) do nothing;
 
+-- Initial administration is authorized by a one-use secret generated during
+-- setup. Only its SHA-256 verifier reaches SQL; neither value is public tenant
+-- identity. An unclaimed installation without a verifier fails closed.
+create table if not exists public.department_bootstrap (
+  id          boolean primary key default true check (id),
+  secret_hash text not null check (secret_hash ~ '^[0-9a-f]{64}$')
+);
+alter table public.department_bootstrap enable row level security;
+revoke all on public.department_bootstrap from anon, authenticated;
+
 -- A department created before open_join existed has a settings table without
 -- it, and the `if not exists` above leaves such a table alone. Re-running this
 -- file is the supported way to pick up a schema change, so add the column
@@ -181,6 +191,13 @@ create table if not exists public.profiles (
 
 create unique index if not exists profiles_username_lower_idx
   on public.profiles (lower(username));
+
+-- The direct profile UPDATE API must enforce the same shape as claim_username.
+-- Existing legacy names remain readable; any subsequent change must be valid.
+alter table public.profiles drop constraint if exists profiles_username_shape;
+alter table public.profiles
+  add constraint profiles_username_shape
+  check (username is null or username ~ '^[A-Za-z0-9_-]{3,20}$') not valid;
 
 -- 3. USER_EMAILS -- private. Owner and admins only. Split out because RLS is
 --    row-level, not column-level.
@@ -351,6 +368,26 @@ delete from public.reports r
 create unique index if not exists reports_one_per_file_idx
   on public.reports (file_id, reporter_id) where file_id is not null;
 
+-- A report has one target. Keep legacy malformed reports available for review,
+-- but refuse new targetless or ambiguous writes, including direct API inserts.
+alter table public.reports drop constraint if exists reports_one_target;
+alter table public.reports
+  add constraint reports_one_target
+  check ((file_id is not null)::integer + (comment_id is not null)::integer = 1)
+  not valid;
+
+-- Apply the same deduplication to comment reports as to file reports above.
+delete from public.reports r
+ where r.comment_id is not null
+   and exists (
+     select 1 from public.reports keep
+      where keep.comment_id = r.comment_id
+        and keep.reporter_id = r.reporter_id
+        and (keep.created_at, keep.id) < (r.created_at, r.id)
+   );
+create unique index if not exists reports_one_per_comment_idx
+  on public.reports (comment_id, reporter_id) where comment_id is not null;
+
 -- The report dialog offers six reasons and nothing else, so the column should
 -- say so: free text here is an unbounded write into the admin queue. NOT VALID
 -- for the same reason as `files` above -- reports already filed are left alone.
@@ -408,7 +445,7 @@ $fn$;
 -- INSERT into auth.users. Rejecting here cannot be bypassed from the client.
 --
 -- Three ways in:
---   1. Nobody has claimed the department yet -> this user founds it as admin.
+--   1. Unclaimed, with the setup secret -> this user founds it as admin.
 --   2. The department is public (settings.open_join) -> no code needed.
 --   3. They presented a valid invite code.
 --
@@ -423,6 +460,8 @@ declare
   unclaimed   boolean;
   open_door   boolean;
   want_code   text;
+  want_secret text;
+  expected_secret text;
   inv         public.invites%rowtype;
   make_admin  boolean := false;
 begin
@@ -435,9 +474,26 @@ begin
     from public.settings s where s.id for update;
 
   if unclaimed then
-    -- The first account through the door founds the department.
+    want_secret := coalesce(new.raw_user_meta_data ->> 'bootstrap_secret', '');
+    select b.secret_hash into expected_secret
+      from public.department_bootstrap b where b.id;
+    if want_secret !~ '^[0-9a-f]{64}$'
+       or expected_secret is null
+       or expected_secret is distinct from
+          encode(sha256(convert_to(want_secret, 'UTF8')), 'hex') then
+      raise exception 'DEPT_BAD_BOOTSTRAP'
+        using hint = 'Use the private founder link supplied during setup.';
+    end if;
+
+    -- The settings lock serializes validation and consumption with all signups.
     make_admin := true;
     update public.settings set claimed = true where id;
+    delete from public.department_bootstrap where id;
+    -- This is an AFTER INSERT trigger, so changing metadata does not recurse.
+    -- Once consumed, the raw setup capability has no reason to remain in Auth.
+    update auth.users
+      set raw_user_meta_data = raw_user_meta_data - 'bootstrap_secret'
+      where id = new.id;
 
   else
     -- Named want_code, not code: `code` is also a column on public.invites,
@@ -707,10 +763,14 @@ create or replace function public.delete_file(target uuid, why text default null
 returns text language plpgsql security definer set search_path = public as $fn$
 declare path text; owner uuid;
 begin
+  -- An anonymous auth.uid() is NULL. SQL's three-valued equality must never
+  -- turn a failed ownership comparison into a skipped rejection branch.
+  if not public.is_active_member() then raise exception 'NOT_A_MEMBER'; end if;
+
   select f.storage_path, f.owner_id into path, owner from public.files f where f.id = target;
   if path is null then raise exception 'NOT_FOUND'; end if;
 
-  if not (public.is_admin() or owner = auth.uid()) then
+  if owner is distinct from auth.uid() and not public.is_admin() then
     raise exception 'NOT_ALLOWED';
   end if;
 
@@ -721,6 +781,9 @@ begin
   delete from public.files where id = target;
   return path;
 end; $fn$;
+
+revoke execute on function public.delete_file(uuid, text) from anon, public;
+grant execute on function public.delete_file(uuid, text) to authenticated;
 
 create or replace function public.admin_set_flag(target uuid, flag text, value boolean)
 returns void language plpgsql security definer set search_path = public as $fn$
@@ -771,6 +834,9 @@ begin
              o.created_at
         from storage.objects o
        where o.bucket_id = 'department-files'
+         -- Uploading bytes and filing metadata are separate requests. Give a
+         -- normal upload an hour to finish before offering the object to purge.
+         and o.created_at < now() - interval '1 hour'
          and not exists (
            select 1 from public.files f where f.storage_path = o.name
          )
@@ -881,6 +947,7 @@ begin
   delete from public.files;
   delete from public.subjects;
   delete from public.invites;
+  delete from public.department_bootstrap;
   delete from public.audit_log;
   delete from public.user_emails where user_id <> auth.uid();
   delete from public.profiles   where id      <> auth.uid();
@@ -1016,7 +1083,9 @@ create policy profiles_read on public.profiles
 
 drop policy if exists profiles_update_self on public.profiles;
 create policy profiles_update_self on public.profiles
-  for update to authenticated using (id = auth.uid()) with check (id = auth.uid());
+  for update to authenticated
+  using (id = auth.uid() and public.is_active_member())
+  with check (id = auth.uid() and public.is_active_member());
 
 drop policy if exists profiles_admin_all on public.profiles;
 create policy profiles_admin_all on public.profiles
@@ -1076,7 +1145,8 @@ create policy files_update_own on public.files
 
 drop policy if exists files_delete_own_or_admin on public.files;
 create policy files_delete_own_or_admin on public.files
-  for delete to authenticated using (owner_id = auth.uid() or public.is_admin());
+  for delete to authenticated
+  using (public.is_active_member() and (owner_id = auth.uid() or public.is_admin()));
 
 -- Same column-level reasoning as `profiles` above. Everything on this table
 -- past the three descriptive fields is a counter maintained by a trigger, and
@@ -1085,6 +1155,13 @@ create policy files_delete_own_or_admin on public.files
 -- `security definer`, so they still write whatever they like.
 revoke update on public.files from anon, authenticated;
 grant  update (title, description, category) on public.files to authenticated;
+
+-- Defaults are not protection: a caller with table-wide INSERT can supply
+-- forged scores, counters, case numbers or timestamps on a brand-new row.
+revoke insert on public.files from anon, authenticated;
+grant insert (owner_id, title, description, category, storage_path,
+              original_name, mime_type, size_bytes, kind)
+  on public.files to authenticated;
 
 -- FILE_SUBJECTS
 drop policy if exists fs_read on public.file_subjects;
@@ -1131,6 +1208,12 @@ create policy comments_delete on public.comments
 drop policy if exists reports_insert on public.reports;
 create policy reports_insert on public.reports
   for insert to authenticated with check (reporter_id = auth.uid() and public.is_active_member());
+
+-- Every report starts open and unresolved at the database's current time.
+-- Administrator resolution continues through the UPDATE policy below.
+revoke insert on public.reports from anon, authenticated;
+grant insert (file_id, comment_id, reporter_id, reason, details)
+  on public.reports to authenticated;
 
 drop policy if exists reports_read on public.reports;
 create policy reports_read on public.reports
@@ -1237,6 +1320,6 @@ create policy "dept delete own or admin" on storage.objects
 
 -- ===========================================================================
 --  DONE. Go back to OpenDepartment and finish connecting your project.
---  The FIRST account that signs up becomes the administrator -- make sure
---  that is you.
+--  Use the PRIVATE FOUNDER LINK from the wizard to create the administrator.
+--  The public department address alone never authorizes the first signup.
 -- ===========================================================================

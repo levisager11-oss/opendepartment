@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createControlClient } from "@/lib/control/client";
-import { TOKEN_COOKIE, oauthConfigured, unseal } from "@/lib/setup/oauth-session";
+import { TOKEN_COOKIE, oauthConfigured, managementToken } from "@/lib/setup/oauth-session";
 import { listOrganizations } from "@/lib/setup/supabase-management";
 
 /**
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const token = unseal(request.cookies.get(TOKEN_COOKIE)?.value);
+  const token = managementToken(request.cookies.get(TOKEN_COOKIE)?.value, user.id);
   if (!token) {
     return NextResponse.json({
       available: true,

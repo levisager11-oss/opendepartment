@@ -1,0 +1,19 @@
+flowchart LR
+  subgraph browser["Member browser - untrusted"]
+    M["Member"]
+    F["Upload form"]
+    M --> F
+  end
+  subgraph tenant["Tenant Supabase"]
+    S["Storage API and private objects"]
+    D["Database metadata and quota"]
+    C["Cleanup RPC"]
+  end
+  F -->|"1 bytes; active member and own folder"| S
+  F -->|"2 client size; optional to attacker"| D
+  M -->|"direct upload; no aggregate admission"| S
+  D -->|"metadata totals only"| D
+  A["Administrator browser"] --> C
+  C -->|"unreferenced paths"| A
+  A -->|"separate delete request"| S
+

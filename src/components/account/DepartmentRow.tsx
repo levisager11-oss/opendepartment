@@ -51,6 +51,7 @@ export function DepartmentRow({ dept }: { dept: Dept }) {
   const [busy, setBusy] = useState(false);
   const [visibility, setVisibility] = useState(dept.visibility);
   const [name, setName] = useState(dept.display_name);
+  const [visibilityError, setVisibilityError] = useState<string | null>(null);
   const [refreshState, setRefreshState] = useState<
     "idle" | "busy" | "done" | "failed"
   >("idle");
@@ -81,6 +82,7 @@ export function DepartmentRow({ dept }: { dept: Dept }) {
   const openPanel = useCallback(() => {
     setPanel(true);
     setError(null);
+    setOauth(null);
     void (async () => {
       try {
         const status = await fetch("/api/setup/oauth/status").then((r) =>
@@ -167,54 +169,67 @@ export function DepartmentRow({ dept }: { dept: Dept }) {
   async function refreshName() {
     setRefreshState("busy");
 
-    // No session and no cookies: this is one anonymous read of a function that
-    // is public by design, not a sign-in to somebody else's department.
-    const tenant = createClient(dept.supabase_url, dept.anon_key, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
+    try {
+      // No session and no cookies: this is one anonymous read of a function that
+      // is public by design, not a sign-in to somebody else's department.
+      const tenant = createClient(dept.supabase_url, dept.anon_key, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
 
-    const { data, error } = await tenant.rpc("department_identity");
-    if (error || !data || data.length === 0) {
+      const { data, error } = await tenant.rpc("department_identity");
+      if (error || !data || data.length === 0) {
+        setRefreshState("failed");
+        return;
+      }
+
+      const identity = data[0] as { department_name?: string; tagline?: string | null };
+      const nextName = (identity.department_name ?? "").trim().slice(0, 60);
+      if (!nextName) {
+        setRefreshState("failed");
+        return;
+      }
+      const nextTagline = (identity.tagline ?? "")?.trim().slice(0, 160) || null;
+
+      const { data: written, error: writeError } = await createControlBrowserClient()
+        .from("departments")
+        .update({ display_name: nextName, tagline: nextTagline })
+        .eq("slug", dept.slug)
+        .select("display_name");
+
+      // Same reasoning as the settings screen inside a department: an update the
+      // policy blocks touches no rows and reports no failure, so the returned
+      // row is the only thing that separates "saved" from "refused".
+      if (writeError || !written || written.length === 0) {
+        setRefreshState("failed");
+        return;
+      }
+
+      setName(nextName);
+      setRefreshState("done");
+      router.refresh();
+    } catch {
       setRefreshState("failed");
-      return;
     }
-
-    const identity = data[0] as { department_name?: string; tagline?: string | null };
-    const nextName = (identity.department_name ?? "").trim().slice(0, 60);
-    if (!nextName) {
-      setRefreshState("failed");
-      return;
-    }
-    const nextTagline = (identity.tagline ?? "")?.trim().slice(0, 160) || null;
-
-    const { data: written, error: writeError } = await createControlBrowserClient()
-      .from("departments")
-      .update({ display_name: nextName, tagline: nextTagline })
-      .eq("slug", dept.slug)
-      .select("display_name");
-
-    // Same reasoning as the settings screen inside a department: an update the
-    // policy blocks touches no rows and reports no failure, so the returned
-    // row is the only thing that separates "saved" from "refused".
-    if (writeError || !written || written.length === 0) {
-      setRefreshState("failed");
-      return;
-    }
-
-    setName(nextName);
-    setRefreshState("done");
-    router.refresh();
   }
 
   async function toggleVisibility() {
     setBusy(true);
+    setVisibilityError(null);
     const next = visibility === "public" ? "unlisted" : "public";
-    const { error } = await createControlBrowserClient()
-      .from("departments")
-      .update({ visibility: next })
-      .eq("slug", dept.slug);
-    setBusy(false);
-    if (!error) setVisibility(next);
+    try {
+      const { data, error } = await createControlBrowserClient()
+        .from("departments")
+        .update({ visibility: next })
+        .eq("slug", dept.slug)
+        .select("visibility");
+      if (error || !data?.length) throw error ?? new Error("Update refused");
+      setVisibility(data[0].visibility);
+      router.refresh();
+    } catch {
+      setVisibilityError(t("common.actionFailed"));
+    } finally {
+      setBusy(false);
+    }
   }
 
   /** Send the tab to Supabase to authorise, and come back to this panel. */
@@ -291,18 +306,23 @@ export function DepartmentRow({ dept }: { dept: Dept }) {
     // A DELETE the policy refuses touches no rows and reports no error -- a
     // suspended department is exactly that case -- so the returned row is the
     // only thing that separates "removed" from "refused".
-    const { data: removed, error: deleteError } = await createControlBrowserClient()
-      .from("departments")
-      .delete()
-      .eq("slug", dept.slug)
-      .select("slug");
+    try {
+      const { data: removed, error: deleteError } = await createControlBrowserClient()
+        .from("departments")
+        .delete()
+        .eq("slug", dept.slug)
+        .select("slug");
 
-    setBusy(false);
-    setOutcome({
-      delisted: !deleteError && (removed?.length ?? 0) > 0,
-      project,
-      detail,
-    });
+      setOutcome({
+        delisted: !deleteError && (removed?.length ?? 0) > 0,
+        project,
+        detail,
+      });
+    } catch {
+      setOutcome({ delisted: false, project, detail });
+    } finally {
+      setBusy(false);
+    }
   }
 
   // The outcome replaces the row rather than sitting beside it: a refresh takes
@@ -373,7 +393,16 @@ export function DepartmentRow({ dept }: { dept: Dept }) {
 
         <button
           type="button"
-          onClick={() => router.refresh()}
+          onClick={() => {
+            if (!outcome.delisted) {
+              setOutcome(null);
+              setPanel(false);
+              setTyped("");
+              setError(null);
+              setAlsoProject(false);
+            }
+            router.refresh();
+          }}
           className="btn btn-sm btn-primary mt-4"
         >
           {t("delete.dismiss")}
@@ -449,6 +478,7 @@ export function DepartmentRow({ dept }: { dept: Dept }) {
           {t("account.refreshFailed")}
         </p>
       )}
+      {visibilityError && <p role="alert" className="mt-2 text-xs text-stamp-red">{visibilityError}</p>}
 
       {panel && (
         <div className="paper paper-flag-red mt-4 p-4">
@@ -498,6 +528,7 @@ export function DepartmentRow({ dept }: { dept: Dept }) {
               <input
                 type="checkbox"
                 checked={alsoProject}
+                disabled={busy}
                 onChange={(e) => setAlsoProject(e.target.checked)}
                 className="mt-1"
               />
@@ -523,6 +554,7 @@ export function DepartmentRow({ dept }: { dept: Dept }) {
             id={`del-${dept.slug}`}
             className="field typewriter"
             value={typed}
+            disabled={busy}
             onChange={(e) => {
               setTyped(e.target.value);
               setError(null);
@@ -535,7 +567,7 @@ export function DepartmentRow({ dept }: { dept: Dept }) {
             <button
               type="button"
               onClick={destroy}
-              disabled={busy || typed.trim().toLowerCase() !== dept.slug}
+              disabled={busy || oauth === null || typed.trim().toLowerCase() !== dept.slug}
               aria-busy={busy}
               className="btn btn-danger"
             >

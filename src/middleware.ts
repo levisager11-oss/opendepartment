@@ -126,10 +126,10 @@ async function dispatch(
 ): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
 
-  // Not configured yet: let everything through so the setup page can render.
-  if (!controlConfigured()) return NextResponse.next({ request: { headers } });
-
   if (pathname.startsWith("/d/")) return tenantMiddleware(request, headers);
+  // Pinned departments still need canonical paths and refreshed cookies even
+  // when this deployment does not have a control plane.
+  if (!controlConfigured()) return NextResponse.next({ request: { headers } });
   if (
     CONTROL_PRIVATE.some((p) => pathname.startsWith(p)) &&
     !CONTROL_PUBLIC.some((p) => pathname.startsWith(p))
@@ -190,6 +190,7 @@ async function tenantMiddleware(request: NextRequest, headers: Headers) {
         cookiesToSet.forEach(({ name, value }) =>
           request.cookies.set(name, value)
         );
+        headers.set("cookie", request.cookies.toString());
         response = NextResponse.next({ request: { headers } });
         cookiesToSet.forEach(({ name, value, options }) =>
           response.cookies.set(name, value, {
@@ -212,7 +213,7 @@ async function tenantMiddleware(request: NextRequest, headers: Headers) {
     const url = request.nextUrl.clone();
     url.pathname = `/d/${dept.slug}/login`;
     url.searchParams.set("next", request.nextUrl.pathname);
-    return NextResponse.redirect(url);
+    return redirectWithCookies(url, response);
   }
 
   // A member landing on the front door or the login page wants the archive.
@@ -220,7 +221,7 @@ async function tenantMiddleware(request: NextRequest, headers: Headers) {
     const url = request.nextUrl.clone();
     url.pathname = `/d/${dept.slug}/vault`;
     url.search = "";
-    return NextResponse.redirect(url);
+    return redirectWithCookies(url, response);
   }
 
   return response;
@@ -242,6 +243,7 @@ async function controlMiddleware(request: NextRequest, headers: Headers) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
+          headers.set("cookie", request.cookies.toString());
           response = NextResponse.next({ request: { headers } });
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
@@ -259,10 +261,16 @@ async function controlMiddleware(request: NextRequest, headers: Headers) {
     const url = request.nextUrl.clone();
     url.pathname = "/account/login";
     url.searchParams.set("next", request.nextUrl.pathname);
-    return NextResponse.redirect(url);
+    return redirectWithCookies(url, response);
   }
 
   return response;
+}
+
+function redirectWithCookies(url: URL, refreshed: NextResponse) {
+  const redirect = NextResponse.redirect(url);
+  for (const cookie of refreshed.cookies.getAll()) redirect.cookies.set(cookie);
+  return redirect;
 }
 
 export const config = {

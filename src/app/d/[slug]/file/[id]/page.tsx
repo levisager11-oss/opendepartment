@@ -33,6 +33,7 @@ export default async function FilePage({
 }) {
   const { slug, id } = await params;
   const member = await requireMember(slug);
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) notFound();
   const supabase = await createTenantClient(member.dept);
 
   // Count this visit BEFORE reading the record, so the number on the page
@@ -49,12 +50,13 @@ export default async function FilePage({
     console.error("increment_view failed:", viewError.message);
   }
 
-  const { data } = await supabase
+  const { data, error: fileError } = await supabase
     .from("files_public")
     .select("*")
     .eq("id", id)
     .maybeSingle();
 
+  if (fileError) throw new Error("Could not load the exhibit.");
   if (!data) notFound();
   const file = data as CaseFile;
 
@@ -65,7 +67,7 @@ export default async function FilePage({
     .from(STORAGE_BUCKET)
     .createSignedUrl(file.storage_path, 3600);
 
-  const [{ data: myVote }, { data: commentRows }] = await Promise.all([
+  const [{ data: myVote, error: voteError }, { data: commentRows, error: commentsError }] = await Promise.all([
     supabase.from("votes").select("value").eq("file_id", id).maybeSingle(),
     supabase
       .from("comments")
@@ -73,6 +75,13 @@ export default async function FilePage({
       .eq("file_id", id)
       .order("created_at", { ascending: true }),
   ]);
+  if (voteError || commentsError) throw new Error("Could not load exhibit discussion.");
+
+  // Storage's signed download option sets Content-Disposition on its origin;
+  // the browser download attribute alone cannot force a cross-origin download.
+  const { data: download } = signed?.signedUrl
+    ? await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(file.storage_path, 3600, { download: file.original_name })
+    : { data: null };
 
   // Admins, and only admins, see who filed the document. The check happens
   // inside the database function, not here.
@@ -173,9 +182,9 @@ export default async function FilePage({
         />
 
         <div className="flex flex-wrap items-center gap-3 border-t border-paper-300 p-4 sm:p-5">
-          {signed?.signedUrl && (
+          {download?.signedUrl && (
             <a
-              href={signed.signedUrl}
+              href={download.signedUrl}
               download={file.original_name}
               className="btn btn-primary"
             >

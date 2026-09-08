@@ -18,8 +18,8 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypt
  *     control-plane database yields nothing, because nothing is in it.
  *   - The token is not readable by any script on the page, ours or anybody
  *     else's, because httpOnly.
- *   - It cannot be replayed by whoever holds the cookie alone: the encryption
- *     key never leaves the server.
+ *   - The encrypted token envelope binds it to the control account that
+ *     authorized it and includes a server-checked expiry.
  *   - It is deleted the moment provisioning finishes, and expires by itself if
  *     somebody abandons the wizard halfway.
  *
@@ -89,8 +89,8 @@ export function seal(value: string): string {
 export function unseal(value: string | undefined): string | null {
   if (!value) return null;
   try {
-    const [iv, tag, body] = value.split(".");
-    if (!iv || !tag || !body) return null;
+    const [iv, tag, body, extra] = value.split(".");
+    if (!iv || !tag || !body || extra !== undefined) return null;
 
     const decipher = createDecipheriv(
       "aes-256-gcm",
@@ -107,6 +107,22 @@ export function unseal(value: string | undefined): string | null {
     // Either way there is no token here and the caller starts over.
     return null;
   }
+}
+
+export function sealManagementToken(token: string, userId: string): string {
+  return seal(JSON.stringify({ purpose: "management", token, userId, expiresAt: Date.now() + 3_600_000 }));
+}
+
+export function managementToken(value: string | undefined, userId: string): string | null {
+  const clear = unseal(value);
+  if (!clear) return null;
+  try {
+    const session = JSON.parse(clear);
+    return session?.purpose === "management" && session.userId === userId &&
+      typeof session.expiresAt === "number" && session.expiresAt > Date.now() &&
+      typeof session.token === "string" && session.token.length > 0
+      ? session.token : null;
+  } catch { return null; }
 }
 
 /** PKCE, so an intercepted authorization code is not on its own enough. */

@@ -5,6 +5,7 @@ import { Spinner } from "@/components/Spinner";
 import { useI18n } from "@/lib/i18n/provider";
 import { CONTROL_READY, createControlBrowserClient } from "@/lib/control/browser";
 import type { TranslationKey } from "@/lib/i18n/dictionary";
+import { departmentSlug } from "@/lib/navigation";
 
 /**
  * The platform's takedown path, as distinct from the per-file report feature
@@ -46,7 +47,7 @@ export function ReportForm({ presetSlug }: { presetSlug?: string }) {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const clean = slug.trim().toLowerCase().replace(/^.*\/d\//, "").split("/")[0];
+    const clean = departmentSlug(slug);
     if (!clean) return setError(t("abuse.slugRequired"));
 
     setBusy(true);

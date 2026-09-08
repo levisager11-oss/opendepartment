@@ -25,28 +25,42 @@ export function AdminReports({ reports }: { reports: AdminReport[] }) {
   const router = useRouter();
   const [showResolved, setShowResolved] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [updated, setUpdated] = useState(false);
+  const [deletedFiles, setDeletedFiles] = useState<Set<string>>(new Set());
 
   const visible = reports.filter((r) =>
-    showResolved ? true : r.status === "open"
+    !(r.file_id && deletedFiles.has(r.file_id)) && (showResolved || r.status === "open")
   );
 
   async function setStatus(id: string, status: "resolved" | "dismissed") {
     setBusyId(id);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    setError(null);
+    setUpdated(false);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Session expired");
 
-    await supabase
-      .from("reports")
-      .update({
-        status,
-        resolved_at: new Date().toISOString(),
-        resolved_by: user?.id ?? null,
-      })
-      .eq("id", id);
+      const { data, error: updateError } = await supabase
+        .from("reports")
+        .update({
+          status,
+          resolved_at: new Date().toISOString(),
+          resolved_by: user?.id ?? null,
+        })
+        .eq("id", id)
+        .select("id");
+      if (updateError || !data?.length) throw updateError ?? new Error("Update refused");
 
-    setBusyId(null);
-    router.refresh();
+      setUpdated(true);
+      router.refresh();
+    } catch {
+      setError(t("common.actionFailed"));
+    } finally {
+      setBusyId(null);
+    }
   }
 
   async function destroyFile(report: AdminReport) {
@@ -54,29 +68,48 @@ export function AdminReports({ reports }: { reports: AdminReport[] }) {
     if (!confirm(t("file.deleteConfirm"))) return;
 
     setBusyId(report.id);
+    setError(null);
+    setUpdated(false);
 
-    // delete_file() re-checks admin-or-owner inside the tenant's database and
-    // returns the storage path, so no service-role key is involved.
-    const { data: path, error } = await supabase.rpc("delete_file", {
-      target: report.file_id,
-      why: `report:${report.id}`,
-    });
+    try {
+      // delete_file() re-checks admin-or-owner inside the tenant's database and
+      // returns the storage path, so no service-role key is involved.
+      const { data: path, error } = await supabase.rpc("delete_file", {
+        target: report.file_id,
+        why: `report:${report.id}`,
+      });
 
-    if (error) {
+      if (error) {
+        throw error;
+      }
+      setDeletedFiles((prev) => new Set(prev).add(report.file_id!));
+
+      let storageFailed = false;
+      if (typeof path === "string" && path) {
+        try {
+          const result = await supabase.storage.from(STORAGE_BUCKET).remove([path]);
+          storageFailed = Boolean(result.error);
+        } catch {
+          storageFailed = true;
+        }
+      }
+
+      // File reports cascade with the deleted file, so there is no report row
+      // left to update. The delete_file RPC records the moderation audit entry.
+      setUpdated(true);
+      router.refresh();
+      if (storageFailed) setError(t("danger.objectsLeft"));
+    } catch {
+      setError(t("common.actionFailed"));
+    } finally {
       setBusyId(null);
-      alert(t("common.error"));
-      return;
     }
-
-    if (typeof path === "string" && path) {
-      await supabase.storage.from(STORAGE_BUCKET).remove([path]);
-    }
-
-    await setStatus(report.id, "resolved");
   }
 
   return (
     <div>
+      {error && <p role="alert" className="notice notice-error mb-4">{error}</p>}
+      {updated && !error && <p role="status" className="notice notice-ok mb-4">{t("common.done")}</p>}
       <label className="mb-4 flex cursor-pointer items-center gap-2 text-sm text-ink-700">
         <input
           type="checkbox"
@@ -154,7 +187,7 @@ export function AdminReports({ reports }: { reports: AdminReport[] }) {
                     <button
                       type="button"
                       onClick={() => destroyFile(report)}
-                      disabled={busyId === report.id || !report.file_id}
+                      disabled={Boolean(busyId) || !report.file_id}
                       className="btn btn-sm btn-danger"
                     >
                       {t("admin.reports.deleteFile")}
@@ -162,7 +195,7 @@ export function AdminReports({ reports }: { reports: AdminReport[] }) {
                     <button
                       type="button"
                       onClick={() => setStatus(report.id, "resolved")}
-                      disabled={busyId === report.id}
+                      disabled={Boolean(busyId)}
                       className="btn btn-sm btn-ghost"
                     >
                       {t("admin.reports.resolve")}
@@ -170,7 +203,7 @@ export function AdminReports({ reports }: { reports: AdminReport[] }) {
                     <button
                       type="button"
                       onClick={() => setStatus(report.id, "dismissed")}
-                      disabled={busyId === report.id}
+                      disabled={Boolean(busyId)}
                       className="btn btn-sm btn-ghost"
                     >
                       {t("admin.reports.dismiss")}

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { probeTenant } from "@/lib/tenant/branding";
 import { createControlClient, CONTROL_CONFIGURED } from "@/lib/control/client";
 import { clientKey, rateLimit } from "@/lib/rate-limit";
+import { readJsonObject, sameOrigin, stringFields } from "@/lib/setup/request";
 
 /**
  * Ask a candidate Supabase project whether it is ready to become a department.
@@ -17,9 +18,8 @@ import { clientKey, rateLimit } from "@/lib/rate-limit";
  *  - AN ACCOUNT. The answer distinguishes "no schema" from "unreachable" from
  *    "already claimed", which makes an open version of this a way to sweep
  *    Supabase for projects running OpenDepartment and find the UNCLAIMED ones
- *    -- and an unclaimed project whose URL and anon key you hold is one signup
- *    away from belonging to you, because the first account through the door
- *    founds the department. The wizard already requires an account before it
+ *    without a legitimate setup workflow. Founder verification separately
+ *    protects the first signup. The wizard already requires an account before it
  *    reaches this step (registering the slug needs an owner to attach it to),
  *    so nothing legitimate is turned away.
  *  - A RATE LIMIT. Even with an account, one address should not be able to
@@ -61,6 +61,7 @@ function looksLikeServiceKey(key: string): boolean {
 }
 
 export async function POST(request: Request) {
+  if (!sameOrigin(request)) return NextResponse.json({ error: "BAD_ORIGIN" }, { status: 403 });
   // Without a control plane there is no account to require and no directory to
   // register into; the wizard says so on this step. Refusing outright is the
   // honest answer rather than probing on behalf of nobody.
@@ -91,12 +92,12 @@ export async function POST(request: Request) {
     );
   }
 
-  let body: { url?: string; key?: string };
-  try {
-    body = await request.json();
-  } catch {
+  const parsed = await readJsonObject(request);
+  if (!parsed.ok) return parsed.response;
+  if (!stringFields(parsed.value, ["url", "key"])) {
     return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
   }
+  const body = parsed.value as { url?: string; key?: string };
 
   const url = (body.url ?? "").trim().replace(/\/+$/, "");
   const key = (body.key ?? "").trim();

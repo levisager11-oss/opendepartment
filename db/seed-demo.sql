@@ -11,14 +11,28 @@
 --  created by hand alone.
 -- ===========================================================================
 
+begin;
+set local search_path = public, extensions;
+
+-- Found the department using its private founder link before seeding. This
+-- script never reopens bootstrap or silently turns a demo user into an admin.
+do $ready$ begin
+  if not coalesce((select claimed from public.settings where id), false)
+     or not exists (select 1 from public.profiles where is_admin and not is_banned) then
+    raise exception 'Sign up with your private founder link before running the demo seed; an administrator is required.';
+  end if;
+end $ready$;
+
+create extension if not exists pgcrypto;
+
 -- ---------------------------------------------------------------------------
 -- 0. Demo members.
 --
 -- Creating auth users from SQL means writing into auth.users, whose exact
--- column set moves between GoTrue releases. The whole block is therefore
--- best-effort: if it fails on your version, the seed carries on and attributes
--- everything to the accounts that already exist, which still exercises the
--- list, the sorting, the comments and the admin screens.
+-- column set moves between GoTrue releases. An incompatible version fails the
+-- transaction with its actual error; no partial seed or renamed real account
+-- is left behind. The temporary invite uses the ordinary signup trigger and
+-- is removed before commit, without changing the department's join policy.
 --
 -- Demo password for all three: demopass123
 -- ---------------------------------------------------------------------------
@@ -31,13 +45,16 @@ declare
   ];
   emails text[] := array['agent.k@example.test','agent.m@example.test','agent.q@example.test'];
   names  text[] := array['agent_k','agent_m','agent_q'];
+  invite text := 'DEMO-' || upper(replace(gen_random_uuid()::text, '-', ''));
   i int;
 begin
+  insert into public.invites (code, note, max_uses, grants_admin, expires_at)
+  values (invite, 'Temporary demo seed invite', 3, false, now() + interval '1 hour');
+
   for i in 1..3 loop
-    -- The signup trigger enforces the door policy, so open it first.
-    insert into public.allowlist (email, note)
-    values (emails[i], 'demo seed')
-    on conflict (email) do nothing;
+    if exists (select 1 from auth.users where id = ids[i] and email is distinct from emails[i]) then
+      raise exception 'Demo account ID % belongs to a different user; nothing was seeded.', ids[i];
+    end if;
 
     insert into auth.users (
       instance_id, id, aud, role, email, encrypted_password,
@@ -49,7 +66,8 @@ begin
       '00000000-0000-0000-0000-000000000000', ids[i], 'authenticated',
       'authenticated', emails[i], crypt('demopass123', gen_salt('bf')),
       now(), now() - (i || ' days')::interval, now(),
-      '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb,
+      '{"provider":"email","providers":["email"]}'::jsonb,
+      jsonb_build_object('invite_code', invite),
       '', '', '', '', ''
     )
     on conflict (id) do nothing;
@@ -67,18 +85,21 @@ begin
     on conflict do nothing;
 
     update public.profiles set username = names[i] where id = ids[i];
+    if not found then
+      raise exception 'Demo account % has no member profile; nothing was seeded.', ids[i];
+    end if;
+    update auth.users set raw_user_meta_data = raw_user_meta_data - 'invite_code' where id = ids[i];
   end loop;
 
+  delete from public.invites where code = invite;
   raise notice 'demo members ready (password: demopass123)';
-exception when others then
-  raise notice 'demo members skipped (%): seeding with existing accounts only',
-    sqlerrm;
 end $demo$;
 
 -- ---------------------------------------------------------------------------
 -- 1. Clear previous demo content, identified by the marker in storage_path.
 -- ---------------------------------------------------------------------------
-delete from public.files where storage_path like 'demo-seed/%';
+delete from public.files where storage_path like 'demo-seed/%'
+  or storage_path like owner_id::text || '/demo-seed/%';
 delete from public.subjects where description = 'demo seed';
 
 -- ---------------------------------------------------------------------------
@@ -93,7 +114,7 @@ insert into public.subjects (name, description) values
 on conflict (name) do nothing;
 
 -- ---------------------------------------------------------------------------
--- 3. Exhibits, spread across whichever members exist.
+-- 3. Exhibits, attributed only to the three demo members.
 --
 -- Mostly non-image kinds on purpose: these rows point at storage objects that
 -- were never uploaded, and a pdf or audio card renders its icon happily while
@@ -118,20 +139,19 @@ declare
   ];
   cats text[] := array['EXHIBIT','TRANSCRIPT','MEMORANDUM','SURVEILLANCE',
                        'WITNESS STATEMENT','CORRESPONDENCE','MISCELLANEOUS'];
-  kinds public.file_kind[] := array['pdf','pdf','other','audio','pdf','other',
-                                    'pdf','image','image','other','pdf','pdf'];
-  mimes text[] := array['application/pdf','application/pdf','text/plain',
-                        'audio/mpeg','application/pdf','text/plain',
+  kinds public.file_kind[] := array['pdf','pdf','pdf','audio','pdf','pdf',
+                                    'pdf','image','image','pdf','pdf','pdf'];
+  mimes text[] := array['application/pdf','application/pdf','application/pdf',
+                        'audio/mpeg','application/pdf','application/pdf',
                         'application/pdf','image/jpeg','image/jpeg',
-                        'text/plain','application/pdf','application/pdf'];
+                        'application/pdf','application/pdf','application/pdf'];
   new_id uuid;
   subject_ids uuid[];
   i int;
 begin
-  select array_agg(id order by created_at) into owners from public.profiles;
-  if owners is null or array_length(owners, 1) = 0 then
-    raise exception 'No profiles yet. Sign up once, then run this seed.';
-  end if;
+  owners := array['11111111-1111-4111-8111-111111111111'::uuid,
+                  '22222222-2222-4222-8222-222222222222'::uuid,
+                  '33333333-3333-4333-8333-333333333333'::uuid];
 
   select array_agg(id order by name) into subject_ids
     from public.subjects where description = 'demo seed';
@@ -145,7 +165,7 @@ begin
       titles[i],
       'Seeded demo record number ' || i || '. Not a real document.',
       cats[1 + (i % array_length(cats, 1))],
-      'demo-seed/' || i || '-' || gen_random_uuid(),
+      owners[1 + (i % array_length(owners, 1))]::text || '/demo-seed/' || i || '-' || gen_random_uuid(),
       'exhibit-' || lpad(i::text, 3, '0'),
       mimes[i],
       40000 + (i * 91733) % 4000000,
@@ -174,9 +194,11 @@ declare
   voter uuid;
   j int;
 begin
-  select array_agg(id order by created_at) into owners from public.profiles;
+  owners := array['11111111-1111-4111-8111-111111111111'::uuid,
+                  '22222222-2222-4222-8222-222222222222'::uuid,
+                  '33333333-3333-4333-8333-333333333333'::uuid];
 
-  for f in select id from public.files where storage_path like 'demo-seed/%'
+  for f in select id from public.files where storage_path like owner_id::text || '/demo-seed/%'
            order by created_at
   loop
     i := i + 1;
@@ -207,20 +229,21 @@ begin
     end if;
   end loop;
 
-  update public.files set view_count = 3 + (abs(hashtext(id::text)) % 240)
-   where storage_path like 'demo-seed/%';
+  update public.files set view_count = 3 + (abs(hashtext(id::text)::bigint) % 240)
+   where storage_path like owner_id::text || '/demo-seed/%';
 end $engagement$;
 
 -- ---------------------------------------------------------------------------
 -- 5. One open report, so the admin queue is not empty.
 -- ---------------------------------------------------------------------------
 insert into public.reports (file_id, reporter_id, reason, details)
-select f.id, p.id, 'inaccurate', 'Seeded demo report -- safe to dismiss.'
+select f.id, '11111111-1111-4111-8111-111111111111'::uuid, 'other', 'Seeded demo report -- safe to dismiss.'
   from public.files f
-  cross join lateral (select id from public.profiles order by created_at limit 1) p
- where f.storage_path like 'demo-seed/%'
+ where f.storage_path like f.owner_id::text || '/demo-seed/%'
  order by f.created_at
  limit 1;
+
+commit;
 
 -- ===========================================================================
 --  Done. Open /d/<your-slug>/vault to see it.

@@ -30,7 +30,7 @@ export function AdminInvites({ invites }: { invites: InviteEntry[] }) {
   const [doorBusy, setDoorBusy] = useState(false);
   const [doorError, setDoorError] = useState<string | null>(null);
 
-  const [code, setCode] = useState(randomCode());
+  const [code, setCode] = useState(randomCode);
   const [note, setNote] = useState("");
   const [maxUses, setMaxUses] = useState("");
   const [grantsAdmin, setGrantsAdmin] = useState(false);
@@ -38,6 +38,9 @@ export function AdminInvites({ invites }: { invites: InviteEntry[] }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [copyFallback, setCopyFallback] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionDone, setActionDone] = useState(false);
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
 
@@ -49,44 +52,50 @@ export function AdminInvites({ invites }: { invites: InviteEntry[] }) {
     setBusy(true);
     setError(null);
 
-    const expires =
-      expiresDays.trim() && Number(expiresDays) > 0
-        ? new Date(
-            Date.now() + Number(expiresDays) * 24 * 60 * 60 * 1000
-          ).toISOString()
-        : null;
+    try {
+      const expires =
+        expiresDays.trim() && Number(expiresDays) > 0
+          ? new Date(
+              Date.now() + Number(expiresDays) * 24 * 60 * 60 * 1000
+            ).toISOString()
+          : null;
 
-    const { error: insertError } = await supabase.from("invites").insert({
-      code: clean,
-      note: note.trim() || null,
-      max_uses: maxUses.trim() ? Number(maxUses) : null,
-      grants_admin: grantsAdmin,
-      expires_at: expires,
-    });
+      const { error: insertError } = await supabase.from("invites").insert({
+        code: clean,
+        note: note.trim() || null,
+        max_uses: maxUses.trim() ? Number(maxUses) : null,
+        grants_admin: grantsAdmin,
+        expires_at: expires,
+      });
 
-    setBusy(false);
+      setBusy(false);
 
-    if (insertError) {
-      // 23514 is the shape constraint in db/tenant-schema.sql. A code may be
-      // marked as granting administrator rights, so a short one is not a weak
-      // password -- it is a guessable route to every member's e-mail address.
-      // The constraint is the rule; this is only the sentence that explains it.
-      const message =
-        insertError.code === "23505"
-          ? t("invite.duplicate")
-          : insertError.code === "23514"
-            ? t("invite.tooShort")
-            : t("common.error");
-      setError(message);
-      return;
+      if (insertError) {
+        // 23514 is the shape constraint in db/tenant-schema.sql. A code may be
+        // marked as granting administrator rights, so a short one is not a weak
+        // password -- it is a guessable route to every member's e-mail address.
+        // The constraint is the rule; this is only the sentence that explains it.
+        const message =
+          insertError.code === "23505"
+            ? t("invite.duplicate")
+            : insertError.code === "23514"
+              ? t("invite.tooShort")
+              : t("common.error");
+        setError(message);
+        return;
+      }
+
+      setCode(randomCode());
+      setNote("");
+      setMaxUses("");
+      setExpiresDays("");
+      setGrantsAdmin(false);
+      router.refresh();
+    } catch {
+      setError(t("common.actionFailed"));
+    } finally {
+      setBusy(false);
     }
-
-    setCode(randomCode());
-    setNote("");
-    setMaxUses("");
-    setExpiresDays("");
-    setGrantsAdmin(false);
-    router.refresh();
   }
 
   /**
@@ -100,42 +109,63 @@ export function AdminInvites({ invites }: { invites: InviteEntry[] }) {
     setDoorBusy(true);
     setDoorError(null);
 
-    // Selecting the row back is what turns "RLS refused this" into an error:
-    // an update the policy blocks touches no rows and reports no failure, so
-    // without the returned row a non-admin would watch the radio move.
-    const { data, error: updateError } = await supabase
-      .from("settings")
-      .update({ open_join: next })
-      .eq("id", true)
-      .select("open_join");
+    try {
+      // Selecting the row back is what turns "RLS refused this" into an error:
+      // an update the policy blocks touches no rows and reports no failure, so
+      // without the returned row a non-admin would watch the radio move.
+      const { data, error: updateError } = await supabase
+        .from("settings")
+        .update({ open_join: next })
+        .eq("id", true)
+        .select("open_join");
 
-    setDoorBusy(false);
-    if (updateError || !data || data.length === 0) {
-      setDoorError(t("common.error"));
-      return;
+      setDoorBusy(false);
+      if (updateError || !data || data.length === 0) {
+        setDoorError(t("common.error"));
+        return;
+      }
+
+      setOpenJoin(next);
+      // The flag rides down through branding, which the layout reads per
+      // request -- so the sign-up form only stops asking for a code once the
+      // server has re-rendered.
+      router.refresh();
+    } catch {
+      setDoorError(t("common.actionFailed"));
+    } finally {
+      setDoorBusy(false);
     }
-
-    setOpenJoin(next);
-    // The flag rides down through branding, which the layout reads per
-    // request -- so the sign-up form only stops asking for a code once the
-    // server has re-rendered.
-    router.refresh();
   }
 
   async function revoke(target: string) {
     if (!confirm(t("invite.revokeConfirm"))) return;
     setBusy(true);
-    await supabase.from("invites").delete().eq("code", target);
-    setBusy(false);
-    router.refresh();
+    setActionError(null);
+    setActionDone(false);
+    try {
+      const { data, error: deleteError } = await supabase.from("invites")
+        .delete().eq("code", target).select("code");
+      if (deleteError || !data?.length) throw deleteError ?? new Error("Deletion refused");
+      setActionDone(true);
+      router.refresh();
+    } catch {
+      setActionError(t("common.actionFailed"));
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function copyLink(target: string) {
-    await navigator.clipboard.writeText(
-      `${origin}/d/${slug}/join?code=${encodeURIComponent(target)}`
-    );
-    setCopied(target);
-    setTimeout(() => setCopied(null), 2000);
+    const link = `${origin}/d/${slug}/join?code=${encodeURIComponent(target)}`;
+    setCopyFallback(null);
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(target);
+      setTimeout(() => setCopied(null), 2000);
+    } catch {
+      setCopied(null);
+      setCopyFallback(link);
+    }
   }
 
   function statusOf(invite: InviteEntry): { label: string; spent: boolean } {
@@ -296,6 +326,15 @@ export function AdminInvites({ invites }: { invites: InviteEntry[] }) {
         )}
       </form>
 
+      {actionError && <p role="alert" className="notice notice-error">{actionError}</p>}
+      {actionDone && !actionError && <p role="status" className="notice notice-ok">{t("common.done")}</p>}
+      {copyFallback && (
+        <div className="paper p-4">
+          <p role="alert" className="mb-2 text-sm text-stamp-red">{t("invite.copyFailed")}</p>
+          <input className="field" aria-label={t("invite.link")} readOnly value={copyFallback}
+            onFocus={(e) => e.target.select()} />
+        </div>
+      )}
       {invites.length === 0 ? (
         <div className="paper py-14 text-center">
           <span className="stamp stamp-blue text-sm">NO INVITES</span>

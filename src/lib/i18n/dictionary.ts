@@ -8,6 +8,20 @@ export const LOCALES: Locale[] = ["de", "en"];
  */
 export const dictionary = {
   en: {
+    "common.back": "Back",
+    "common.next": "Next",
+    "common.done": "Done.",
+    "common.actionFailed": "The action could not be completed. Please try again.",
+    "vault.more": "Load more documents",
+    "upload.savedNeedsSubjects": "Your document was uploaded, but its subjects could not be saved. Retry to finish filing the same document.",
+    "upload.retrySubjects": "Retry saving subjects",
+    "upload.openSavedFile": "Open the uploaded document",
+    "upload.confirmSave": "The file was uploaded, but its saved status could not be confirmed. Retry to recover the same upload.",
+    "auth.linkInvalid": "That sign-in link could not be used. It may have expired. Sign in again or request a new password reset link.",
+    "file.previewFailed": "The preview could not be loaded. Try again to request a fresh link.",
+    "invite.copyFailed": "The link could not be copied. Select and copy it below.",
+    "setup.slugCheckFailed": "We could not check this address. Please try again.",
+    "setup.slugChecking": "Checking availability...",
     // --- chrome ---------------------------------------------------------
     "gov.official": "An official website of {name}",
     "gov.parody": "PARODY",
@@ -26,7 +40,7 @@ export const dictionary = {
     "setup.tooMany":
       "You have reached the maximum of 3 departments for one account. Remove one under Your departments first.",
     "setup.next1":
-      "Open your department and create the first account. Whoever signs up first becomes the administrator, so make sure it is you.",
+      "Use the private founder link below to create your administrator account. Keep this link to yourself until signup is complete.",
     "setup.next2":
       "Go to Administration, then Invites, and create a code. That is how everybody else gets in.",
     "setup.next3":
@@ -98,14 +112,14 @@ export const dictionary = {
     "settings.categoriesEmpty": "Keep at least one category.",
     "settings.memberQuota": "Storage per member",
     "settings.memberQuotaHint":
-      "Megabytes one member may keep in total. Leave empty for no limit. A free Supabase project holds about a gigabyte, and the per-file limit above does not stop one person filling it.",
+      "Megabytes recorded for one member's documents. Leave empty for no limit. This checks archive records; it is not a storage or billing cap. Direct uploads and leftover objects can exceed it. Monitor actual usage in Supabase.",
     "settings.memberQuotaNone": "No limit",
     "settings.quotaInvalid":
       "Storage per member must be a whole number of megabytes, or empty for no limit.",
     "settings.storage": "Storage",
     "settings.orphans": "Objects with no document",
     "settings.orphansHint":
-      "Deleting a document removes its row and then its file, which is two steps. A browser closed in between leaves the file behind: nothing in the archive can see it, and it still counts against your Supabase storage.",
+      "Deleting a document removes its row and then its file, which is two steps. A browser closed in between leaves the file behind: nothing in the archive can see it, and it still counts against your Supabase storage. Only unfiled objects older than one hour are shown, and their status is checked again before deletion.",
     "settings.orphansNone": "Nothing left behind.",
     "settings.orphansPurge": "Delete these files",
     "settings.orphansPurged": "Removed {n} file(s).",
@@ -171,7 +185,7 @@ export const dictionary = {
 
     // --- support --------------------------------------------------------
     "od.supportBody":
-      "OpenDepartment is free and stores nothing of yours. If it is useful to you, you can buy me a coffee.",
+      "OpenDepartment is free to use. If it is useful to you, you can buy me a coffee.",
 
     // --- department chrome (OpenDepartment additions) -------------------
     "dept.hostedNotice":
@@ -213,13 +227,13 @@ export const dictionary = {
       "Build a mock government archive for your class, your team or your group chat. Members upload exhibits, vote on them and argue in the comments. You decide who gets in.",
     "od.yourData": "Your database, not ours",
     "od.yourDataBody":
-      "Every department stores its files, members and comments in a Supabase project you own. We keep a name and a URL. Nothing you upload ever touches our servers, and we cannot read it.",
+      "Every department stores its files, members and comments in a Supabase project you own. Uploads go directly there. OpenDepartment uses your member session to render pages; it holds no permanent tenant administrator key.",
     "od.private": "Invite only by default",
     "od.privateBody":
-      "A new department is unlisted and closed. People get in with an invite code you hand out, or an e-mail address you add. You can ban, delete and see every report.",
-    "od.free": "Free to run",
+      "A new department is unlisted and closed. People get in with an invite code you hand out. You can open membership later, ban members, delete exhibits and review reports.",
+    "od.free": "Your hosting plan",
     "od.freeBody":
-      "Supabase free tier covers a group of thirty comfortably. If you outgrow it, you upgrade your own project -- there is no plan to buy from us.",
+      "Your archive uses your own Supabase project. Storage limits and hosting charges depend on your plan and usage. Check them in your Supabase dashboard -- there is no OpenDepartment subscription to buy.",
     "od.create": "Create a department",
     "od.browse": "Browse public departments",
     "od.needSupabase":
@@ -281,6 +295,13 @@ export const dictionary = {
       "The project was created, but the schema did not install. Open it in the Supabase dashboard and paste the SQL from the next step by hand.",
     "setup.provisionCreating": "Creating your project...",
 
+    "setup.bootstrapResume": "Sign in with the account that registered this department, then retry to recover its founder link. The saved key is still in this tab.",
+    "setup.bootstrapPreparing": "Preparing your private founder link...",
+    "setup.bootstrapUnavailable": "This browser could not create your private founder link. Use HTTPS or localhost, then reload before installing the schema.",
+    "setup.bootstrapRefresh": "Your saved setup has no founder key. Copy and run the current SQL before continuing; it installs a new private founder link.",
+    "setup.bootstrapPrivate": "This private link creates your administrator account. Keep it to yourself and keep this tab open until signup is complete. Share the ordinary department address with members afterward.",
+    "setup.createAnother": "Create another department",
+    "auth.bootstrapInvalid": "This founder link is missing, invalid or already used. Return to your setup tab for its private link, or ask the project owner to reset founder access in the SQL editor.",
     "setup.title": "Create a department",
     "setup.step": "Step {n} of {total}",
     "setup.step1": "Name it",
@@ -675,8 +696,8 @@ export const dictionary = {
     "cookies.body":
       "This site sets only the cookies it needs to work: one that keeps you " +
       "signed in, one that remembers your language, and one that remembers " +
-      "you have read this. There is no advertising or tracking cookie, and " +
-      "nothing here is shared with a third party.",
+      "you have read this. Optional setup uses short-lived authorization cookies. " +
+      "The privacy notice explains hosting, analytics and optional external services.",
     "cookies.more": "Read the privacy notice",
     "cookies.ok": "Understood",
 
@@ -710,6 +731,20 @@ export const dictionary = {
   },
 
   de: {
+    "common.back": "Zurück",
+    "common.next": "Weiter",
+    "common.done": "Erledigt.",
+    "common.actionFailed": "Die Aktion konnte nicht abgeschlossen werden. Bitte versuchen Sie es erneut.",
+    "vault.more": "Weitere Dokumente laden",
+    "upload.savedNeedsSubjects": "Ihr Dokument wurde hochgeladen, aber die zugehörigen Akten konnten nicht gespeichert werden. Versuchen Sie es erneut, um dasselbe Dokument fertig abzulegen.",
+    "upload.retrySubjects": "Akten erneut speichern",
+    "upload.openSavedFile": "Hochgeladenes Dokument öffnen",
+    "upload.confirmSave": "Die Datei wurde hochgeladen, aber ihr Speicherstatus konnte nicht bestätigt werden. Versuchen Sie es erneut, um denselben Upload wiederherzustellen.",
+    "auth.linkInvalid": "Dieser Anmeldelink konnte nicht verwendet werden. Er ist möglicherweise abgelaufen. Melden Sie sich erneut an oder fordern Sie einen neuen Link zum Zurücksetzen des Passworts an.",
+    "file.previewFailed": "Die Vorschau konnte nicht geladen werden. Versuchen Sie es erneut, um einen neuen Link anzufordern.",
+    "invite.copyFailed": "Der Link konnte nicht kopiert werden. Markieren und kopieren Sie ihn unten.",
+    "setup.slugCheckFailed": "Diese Adresse konnte nicht geprüft werden. Bitte versuchen Sie es erneut.",
+    "setup.slugChecking": "Verfügbarkeit wird geprüft...",
     // --- chrome ---------------------------------------------------------
     "gov.official": "Eine offizielle Website von {name}",
     "gov.parody": "PARODIE",
@@ -728,7 +763,7 @@ export const dictionary = {
     "setup.tooMany":
       "Sie haben das Maximum von 3 Departementen pro Konto erreicht. Entfernen Sie zuerst eines unter «Ihre Departemente».",
     "setup.next1":
-      "Öffnen Sie Ihr Departement und erstellen Sie das erste Konto. Wer sich zuerst registriert, wird zur Administration — stellen Sie sicher, dass Sie das sind.",
+      "Erstellen Sie Ihr Administrationskonto über den privaten Gründerlink unten. Behalten Sie diesen Link bis zum Abschluss der Registrierung für sich.",
     "setup.next2":
       "Gehen Sie zu Verwaltung, dann Einladungen, und erstellen Sie einen Code. So kommen alle anderen hinein.",
     "setup.next3":
@@ -801,14 +836,14 @@ export const dictionary = {
     "settings.categoriesEmpty": "Behalten Sie mindestens eine Kategorie.",
     "settings.memberQuota": "Speicher pro Mitglied",
     "settings.memberQuotaHint":
-      "Megabyte, die ein Mitglied insgesamt belegen darf. Leer lassen für kein Limit. Ein kostenloses Supabase-Projekt fasst etwa ein Gigabyte, und das Limit pro Datei hindert eine einzelne Person nicht daran, es zu füllen.",
+      "Megabyte, die für die Dokumente eines Mitglieds erfasst sind. Leer lassen für kein Limit. Dies prüft Archiveinträge und begrenzt weder den tatsächlichen Speicher noch die Kosten. Direkte Uploads und zurückgebliebene Objekte können das Limit überschreiten. Prüfen Sie die Nutzung in Supabase.",
     "settings.memberQuotaNone": "Kein Limit",
     "settings.quotaInvalid":
       "Speicher pro Mitglied muss eine ganze Zahl in Megabyte sein oder leer für kein Limit.",
     "settings.storage": "Speicher",
     "settings.orphans": "Dateien ohne Dokument",
     "settings.orphansHint":
-      "Beim Löschen eines Dokuments wird zuerst der Datensatz und dann die Datei entfernt -- zwei Schritte. Wird der Browser dazwischen geschlossen, bleibt die Datei liegen: im Archiv ist sie unsichtbar, Ihren Supabase-Speicher belegt sie trotzdem.",
+      "Beim Löschen eines Dokuments wird zuerst der Datensatz und dann die Datei entfernt -- zwei Schritte. Wird der Browser dazwischen geschlossen, bleibt die Datei liegen: im Archiv ist sie unsichtbar, Ihren Supabase-Speicher belegt sie trotzdem. Angezeigt werden nur nicht zugeordnete Dateien, die älter als eine Stunde sind. Vor dem Löschen wird ihr Status erneut geprüft.",
     "settings.orphansNone": "Nichts liegen geblieben.",
     "settings.orphansPurge": "Diese Dateien löschen",
     "settings.orphansPurged": "{n} Datei(en) entfernt.",
@@ -876,7 +911,7 @@ export const dictionary = {
 
     // --- Unterstützung -------------------------------------------------
     "od.supportBody":
-      "OpenDepartment ist kostenlos und speichert nichts von Ihnen. Wenn es Ihnen nützt, können Sie mir einen Kaffee ausgeben.",
+      "OpenDepartment ist kostenlos nutzbar. Wenn es Ihnen nützt, können Sie mir einen Kaffee ausgeben.",
 
     // --- department chrome (OpenDepartment additions) -------------------
     "dept.hostedNotice":
@@ -918,13 +953,13 @@ export const dictionary = {
       "Erstellen Sie ein fiktives Behördenarchiv für Ihre Klasse, Ihr Team oder Ihren Gruppenchat. Mitglieder laden Beweismittel hoch, stimmen darüber ab und diskutieren in den Kommentaren. Sie bestimmen, wer hineinkommt.",
     "od.yourData": "Ihre Datenbank, nicht unsere",
     "od.yourDataBody":
-      "Jedes Departement speichert Dateien, Mitglieder und Kommentare in einem Supabase-Projekt, das Ihnen gehört. Wir behalten einen Namen und eine URL. Nichts, was Sie hochladen, berührt unsere Server, und wir können es nicht lesen.",
+      "Jedes Departement speichert Dateien, Mitglieder und Kommentare in Ihrem eigenen Supabase-Projekt. Uploads gehen direkt dorthin. OpenDepartment verwendet Ihre Mitgliedssitzung zur Seitendarstellung und hält keinen dauerhaften Administrator-Schlüssel für Ihr Projekt.",
     "od.private": "Standardmässig nur auf Einladung",
     "od.privateBody":
-      "Ein neues Departement ist nicht gelistet und geschlossen. Der Zugang erfolgt über einen Einladungscode oder eine E-Mail-Adresse, die Sie hinzufügen. Sie können sperren, löschen und alle Meldungen einsehen.",
-    "od.free": "Kostenlos im Betrieb",
+      "Ein neues Departement ist nicht gelistet und geschlossen. Der Zugang erfolgt über einen Einladungscode. Sie können den Zugang später öffnen, Mitglieder sperren, Dokumente löschen und Meldungen prüfen.",
+    "od.free": "Ihr Hosting-Tarif",
     "od.freeBody":
-      "Der kostenlose Tarif von Supabase reicht für eine Gruppe von dreissig Personen bequem aus. Wird es mehr, erweitern Sie Ihr eigenes Projekt -- bei uns gibt es nichts zu kaufen.",
+      "Ihr Archiv nutzt Ihr eigenes Supabase-Projekt. Speichergrenzen und Hosting-Kosten hängen von Ihrem Tarif und Ihrer Nutzung ab. Prüfen Sie diese im Supabase-Dashboard -- ein OpenDepartment-Abonnement gibt es nicht.",
     "od.create": "Departement erstellen",
     "od.browse": "Öffentliche Departemente ansehen",
     "od.needSupabase":
@@ -986,6 +1021,13 @@ export const dictionary = {
       "Das Projekt wurde angelegt, das Schema aber nicht installiert. Öffnen Sie es im Supabase-Dashboard und fügen Sie das SQL aus dem nächsten Schritt von Hand ein.",
     "setup.provisionCreating": "Ihr Projekt wird angelegt...",
 
+    "setup.bootstrapResume": "Melde dich mit dem Konto an, das dieses Departement registriert hat, und versuche es erneut, um den Gründerlink wiederherzustellen. Der gespeicherte Schlüssel bleibt in diesem Tab.",
+    "setup.bootstrapPreparing": "Dein privater Gründerlink wird vorbereitet...",
+    "setup.bootstrapUnavailable": "Dieser Browser konnte deinen privaten Gründerlink nicht erstellen. Nutze HTTPS oder localhost und lade die Seite vor der Schema-Installation neu.",
+    "setup.bootstrapRefresh": "In deiner gespeicherten Einrichtung fehlt der Gründerschlüssel. Kopiere die aktuelle SQL-Datei und führe sie erneut aus, bevor du fortfährst. Sie richtet einen neuen privaten Gründerlink ein.",
+    "setup.bootstrapPrivate": "Mit diesem privaten Link erstellst du dein Administratorkonto. Behalte ihn für dich und lass diesen Tab bis zur Registrierung geöffnet. Teile danach die normale Departementsadresse mit Mitgliedern.",
+    "setup.createAnother": "Weiteres Departement erstellen",
+    "auth.bootstrapInvalid": "Dieser Gründerlink fehlt, ist ungültig oder wurde bereits benutzt. Öffne den privaten Link in deinem Einrichtungs-Tab oder bitte den Projekteigentümer, den Gründerzugang im SQL-Editor zurückzusetzen.",
     "setup.title": "Departement erstellen",
     "setup.step": "Schritt {n} von {total}",
     "setup.step1": "Benennen",
@@ -1377,8 +1419,8 @@ export const dictionary = {
     "cookies.body":
       "Diese Seite setzt nur die Cookies, die für den Betrieb nötig sind: " +
       "eines hält Sie angemeldet, eines merkt sich Ihre Sprache, eines merkt " +
-      "sich, dass Sie diesen Hinweis gelesen haben. Es gibt keine Werbe- oder " +
-      "Tracking-Cookies, und nichts davon wird an Dritte weitergegeben.",
+      "sich, dass Sie diesen Hinweis gelesen haben. Die optionale Einrichtung nutzt kurzlebige Autorisierungs-Cookies. " +
+      "Die Datenschutzerklärung erläutert Hosting, Statistiken und optionale externe Dienste.",
     "cookies.more": "Zur Datenschutzerklärung",
     "cookies.ok": "Verstanden",
 

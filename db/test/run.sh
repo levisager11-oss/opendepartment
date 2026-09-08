@@ -68,6 +68,7 @@ psql -d tenant -q -f "$repo/db/tenant-schema.sql" >/dev/null 2>&1
 echo "==> tenant: running the suite"
 psql -d tenant -q -f "$here/01-helpers.sql" >/dev/null
 psql -d tenant -q -f "$here/02-rls-tests.sql"
+psql -d tenant -q -f "$here/04-tenant-security-regressions.sql"
 
 # -------------------------------------------------------------- control ----
 echo
@@ -83,3 +84,4 @@ psql -d control -q -f "$repo/db/control-plane.sql" >/dev/null 2>&1
 echo "==> control plane: running the suite"
 psql -d control -q -f "$here/01-helpers.sql" >/dev/null
 psql -d control -q -f "$here/03-control-plane-tests.sql"
+psql -d control -q -f "$here/05-control-security-regressions.sql"

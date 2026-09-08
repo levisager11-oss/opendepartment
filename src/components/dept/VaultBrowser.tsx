@@ -52,6 +52,29 @@ export function VaultBrowser({
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [filtersReady, setFiltersReady] = useState(false);
+
+  // Read after hydration so the server and first client render agree. Native
+  // history keeps the current filters shareable without refetching the route.
+  useEffect(() => {
+    function restoreFilters() {
+      const params = new URLSearchParams(window.location.search);
+      const query = params.get("q") ?? "";
+      const requestedSort = params.get("sort") ?? "top";
+      const requestedKind = params.get("kind") ?? "";
+      setSearch(query);
+      setDebounced(query.trim());
+      setSort(Object.hasOwn(SORTS, requestedSort) ? requestedSort as SortKey : "top");
+      setSubjectId(params.get("subject") ?? "");
+      setCategory(params.get("category") ?? "");
+      setKind(KINDS.includes(requestedKind as FileKind) ? requestedKind : "");
+      setMineOnly(params.get("mine") === "1");
+      setFiltersReady(true);
+    }
+    restoreFilters();
+    window.addEventListener("popstate", restoreFilters);
+    return () => window.removeEventListener("popstate", restoreFilters);
+  }, []);
 
   // Debounce the search box so typing does not fire a query per keystroke.
   useEffect(() => {
@@ -59,8 +82,17 @@ export function VaultBrowser({
     return () => clearTimeout(id);
   }, [search]);
 
-  const filtersKey = `${debounced}|${sort}|${subjectId}|${category}|${kind}|${mineOnly}`;
-  const previousFilters = useRef(filtersKey);
+  useEffect(() => {
+    if (!filtersReady) return;
+    const url = new URL(window.location.href);
+    const values = { q: debounced, sort: sort === "top" ? "" : sort,
+      subject: subjectId, category, kind, mine: mineOnly ? "1" : "" };
+    for (const [key, value] of Object.entries(values)) {
+      if (value) url.searchParams.set(key, value);
+      else url.searchParams.delete(key);
+    }
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  }, [filtersReady, debounced, sort, subjectId, category, kind, mineOnly]);
 
   // Changing two filters quickly leaves two queries in flight, and they do not
   // have to come back in the order they were sent. Every load claims a ticket
@@ -81,15 +113,17 @@ export function VaultBrowser({
         // Subject is a many-to-many, so resolve it to a set of ids first.
         let restrictTo: string[] | null = null;
         if (subjectId) {
-          const { data } = await supabase
+          const { data, error: subjectError } = await supabase
             .from("file_subjects")
             .select("file_id")
             .eq("subject_id", subjectId);
+          if (subjectError) throw subjectError;
           if (stale()) return;
           restrictTo = (data ?? []).map((row) => row.file_id as string);
           if (restrictTo.length === 0) {
             setFiles([]);
             setTotal(0);
+            setPage(0);
             setLoading(false);
             return;
           }
@@ -112,6 +146,7 @@ export function VaultBrowser({
         query = query
           .order(column, { ascending })
           .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
           .range(pageIndex * PAGE_SIZE, pageIndex * PAGE_SIZE + PAGE_SIZE - 1);
 
         const { data, count, error } = await query;
@@ -124,10 +159,12 @@ export function VaultBrowser({
         // return their own rows, so nobody can see how anyone else voted.
         const ids = rows.map((r) => r.id);
         if (ids.length) {
-          const { data: myVotes } = await supabase
+          const { data: myVotes, error: votesError } = await supabase
             .from("votes")
             .select("file_id, value")
             .in("file_id", ids);
+          if (votesError) throw votesError;
+          if (stale()) return;
           const map = new Map(
             (myVotes ?? []).map((v) => [v.file_id as string, v.value as number])
           );
@@ -138,6 +175,7 @@ export function VaultBrowser({
 
         setTotal(count ?? 0);
         setFiles((prev) => (replace ? rows : [...prev, ...rows]));
+        setPage(pageIndex);
 
         // One batched call for all image thumbnails on this page.
         const imagePaths = rows
@@ -167,17 +205,17 @@ export function VaultBrowser({
   );
 
   useEffect(() => {
-    const changed = previousFilters.current !== filtersKey;
-    previousFilters.current = filtersKey;
-    if (changed) setPage(0);
-    load(changed ? 0 : page, changed || page === 0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtersKey, page]);
+    if (!filtersReady) return;
+    void load(0, true);
+    return () => { latestRequest.current += 1; };
+  }, [filtersReady, load]);
 
-  const hasFilters = Boolean(debounced || subjectId || category || kind || mineOnly);
+  const hasFilters = Boolean(search || sort !== "top" || subjectId || category || kind || mineOnly);
 
   function clearFilters() {
     setSearch("");
+    setDebounced("");
+    setSort("top");
     setSubjectId("");
     setCategory("");
     setKind("");
@@ -339,7 +377,8 @@ export function VaultBrowser({
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {loading && <p role="status" className="mb-3 text-sm text-ink-500">{t("vault.loading")}</p>}
+          <div aria-busy={loading} className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {files.map((file) => (
               <FileCard
                 key={file.id}
@@ -353,11 +392,11 @@ export function VaultBrowser({
             <div className="mt-8 text-center">
               <button
                 type="button"
-                onClick={() => setPage((p) => p + 1)}
+                onClick={() => load(page + 1, false)}
                 disabled={loading}
                 className="btn btn-ghost"
               >
-                {loading ? t("common.loading") : `${files.length} / ${total}`}
+                {loading ? t("common.loading") : `${t("vault.more")} (${files.length} / ${total})`}
               </button>
             </div>
           )}

@@ -1,6 +1,7 @@
 import { MarketingShell } from "@/components/MarketingShell";
 import { AccountLoginForm } from "@/components/account/AccountLoginForm";
 import { privatePage } from "@/lib/seo";
+import { safeLocalPath } from "@/lib/navigation";
 
 export const metadata = privatePage("Sign in", { path: "/account/login" });
 
@@ -13,8 +14,7 @@ export default async function AccountLoginPage({
 
   // Only same-site paths. An open redirect here would let a crafted link
   // bounce someone off a trusted domain the instant they authenticate.
-  const target =
-    next && next.startsWith("/") && !next.startsWith("//") ? next : "/account";
+  const target = safeLocalPath(next, "/account");
 
   return (
     <MarketingShell>

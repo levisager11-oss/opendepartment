@@ -8,7 +8,7 @@ import {
   VERIFIER_COOKIE,
   oauthConfigured,
   safeReturn,
-  seal,
+  sealManagementToken,
   unseal,
 } from "@/lib/setup/oauth-session";
 import { exchangeCode } from "@/lib/setup/supabase-management";
@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
   const response = back();
   // An hour is longer than provisioning takes and shorter than anybody leaves
   // a tab open on purpose. Cleared explicitly when setup finishes.
-  response.cookies.set(TOKEN_COOKIE, seal(exchanged.token), {
+  response.cookies.set(TOKEN_COOKIE, sealManagementToken(exchanged.token, user.id), {
     ...COOKIE_BASE,
     maxAge: 3600,
   });

@@ -5,6 +5,7 @@ import { TENANT_SCHEMA_SQL } from "@/lib/tenant/schema-sql.generated";
 import { Seal } from "@/components/Seal";
 import { T } from "@/components/T";
 import { privatePage } from "@/lib/seo";
+import { requestOrigin } from "@/lib/setup/origin";
 
 export const metadata = privatePage("Create a department", {
   path: "/new",
@@ -18,10 +19,7 @@ export const metadata = privatePage("Create a department", {
  * URL instead of production's. Same reasoning as the single-tenant original.
  */
 async function currentOrigin(): Promise<string> {
-  const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
-  const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-  return `${proto}://${host}`;
+  return requestOrigin(await headers());
 }
 
 export default async function NewDepartmentPage() {

@@ -20,6 +20,8 @@ export function DeleteFileButton({
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
+  const [rowDeleted, setRowDeleted] = useState(false);
+  const [remainingPath, setRemainingPath] = useState<string | null>(null);
 
   /**
    * The single-tenant original posted to an API route that used the service
@@ -31,26 +33,44 @@ export function DeleteFileButton({
     setBusy(true);
     setError(false);
 
-    const { data: path, error: rpcError } = await supabase.rpc("delete_file", {
-      target: fileId,
-      why: null,
-    });
-
-    if (rpcError) {
+    try {
+      let path = remainingPath;
+      if (!rowDeleted) {
+        const { data, error: rpcError } = await supabase.rpc("delete_file", {
+          target: fileId, why: null,
+        });
+        if (rpcError) throw rpcError;
+        path = typeof data === "string" && data ? data : null;
+        setRowDeleted(true);
+        setRemainingPath(path);
+      }
+      if (path) {
+        const { error: storageError } = await supabase.storage.from(STORAGE_BUCKET).remove([path]);
+        if (storageError) throw storageError;
+        setRemainingPath(null);
+      }
+      router.push(href("vault"));
+      router.refresh();
+    } catch {
       setError(true);
+    } finally {
       setBusy(false);
-      return;
     }
+  }
 
-    // Best effort: the row is already gone, and storage RLS permits this for
-    // the owner or an admin. A failure here leaves an orphaned object, not a
-    // visible record, so it must not block the redirect.
-    if (typeof path === "string" && path) {
-      await supabase.storage.from(STORAGE_BUCKET).remove([path]);
-    }
-
-    router.push(href("vault"));
-    router.refresh();
+  if (rowDeleted) {
+    return (
+      <div>
+        <p role="status">{t("danger.doneFiles_one", { n: 1 })}</p>
+        {error && <p role="alert" className="notice notice-error mt-2">{t("danger.objectsLeft")}</p>}
+        <div className="mt-3 flex gap-3">
+          <button type="button" className="btn btn-primary" disabled={busy} aria-busy={busy} onClick={destroy}>{busy ? t("common.saving") : t("common.retry")}</button>
+          <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => {
+            router.push(href("vault")); router.refresh();
+          }}>{t("nav.vault")}</button>
+        </div>
+      </div>
+    );
   }
 
   if (!confirming) {
@@ -87,7 +107,7 @@ export function DeleteFileButton({
       >
         {t("common.cancel")}
       </button>
-      {error && <span className="text-sm text-stamp-red">{t("common.error")}</span>}
+      {error && <span role="alert" className="text-sm text-stamp-red">{t("common.actionFailed")}</span>}
     </div>
   );
 }

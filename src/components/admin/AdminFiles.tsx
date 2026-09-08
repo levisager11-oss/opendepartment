@@ -15,8 +15,11 @@ export function AdminFiles({ files }: { files: AdminFile[] }) {
   const router = useRouter();
   const [filter, setFilter] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
+  const [error, setError] = useState<string | null>(null);
 
   const visible = files.filter((f) => {
+    if (removedIds.has(f.id)) return false;
     if (!filter.trim()) return true;
     const q = filter.toLowerCase();
     return (
@@ -29,30 +32,33 @@ export function AdminFiles({ files }: { files: AdminFile[] }) {
   async function destroy(id: string) {
     if (!confirm(t("file.deleteConfirm"))) return;
     setBusyId(id);
+    setError(null);
 
     // delete_file() re-checks admin-or-owner inside the tenant's database and
     // hands back the storage path, so no service-role key is involved.
-    const { data: path, error } = await supabase.rpc("delete_file", {
-      target: id,
-      why: "admin",
-    });
-
-    if (error) {
+    let rowDeleted = false;
+    try {
+      const { data: path, error: rpcError } = await supabase.rpc("delete_file", {
+        target: id, why: "admin",
+      });
+      if (rpcError) throw rpcError;
+      rowDeleted = true;
+      setRemovedIds((prev) => new Set(prev).add(id));
+      if (typeof path === "string" && path) {
+        const { error: storageError } = await supabase.storage.from(STORAGE_BUCKET).remove([path]);
+        if (storageError) throw storageError;
+      }
+    } catch {
+      setError(t(rowDeleted ? "danger.objectsLeft" : "common.actionFailed"));
+    } finally {
       setBusyId(null);
-      alert(t("common.error"));
-      return;
+      if (rowDeleted) router.refresh();
     }
-
-    if (typeof path === "string" && path) {
-      await supabase.storage.from(STORAGE_BUCKET).remove([path]);
-    }
-
-    setBusyId(null);
-    router.refresh();
   }
 
   return (
     <div className="paper">
+      {error && <p role="alert" className="notice notice-error m-3">{error}</p>}
       <div className="border-b border-paper-300 p-3">
         <input
           className="field"
@@ -146,7 +152,7 @@ export function AdminFiles({ files }: { files: AdminFile[] }) {
                   <button
                     type="button"
                     onClick={() => destroy(file.id)}
-                    disabled={busyId === file.id}
+                    disabled={Boolean(busyId)}
                     className="cursor-pointer text-xs text-stamp-red underline hover:opacity-80 disabled:opacity-40"
                   >
                     {t("file.delete")}

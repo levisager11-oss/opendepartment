@@ -68,7 +68,9 @@ create table storage.objects (
   id        uuid primary key default gen_random_uuid(),
   bucket_id text references storage.buckets(id),
   name      text not null,
-  owner     uuid
+  owner     uuid,
+  metadata  jsonb,
+  created_at timestamptz not null default now()
 );
 
 create or replace function storage.foldername(name text)

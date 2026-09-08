@@ -210,8 +210,17 @@ alter table public.abuse_reports  enable row level security;
 alter table public.reserved_slugs enable row level security;
 
 drop policy if exists operators_self on public.operators;
-create policy operators_self on public.operators
-  for all to authenticated using (id = auth.uid()) with check (id = auth.uid());
+drop policy if exists operators_read_self on public.operators;
+create policy operators_read_self on public.operators
+  for select to authenticated using (id = auth.uid());
+drop policy if exists operators_update_self on public.operators;
+create policy operators_update_self on public.operators
+  for update to authenticated using (id = auth.uid()) with check (id = auth.uid());
+
+-- Deleting this parent would cascade through suspended departments and bypass
+-- their DELETE policy. Profiles are created by the auth hook, not the caller.
+revoke insert, update, delete on public.operators from anon, authenticated;
+grant update (display_name) on public.operators to authenticated;
 
 -- An operator sees and edits only their own departments -- but "edits" has to
 -- be spelled out, because a single `for all` policy here handed away three
@@ -379,6 +388,11 @@ declare
   owned integer;
 begin
   if auth.uid() is null then raise exception 'NOT_SIGNED_IN'; end if;
+
+  -- Serialize registrations by this operator. Distinct slug inserts otherwise
+  -- race past the count below because their primary keys do not conflict.
+  perform 1 from public.operators o where o.id = auth.uid() for update;
+  if not found then raise exception 'NOT_AN_OPERATOR'; end if;
 
   select count(*) into owned
     from public.departments d where d.operator_id = auth.uid();

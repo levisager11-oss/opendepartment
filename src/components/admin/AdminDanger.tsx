@@ -63,59 +63,69 @@ export function AdminDanger({ departmentName }: { departmentName: string }) {
     setBusy(true);
     setError(null);
 
-    const { data, error: rpcError } = await supabase.rpc("purge_department", {
-      confirm: typed.trim(),
-    });
+    try {
+      const { data, error: rpcError } = await supabase.rpc("purge_department", {
+        confirm: typed.trim(),
+      });
 
-    if (rpcError || !data) {
+      if (rpcError || !data) {
+        setBusy(false);
+        // A department that has not re-run the schema since this was added has
+        // no such function, which is a missing upgrade rather than an error --
+        // and the two are worth telling apart, because one of them has a fix
+        // the administrator can carry out.
+        setError(
+          rpcError?.message?.includes("purge_department")
+            ? t("danger.unavailable")
+            : rpcError?.message?.includes("CONFIRMATION_MISMATCH")
+              ? t("danger.mismatch")
+              : t("common.error")
+        );
+        return;
+      }
+
+      const result = data as {
+        files: number;
+        members: number;
+        accounts: string;
+        storage_paths: string[];
+      };
+
+      // The rows are already gone; the objects are what is left. In batches
+      // because the storage API takes a list and a department that filled a free
+      // tier has thousands of them, and one refusal should not lose the count of
+      // everything that did go.
+      const paths = result.storage_paths ?? [];
+      let removed = 0;
+      let objectsFailed = false;
+      for (let i = 0; i < paths.length; i += 100) {
+        const batch = paths.slice(i, i + 100);
+        try {
+          const { error: storageError } = await supabase.storage
+            .from(STORAGE_BUCKET)
+            .remove(batch);
+          if (storageError) objectsFailed = true;
+          else removed += batch.length;
+        } catch {
+          objectsFailed = true;
+        }
+      }
+
       setBusy(false);
-      // A department that has not re-run the schema since this was added has
-      // no such function, which is a missing upgrade rather than an error --
-      // and the two are worth telling apart, because one of them has a fix
-      // the administrator can carry out.
-      setError(
-        rpcError?.message?.includes("purge_department")
-          ? t("danger.unavailable")
-          : rpcError?.message?.includes("CONFIRMATION_MISMATCH")
-            ? t("danger.mismatch")
-            : t("common.error")
-      );
-      return;
+      setDone({
+        files: Number(result.files ?? 0),
+        members: Number(result.members ?? 0),
+        objects: removed,
+        objectsFailed,
+        accountsKept: result.accounts !== "deleted",
+      });
+      // Every panel on this screen was rendered from rows that no longer exist.
+      router.refresh();
+    } catch {
+      setError(t("common.actionFailed"));
+    } finally {
+      setBusy(false);
     }
-
-    const result = data as {
-      files: number;
-      members: number;
-      accounts: string;
-      storage_paths: string[];
-    };
-
-    // The rows are already gone; the objects are what is left. In batches
-    // because the storage API takes a list and a department that filled a free
-    // tier has thousands of them, and one refusal should not lose the count of
-    // everything that did go.
-    const paths = result.storage_paths ?? [];
-    let removed = 0;
-    let objectsFailed = false;
-    for (let i = 0; i < paths.length; i += 100) {
-      const batch = paths.slice(i, i + 100);
-      const { error: storageError } = await supabase.storage
-        .from(STORAGE_BUCKET)
-        .remove(batch);
-      if (storageError) objectsFailed = true;
-      else removed += batch.length;
-    }
-
-    setBusy(false);
-    setDone({
-      files: Number(result.files ?? 0),
-      members: Number(result.members ?? 0),
-      objects: removed,
-      objectsFailed,
-      accountsKept: result.accounts !== "deleted",
-    });
-    // Every panel on this screen was rendered from rows that no longer exist.
-    router.refresh();
   }
 
   if (done) {
@@ -191,6 +201,7 @@ export function AdminDanger({ departmentName }: { departmentName: string }) {
             id={`purge-${slug}`}
             className="field typewriter"
             value={typed}
+            disabled={busy}
             onChange={(e) => {
               setTyped(e.target.value);
               setError(null);
