@@ -212,6 +212,34 @@ export function getProject(token: string, ref: string) {
   );
 }
 
+/**
+ * Delete a project, and everything in it.
+ *
+ * The counterpart to createProject(), and the only call in this file that
+ * destroys something rather than making it. Two things follow from that:
+ *
+ *   - The caller derives the ref from a department row the operator OWNS,
+ *     never from the request body. A token authorised for an organisation can
+ *     delete anything in it, so an endpoint that took a ref from the browser
+ *     would be a way to spend somebody's own authorisation on a project they
+ *     did not mean to name.
+ *   - A 404 is not a failure. It means the project is already gone -- deleted
+ *     from the dashboard a minute ago, or by a retry of this same call -- and
+ *     reporting that as an error sends somebody to a dashboard to look for a
+ *     project that is not there.
+ *
+ * Same scope as creating one (`projects:write`). An OAuth app published before
+ * this existed therefore needs no new consent from anybody who already
+ * authorised it.
+ */
+export function deleteProject(token: string, ref: string) {
+  return call<{ ref?: string; id?: string; name?: string }>(
+    token,
+    `/v1/projects/${ref}`,
+    { method: "DELETE" }
+  );
+}
+
 export function projectHealth(token: string, ref: string) {
   return call<Array<{ name?: string; status?: string }>>(
     token,

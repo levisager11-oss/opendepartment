@@ -2,10 +2,12 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createControlClient, CONTROL_CONFIGURED } from "@/lib/control/client";
 import {
   COOKIE_BASE,
+  RETURN_COOKIE,
   STATE_COOKIE,
   VERIFIER_COOKIE,
   oauthConfigured,
   pkce,
+  safeReturn,
   seal,
 } from "@/lib/setup/oauth-session";
 import { requestOrigin } from "@/lib/setup/origin";
@@ -17,6 +19,12 @@ import { requestOrigin } from "@/lib/setup/origin";
  * whatever comes back is going to be attached to a department row that needs
  * an owner, and an unauthenticated endpoint that starts an OAuth dance is an
  * invitation to use this deployment as somebody else's phishing front.
+ *
+ * `?next=` says which screen asked. The wizard is still the default; the
+ * account screen asks when it is about to delete a department's project, and
+ * landing back in a setup wizard at that moment would be the wrong answer to
+ * the wrong question. It is checked against an allowlist rather than trusted --
+ * see safeReturn().
  */
 export async function GET(request: NextRequest) {
   if (!CONTROL_CONFIGURED || !oauthConfigured()) {
@@ -59,5 +67,10 @@ export async function GET(request: NextRequest) {
   // Ten minutes is a generous ceiling on "click the green button".
   response.cookies.set(VERIFIER_COOKIE, seal(verifier), { ...COOKIE_BASE, maxAge: 600 });
   response.cookies.set(STATE_COOKIE, state, { ...COOKIE_BASE, maxAge: 600 });
+  response.cookies.set(
+    RETURN_COOKIE,
+    safeReturn(request.nextUrl.searchParams.get("next")),
+    { ...COOKIE_BASE, maxAge: 600 }
+  );
   return response;
 }

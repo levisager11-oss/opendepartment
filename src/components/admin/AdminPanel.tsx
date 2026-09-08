@@ -12,6 +12,7 @@ import { AdminInvites } from "./AdminInvites";
 import { AdminSubjects } from "./AdminSubjects";
 import { AdminAudit } from "./AdminAudit";
 import { AdminSettings } from "./AdminSettings";
+import { AdminDanger } from "./AdminDanger";
 import type {
   AdminFile,
   AdminReport,
@@ -238,6 +239,8 @@ export function AdminPanel({
                   from the project instead of from the page's own props, so it
                   loads on its own and must not hold the form up. */}
               <AdminStorage />
+              {/* Last on the screen, under everything it would destroy. */}
+              <AdminDanger departmentName={settings.department_name} />
             </div>
           ) : (
             <p className="paper px-6 py-14 text-center text-sm text-ink-500">
