@@ -798,6 +798,133 @@ begin
      order by coalesce(sum(f.size_bytes), 0) desc;
 end; $fn$;
 
+-- ---------------------------------------------------------------------------
+-- Erase the archive.
+--
+-- The counterpart to the setup wizard, and the piece that was missing: a
+-- department could be created in four clicks and only ever taken apart by
+-- hand, table by table, in somebody's SQL editor. Three things are actually
+-- involved in deleting a department, they live in three different places, and
+-- only one of them is reachable from in here:
+--
+--   the CONTENTS       this function. Files, votes, comments, reports,
+--                      subjects, invites, the log, and every member account
+--                      except the caller's.
+--   the LISTING        a row in OpenDepartment's control plane, deleted by
+--                      whoever registered the department, under Your
+--                      departments. Nothing in this database can reach it.
+--   the PROJECT itself only its owner can delete it -- from the Supabase
+--                      dashboard, or through OpenDepartment when the
+--                      deployment offers one-click setup and the owner
+--                      authorises it. Nothing in here can reach that either,
+--                      which is the same reason OpenDepartment never holds a
+--                      service_role key.
+--
+-- So this is honest about its own scope, and the screen that calls it says the
+-- other two out loud rather than letting "delete" imply all three.
+--
+-- Deliberate choices, each of which is the difference between an erased
+-- archive and a hijacked one:
+--
+--   THE CALLER SURVIVES. Their profile, their e-mail row and their
+--   administrator flag stay. An admin who deleted themselves along with
+--   everybody else would be locked out mid-way -- unable to remove the storage
+--   objects this function hands back, and unable to see that anything worked.
+--
+--   THE DOOR IS SHUT, not reopened. `claimed` stays true and `open_join` goes
+--   false, with every invite gone. Resetting `claimed` would leave an empty
+--   department that the next stranger to find the address founds as its
+--   administrator, which is a worse outcome than the one being fixed.
+--
+--   THE BYTES ARE NOT ITS JOB. Deleting rows out of storage.objects would drop
+--   the metadata and leave the objects where they are, so the paths come back
+--   for the caller to remove through the storage API -- which an
+--   administrator's own session is already allowed to do. Same division of
+--   labour as delete_file().
+--
+-- The confirmation is checked HERE rather than by the form, for the same
+-- reason every other rule in this file is: `files` is admin-deletable over
+-- PostgREST anyway, but an RPC named like this one, callable with no argument
+-- that has to match, is a single mis-click away from being irreversible.
+-- ---------------------------------------------------------------------------
+create or replace function public.purge_department(confirm text)
+returns jsonb language plpgsql security definer set search_path = public as $fn$
+declare
+  wanted     text;
+  paths      text[];
+  file_count bigint;
+  members    bigint;
+  accounts   text := 'deleted';
+begin
+  if not public.is_admin() then raise exception 'NOT_ADMIN'; end if;
+
+  select s.department_name into wanted from public.settings s where s.id;
+  if lower(trim(coalesce(confirm, ''))) is distinct from lower(trim(coalesce(wanted, ''))) then
+    raise exception 'CONFIRMATION_MISMATCH';
+  end if;
+
+  select coalesce(array_agg(f.storage_path order by f.created_at), '{}'),
+         count(*)
+    into paths, file_count
+    from public.files f;
+
+  select count(*) into members
+    from public.profiles p where p.id <> auth.uid();
+
+  -- Most of this cascades from `files` and `profiles`, but naming each table
+  -- is what keeps this correct when a table is added later: a new table with
+  -- no cascade to either would otherwise survive the erasure silently.
+  delete from public.reports;
+  delete from public.comments;
+  delete from public.votes;
+  delete from public.file_subjects;
+  delete from public.files;
+  delete from public.subjects;
+  delete from public.invites;
+  delete from public.audit_log;
+  delete from public.user_emails where user_id <> auth.uid();
+  delete from public.profiles   where id      <> auth.uid();
+
+  -- The accounts themselves, so a member's e-mail address does not outlive
+  -- the archive it was given to. Wrapped for the same reason
+  -- admin_orphaned_objects() is: auth.users belongs to supabase_auth_admin,
+  -- and on a project where this function's owner cannot delete from it an
+  -- erasure should still erase everything else rather than raising. The
+  -- profile rows are already gone either way, so nobody left behind here can
+  -- read anything -- they simply still have a login to a department that has
+  -- shut its door.
+  begin
+    delete from auth.users u where u.id <> auth.uid();
+  exception when others then
+    accounts := 'kept';
+    raise warning 'could not delete auth.users: %', sqlerrm;
+  end;
+
+  update public.settings set open_join = false, claimed = true where id;
+
+  -- The log was just emptied; this is the one row in it. Somebody who finds an
+  -- empty archive tomorrow should be able to see who emptied it and when.
+  insert into public.audit_log (actor_id, action, target, detail)
+  values (auth.uid(), 'department.purge', null,
+          jsonb_build_object('files', file_count, 'members', members,
+                             'accounts', accounts));
+
+  return jsonb_build_object(
+    'files', file_count,
+    'members', members,
+    'accounts', accounts,
+    'storage_paths', to_jsonb(paths)
+  );
+end; $fn$;
+
+-- Stricter than its neighbours on purpose. The other admin RPCs rely on
+-- Postgres granting EXECUTE to PUBLIC and on their own is_admin() check, which
+-- is enough when the worst a refused caller can do is read nothing. This one
+-- deletes an archive, so the signed-out role does not get to reach the check
+-- at all.
+revoke execute on function public.purge_department(text) from anon, public;
+grant  execute on function public.purge_department(text) to authenticated;
+
 -- Counters for the department's front door. Returns only totals -- never
 -- titles, never names.
 create or replace function public.department_stats()

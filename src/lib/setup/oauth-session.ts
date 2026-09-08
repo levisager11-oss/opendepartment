@@ -35,6 +35,27 @@ export const TOKEN_COOKIE = "od-supabase-token";
 export const VERIFIER_COOKIE = "od-supabase-verifier";
 export const STATE_COOKIE = "od-supabase-state";
 
+export const RETURN_COOKIE = "od-supabase-return";
+
+/**
+ * Where the OAuth round trip should come back to.
+ *
+ * The wizard was the only caller for a long time, so the callback redirected
+ * to /new unconditionally. Deleting a department needs the same token from a
+ * different screen, and sending somebody who pressed "delete" into a setup
+ * wizard is worse than not offering the button.
+ *
+ * An allowlist rather than "any same-origin path": this value is a redirect
+ * target the browser follows after an authorisation, and open redirects are
+ * how an authorisation flow becomes somebody else's landing page. There are
+ * two screens that need a Supabase token; both are named here.
+ */
+const RETURNS = ["/new", "/account"] as const;
+
+export function safeReturn(want: string | null | undefined): string {
+  return RETURNS.find((path) => path === want) ?? "/new";
+}
+
 /** Everything below is inert unless the deployment registered an OAuth app. */
 export function oauthConfigured(): boolean {
   return Boolean(

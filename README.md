@@ -61,6 +61,7 @@ the tenant's own database, each re-checking `is_admin()` itself:
 | `admin.from("files").delete()` | `delete_file(id, reason)` |
 | `admin.from("user_emails")` for one file | `admin_file_owner_email(id)` |
 | `admin` counts for the landing page | `department_stats()` |
+| `admin` deleting a department's tables | `purge_department(confirm)` |
 
 What OpenDepartment holds **at rest** is a URL and an anon key — both public by
 design and useless without an account the tenant's own RLS admits. **We cannot
@@ -177,6 +178,8 @@ The redirect URL to register is `https://YOUR-DEPLOYMENT/api/setup/oauth/callbac
 /api/setup/oauth/status     what this deployment offers, and whether you are connected
 /api/setup/provision        create project → wait for health → run schema →
                             read the anon key → configure auth → forget the token
+/api/setup/deprovision      delete the project behind a department you own →
+                            forget the token
 ```
 
 **Scopes to grant the OAuth app**, and nothing else — one per call the code
@@ -186,7 +189,7 @@ resource needed for both appears twice:
 | Scope | Access | Why |
 | --- | --- | --- |
 | Organizations | Read | `GET /v1/organizations`, to know where to put the project |
-| Projects | Write | `POST /v1/projects`, to create it |
+| Projects | Write | `POST /v1/projects` to create it, `DELETE /v1/projects/{ref}` to delete it again |
 | Projects | Read | `GET /v1/projects/{ref}/health`, to wait for it to come up |
 | Database | Write | `POST /v1/projects/{ref}/database/query`, to install the schema |
 | Secrets | Read | `GET /v1/projects/{ref}/api-keys`, to read the anon key back |
@@ -225,6 +228,7 @@ inferred from tag names:
 ```
 GET   /v1/organizations                  organizations:read
 POST  /v1/projects                       projects:write
+DELETE /v1/projects/{ref}                projects:write
 GET   /v1/projects/{ref}/health          projects:read
 POST  /v1/projects/{ref}/database/query  database:write
 GET   /v1/projects/{ref}/api-keys        secrets:read
@@ -328,6 +332,48 @@ A code still counts in a public department: it can be marked as granting
 administrator rights, which is the one thing an open door cannot do. The UI
 warns about that in red, because redeeming one means seeing every member's
 e-mail address.
+
+### Deleting one
+
+Three things carry a department, they live in three different places, and no
+one screen can reach all three. The delete flow says so out loud rather than
+letting one word imply the rest:
+
+| | Where | Who | How |
+| --- | --- | --- | --- |
+| The archive's contents | the owner's Supabase project | any administrator of the department | Administration → Settings → *Erase this department* |
+| The listing (`/d/<slug>`) | OpenDepartment's control plane | whoever registered it | Your departments → *Delete* |
+| The project itself | Supabase | whoever owns the Supabase account | Your departments → *Delete*, with **Delete the Supabase project as well** ticked — or the Supabase dashboard |
+
+`purge_department(confirm)` is the first row: a `security definer` function in
+the department's own database that re-checks `is_admin()`, insists the caller
+type the department's name, and then deletes every file, vote, comment, report,
+subject, invite, log line and member account in one transaction. Like
+`delete_file()` it hands the storage paths back rather than touching
+`storage.objects`, so the objects go through the storage API under the
+administrator's own session — deleting those rows would drop the metadata and
+leave the bytes where they are. Two things it deliberately does not do: it does
+not delete the caller (an administrator who erased themselves mid-way could not
+finish, or even see that it worked), and it does not reset `claimed` — an empty
+department that is *unclaimed* is one the next stranger to find the address
+founds as its administrator, which is worse than the problem being solved.
+
+The third row is the one that actually makes the data stop existing, and it is
+the step people skip. When the deployment has an OAuth app and the owner
+authorises it, `/api/setup/deprovision` deletes the project for them — the ref
+comes from the department row RLS has already established is theirs, never from
+the request body, because a Management API token is authorised for a whole
+organisation. **When it cannot, it says so with the project ref and a link to
+the dashboard**, and keeps saying so after the listing is gone: a "deleted"
+department whose documents are still sitting in a project somebody has stopped
+thinking about is the failure worth designing against. The same notice is what
+a deployment with no OAuth app shows every time, since there is nothing else it
+could honestly offer.
+
+Delisting alone remains available — leave the box unticked — and is still
+irreversible in the one way that surprises people: the slug is freed for
+somebody else, and the project cannot be registered again because it is already
+claimed.
 
 ---
 
@@ -439,9 +485,11 @@ or put arbitrary text where CSS is rendered, that a banned member cannot write,
 that a banned *administrator* is no longer an administrator, that a
 `service_role` key cannot be registered or swapped in later,
 that a signed-out visitor reaches only the two functions the front door needs,
-that the invite door admits and refuses the right people, and that a suspended
-department cannot delist its way out of a suspension. No Supabase project, no
-network, no credentials — just a `postgres` binary.
+that the invite door admits and refuses the right people, that erasing a
+department is something only an unbanned administrator who names it can do, and
+that a suspended department cannot delist its way out of a suspension. 144
+assertions — 98 against the tenant schema, 46 against the control plane. No
+Supabase project, no network, no credentials — just a `postgres` binary.
 
 Applying each schema twice is the point of a separate step: re-running these
 files is the documented upgrade path below, so idempotency fails the suite

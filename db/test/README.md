@@ -23,8 +23,8 @@ directory, tears it down afterwards, and never touches a real database. Set
 |---|---|
 | `00-shim.sql` | Stand-ins for what Supabase provides — the `auth` and `storage` schemas, `auth.uid()`, and the `anon` / `authenticated` roles. **Never run this against a real project.** |
 | `01-helpers.sql` | Assertion helpers and role impersonation. |
-| `02-rls-tests.sql` | The tenant schema: 61 assertions. |
-| `03-control-plane-tests.sql` | The control plane: 34 assertions. |
+| `02-rls-tests.sql` | The tenant schema: 98 assertions. |
+| `03-control-plane-tests.sql` | The control plane: 46 assertions. |
 | `run.sh` | Builds the cluster, applies each schema **twice**, runs both suites. |
 
 Applying each schema twice is deliberate. Re-running the `.sql` files is the

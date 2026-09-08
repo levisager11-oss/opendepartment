@@ -26,7 +26,7 @@ No lint script is configured, and `next.config.ts` sets
 The only tests are SQL. `npm run test:rls` builds a throwaway PostgreSQL
 cluster, applies a Supabase shim, applies both `db/*.sql` files **twice**
 (re-running them is the documented upgrade path, so idempotency is a tested
-property), and asserts the policies actually hold — 81 assertions against the
+property), and asserts the policies actually hold — 98 assertions against the
 tenant schema, 46 against the control plane. It needs a `postgres` server
 binary and nothing else: no Supabase project, no network, no credentials. See
 [db/test/README.md](db/test/README.md) before adding a case; the two rules that
@@ -72,6 +72,21 @@ itself — see the table in the README and the function definitions in
 `db/tenant-schema.sql`. When adding a new admin capability, add a
 `security definer` RPC to the schema rather than reaching for elevated
 credentials from the app.
+
+**Deleting a department is three deletions, not one**, and no single screen
+can reach all three. The contents live in the tenant (`purge_department()`, an
+`is_admin()`-gated `security definer` RPC that also hands storage paths back
+for the caller to remove, like `delete_file()`); the listing lives in the
+control plane (deleted from the browser under `departments_delete_own`, which
+still refuses a suspended row); the Supabase project itself is deleted through
+`/api/setup/deprovision` when the deployment has an OAuth app and the operator
+authorises it. **Anything that cannot be done automatically has to be said
+out loud with the project ref and a dashboard link** — a department reported as
+deleted while its documents sit in a live project is the failure mode this
+flow exists to prevent, so do not simplify a failure path here into silence.
+The deprovision endpoint reads the project ref from the operator's own
+department row, never from the request body: a Management API token is
+authorised for a whole organisation.
 
 Consequences that show up throughout the code:
 

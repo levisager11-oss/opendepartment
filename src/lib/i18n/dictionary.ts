@@ -383,9 +383,84 @@ export const dictionary = {
     "account.refreshFailed": "Could not read that department",
     "account.refreshHint":
       "Reads the name and tagline from the department's own settings and updates its directory entry.",
-    "account.delist": "Remove listing",
-    "account.delistConfirm":
-      "Remove this department from OpenDepartment?\n\nThis cannot be undone. The address stops working permanently and becomes available for somebody else to register -- you cannot take it back, because your Supabase project has already been claimed and will be refused if you try to set it up again.\n\nYour data stays in your own Supabase project and is not touched.",
+
+    // --- deleting a department ------------------------------------------
+    // Three things carry a department and they live in three different
+    // places, so the copy here names all three every time. "Delete" that
+    // quietly means "delist" is how somebody ends up believing their archive
+    // is gone while every document in it is still sitting in a project they
+    // have stopped thinking about.
+    "delete.open": "Delete",
+    "delete.title": "Delete this department",
+    "delete.intro":
+      "Two separate things carry this department, and they are not in the same place.",
+    "delete.layerListing":
+      "The listing here: the address /d/{slug} and its entry in the directory. Removing it stops the address working, permanently, and frees the slug for somebody else.",
+    "delete.layerProject":
+      "Your Supabase project: every document, comment, member account and e-mail address the department ever held. It is yours, and it stays exactly where it is unless it is deleted too.",
+    "delete.alsoProject": "Delete the Supabase project as well",
+    "delete.alsoProjectHint":
+      "Deletes project {ref} and everything in it. There is no undo and no export afterwards -- download anything you want to keep first.",
+    "delete.listingOnly":
+      "The listing will go. Your Supabase project and everything in it stays where it is.",
+    "delete.connect": "Connect Supabase",
+    "delete.connectHint":
+      "To delete the project for you, OpenDepartment needs your permission once. You come straight back here afterwards -- then press Delete again.",
+    "delete.noOauth":
+      "This deployment cannot delete Supabase projects for you. Delete the project yourself in the Supabase dashboard, or everything in it stays where it is.",
+    "delete.confirm": "Type {slug} to confirm",
+    "delete.go": "Delete department",
+    "delete.working": "Deleting...",
+    "delete.mismatch": "That is not this department's address.",
+    "delete.suspended":
+      "This department is suspended. Its listing cannot be removed while a report about it is open, and deleting the project would not change that -- write to whoever runs this deployment instead.",
+    // Outcomes. Shown in place of the row, so they survive the refresh that
+    // takes the row away.
+    "delete.doneListing": "Done. The listing is gone.",
+    "delete.doneProject": "The Supabase project has been deleted.",
+    "delete.projectGone":
+      "That Supabase project no longer exists -- somebody had already deleted it.",
+    "delete.listingFailed":
+      "The listing could not be removed. Try again, or reload the page.",
+    "delete.manualTitle": "Your data is still in Supabase",
+    "delete.manualBody":
+      "Project {ref} and everything in it still exists: every document, comment, member account and e-mail address this department held. Nothing else will delete it -- open it in the Supabase dashboard and use Settings, then General, then Delete project.",
+    "delete.manualOpen": "Open the project in Supabase",
+    "delete.reconnect":
+      "Your Supabase authorisation has run out. Connect again, then press Delete once more.",
+    "delete.refused":
+      "Supabase would not delete the project: {detail}",
+    "delete.failed":
+      "The project could not be deleted: {detail}",
+    "delete.dismiss": "Done",
+
+    // --- erasing a department from inside it -----------------------------
+    "danger.title": "Erase this department",
+    "danger.intro":
+      "Deletes every document, comment, vote, report, subject, invite code and member account in this archive -- everything except your own account, which stays so that you can finish and see that it worked. There is no undo.",
+    "danger.scopeProject":
+      "This does not delete the Supabase project itself. The project keeps existing, empty, and only its owner can delete it: whoever registered this department does that under Your departments, or from the Supabase dashboard.",
+    "danger.confirm": "Type {name} to confirm",
+    "danger.go": "Erase everything",
+    "danger.working": "Erasing...",
+    "danger.mismatch": "That is not this department's name.",
+    "danger.unavailable":
+      "This department's project has not run the current schema, so it has nothing to do this with. Re-run db/tenant-schema.sql in its SQL editor first.",
+    "danger.doneFiles_one": "{n} document deleted.",
+    "danger.doneFiles_other": "{n} documents deleted.",
+    "danger.doneMembers_one": "{n} member account deleted.",
+    "danger.doneMembers_other": "{n} member accounts deleted.",
+    "danger.doneObjects_one": "{n} stored file removed from the bucket.",
+    "danger.doneObjects_other": "{n} stored files removed from the bucket.",
+    "danger.objectsLeft":
+      "Some stored files could not be removed and are still in the bucket. Storage, then the department-files bucket, in the Supabase dashboard.",
+    "danger.accountsKept":
+      "The member logins themselves could not be deleted from this project. Nobody can reach the archive with them any more, but the addresses are still under Authentication in the Supabase dashboard.",
+    "danger.nextTitle": "The project is still there",
+    "danger.nextBody":
+      "The archive is empty and its door is shut. The Supabase project it lives in still exists -- delete that too if you are finished with it.",
+    "danger.nextProject": "Open the project in Supabase",
+    "danger.nextListing": "Remove the listing",
 
     // --- landing --------------------------------------------------------
     "landing.subtitle":
@@ -1012,9 +1087,77 @@ export const dictionary = {
     "account.refreshFailed": "Dieses Departement konnte nicht gelesen werden",
     "account.refreshHint":
       "Liest Name und Untertitel aus den Einstellungen des Departements und aktualisiert den Verzeichniseintrag.",
-    "account.delist": "Eintrag entfernen",
-    "account.delistConfirm":
-      "Dieses Departement von OpenDepartment entfernen?\n\nDas lässt sich nicht rückgängig machen. Die Adresse funktioniert dauerhaft nicht mehr und kann von jemand anderem registriert werden -- Sie bekommen sie nicht zurück, denn Ihr Supabase-Projekt gilt bereits als beansprucht und wird bei einer erneuten Einrichtung abgewiesen.\n\nIhre Daten bleiben in Ihrem eigenen Supabase-Projekt unangetastet.",
+
+    // --- Departement löschen ---------------------------------------------
+    "delete.open": "Löschen",
+    "delete.title": "Dieses Departement löschen",
+    "delete.intro":
+      "Dieses Departement besteht aus zwei getrennten Teilen, und die liegen nicht am selben Ort.",
+    "delete.layerListing":
+      "Der Eintrag hier: die Adresse /d/{slug} und ihr Verzeichniseintrag. Wird er entfernt, funktioniert die Adresse dauerhaft nicht mehr und wird für jemand anderen frei.",
+    "delete.layerProject":
+      "Ihr Supabase-Projekt: jedes Dokument, jeder Kommentar, jedes Mitgliedskonto und jede E-Mail-Adresse, die dieses Departement je hatte. Es gehört Ihnen und bleibt unverändert bestehen, solange es nicht ebenfalls gelöscht wird.",
+    "delete.alsoProject": "Das Supabase-Projekt ebenfalls löschen",
+    "delete.alsoProjectHint":
+      "Löscht das Projekt {ref} und alles darin. Danach gibt es kein Zurück und keinen Export mehr -- laden Sie vorher herunter, was Sie behalten wollen.",
+    "delete.listingOnly":
+      "Nur der Eintrag verschwindet. Ihr Supabase-Projekt und alles darin bleibt, wo es ist.",
+    "delete.connect": "Supabase verbinden",
+    "delete.connectHint":
+      "Um das Projekt für Sie zu löschen, braucht OpenDepartment einmal Ihre Erlaubnis. Sie kommen danach direkt hierher zurück -- drücken Sie dann erneut auf Löschen.",
+    "delete.noOauth":
+      "Diese Installation kann keine Supabase-Projekte für Sie löschen. Löschen Sie das Projekt selbst im Supabase-Dashboard, sonst bleibt alles darin bestehen.",
+    "delete.confirm": "Tippen Sie {slug} zur Bestätigung",
+    "delete.go": "Departement löschen",
+    "delete.working": "Wird gelöscht...",
+    "delete.mismatch": "Das ist nicht die Adresse dieses Departements.",
+    "delete.suspended":
+      "Dieses Departement ist gesperrt. Sein Eintrag kann nicht entfernt werden, solange eine Meldung dazu offen ist, und das Löschen des Projekts ändert daran nichts -- wenden Sie sich stattdessen an den Betreiber dieser Installation.",
+    "delete.doneListing": "Erledigt. Der Eintrag ist entfernt.",
+    "delete.doneProject": "Das Supabase-Projekt wurde gelöscht.",
+    "delete.projectGone":
+      "Dieses Supabase-Projekt existiert nicht mehr -- es war bereits gelöscht.",
+    "delete.listingFailed":
+      "Der Eintrag konnte nicht entfernt werden. Versuchen Sie es erneut oder laden Sie die Seite neu.",
+    "delete.manualTitle": "Ihre Daten liegen weiterhin in Supabase",
+    "delete.manualBody":
+      "Das Projekt {ref} und alles darin besteht weiter: jedes Dokument, jeder Kommentar, jedes Mitgliedskonto und jede E-Mail-Adresse dieses Departements. Nichts sonst löscht es -- öffnen Sie es im Supabase-Dashboard und wählen Sie Settings, dann General, dann Delete project.",
+    "delete.manualOpen": "Projekt in Supabase öffnen",
+    "delete.reconnect":
+      "Ihre Supabase-Autorisierung ist abgelaufen. Verbinden Sie erneut und drücken Sie dann nochmals auf Löschen.",
+    "delete.refused":
+      "Supabase hat das Löschen des Projekts abgelehnt: {detail}",
+    "delete.failed":
+      "Das Projekt konnte nicht gelöscht werden: {detail}",
+    "delete.dismiss": "Fertig",
+
+    // --- Departement von innen leeren -------------------------------------
+    "danger.title": "Dieses Departement leeren",
+    "danger.intro":
+      "Löscht jedes Dokument, jeden Kommentar, jede Stimme, jede Meldung, jeden Betreff, jeden Einladungscode und jedes Mitgliedskonto in diesem Archiv -- alles ausser Ihrem eigenen Konto, das bleibt, damit Sie zu Ende führen und sehen können, dass es funktioniert hat. Es gibt kein Zurück.",
+    "danger.scopeProject":
+      "Das Supabase-Projekt selbst wird dabei nicht gelöscht. Es besteht leer weiter, und nur seine Besitzerin oder sein Besitzer kann es löschen: wer dieses Departement registriert hat, tut das unter Ihre Departemente oder im Supabase-Dashboard.",
+    "danger.confirm": "Tippen Sie {name} zur Bestätigung",
+    "danger.go": "Alles löschen",
+    "danger.working": "Wird gelöscht...",
+    "danger.mismatch": "Das ist nicht der Name dieses Departements.",
+    "danger.unavailable":
+      "Das Projekt dieses Departements hat das aktuelle Schema nicht eingespielt und kann das deshalb nicht. Führen Sie zuerst db/tenant-schema.sql erneut in seinem SQL-Editor aus.",
+    "danger.doneFiles_one": "{n} Dokument gelöscht.",
+    "danger.doneFiles_other": "{n} Dokumente gelöscht.",
+    "danger.doneMembers_one": "{n} Mitgliedskonto gelöscht.",
+    "danger.doneMembers_other": "{n} Mitgliedskonten gelöscht.",
+    "danger.doneObjects_one": "{n} gespeicherte Datei aus dem Bucket entfernt.",
+    "danger.doneObjects_other": "{n} gespeicherte Dateien aus dem Bucket entfernt.",
+    "danger.objectsLeft":
+      "Einige gespeicherte Dateien konnten nicht entfernt werden und liegen weiterhin im Bucket. Storage, dann der Bucket department-files, im Supabase-Dashboard.",
+    "danger.accountsKept":
+      "Die Mitglieder-Logins selbst konnten in diesem Projekt nicht gelöscht werden. Mit ihnen kommt niemand mehr ins Archiv, aber die Adressen stehen weiterhin unter Authentication im Supabase-Dashboard.",
+    "danger.nextTitle": "Das Projekt besteht weiter",
+    "danger.nextBody":
+      "Das Archiv ist leer und seine Tür ist zu. Das Supabase-Projekt, in dem es liegt, existiert weiterhin -- löschen Sie auch das, wenn Sie damit fertig sind.",
+    "danger.nextProject": "Projekt in Supabase öffnen",
+    "danger.nextListing": "Eintrag entfernen",
 
     // --- landing --------------------------------------------------------
     "landing.subtitle":

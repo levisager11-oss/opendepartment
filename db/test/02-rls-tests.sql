@@ -541,6 +541,126 @@ select odtest.equals('walking in does NOT confer administrator rights',
     where e.email = 'walkin@example.test'$$, 'false');
 
 -- ===========================================================================
+--  9. ERASING THE DEPARTMENT
+--
+--  purge_department() deletes everything an archive contains in one call, so
+--  it is the single most destructive thing anybody can reach through the anon
+--  key. Three properties are worth failing a build over: who may call it, that
+--  a caller who may still has to name the department first, and that what it
+--  leaves behind is a shut door rather than an unclaimed department the next
+--  stranger to find the address founds as its administrator.
+--
+--  This section runs LAST because it destroys the fixture every section above
+--  builds on. It rebuilds the two rows it asserts against first, so that what
+--  the sections above did or did not delete cannot change the answers.
+-- ===========================================================================
+select odtest.as_owner();
+
+update public.settings set department_name = 'The Department' where id;
+
+-- Two documents with paths the assertions below can look for. Erasing an
+-- archive has to hand the storage paths back: once the rows are gone there is
+-- nothing left that can name the objects they pointed at.
+delete from public.files;
+insert into public.files
+  (owner_id, title, category, storage_path, original_name, mime_type,
+   size_bytes, kind)
+values
+  ('22222222-2222-2222-2222-222222222222', 'Last exhibit standing', 'EXHIBIT',
+   '22222222-2222-2222-2222-222222222222/last.png', 'last.png', 'image/png',
+   4096, 'image'),
+  ('11111111-1111-1111-1111-111111111111', 'The admin filed one too', 'EXHIBIT',
+   '11111111-1111-1111-1111-111111111111/mine.png', 'mine.png', 'image/png',
+   2048, 'image');
+
+select odtest.as_anon();
+
+-- The other admin RPCs let anon reach their is_admin() check and be turned
+-- away by it. This one does not get that far: EXECUTE is granted to
+-- `authenticated` alone.
+select odtest.denied('a signed-out caller cannot even execute the erasure',
+  $$select public.purge_department('The Department')$$);
+
+select odtest.as_user('22222222-2222-2222-2222-222222222222');
+
+select odtest.denied('an ordinary member cannot erase the department',
+  $$select public.purge_department('The Department')$$);
+
+-- The lever one administrator has over another has to reach this too, or
+-- banning a rogue admin leaves them able to delete the archive on the way out.
+select odtest.as_user('55555555-5555-5555-5555-555555555555');
+
+select odtest.denied('a banned administrator cannot erase the department',
+  $$select public.purge_department('The Department')$$);
+
+select odtest.as_user('11111111-1111-1111-1111-111111111111');
+
+select odtest.denied('an administrator naming the wrong department is refused',
+  $$select public.purge_department('Some Other Department')$$);
+
+select odtest.equals('and the refusal deleted nothing',
+  $$select count(*)::text from public.files$$, '2');
+
+-- The real thing. The reply is stashed in a GUC rather than discarded, because
+-- half of what this function does is REPORT: a caller who is told nothing
+-- cannot tell an erasure from a no-op, and cannot remove the objects either.
+-- Trimming and case are the department's name as somebody actually types it.
+select odtest.equals('an administrator erases the archive and is told what went',
+  $$select set_config('odtest.purge',
+       public.purge_department('  the department  ')::text, false)::jsonb ->> 'files'$$,
+  '2');
+
+select odtest.as_owner();
+
+select odtest.equals('every document is gone',
+  $$select count(*)::text from public.files$$, '0');
+
+select odtest.equals('so is everything hanging off them',
+  $$select (select count(*) from public.votes)::text
+         || (select count(*) from public.comments)::text
+         || (select count(*) from public.reports)::text
+         || (select count(*) from public.file_subjects)::text$$, '0000');
+
+select odtest.equals('the subjects and the invite codes are gone',
+  $$select (select count(*) from public.subjects)::text
+         || (select count(*) from public.invites)::text$$, '00');
+
+select odtest.equals('every member but the caller is gone',
+  $$select string_agg(id::text, ',') from public.profiles$$,
+  '11111111-1111-1111-1111-111111111111');
+
+select odtest.equals('and so are their accounts',
+  $$select string_agg(id::text, ',') from auth.users$$,
+  '11111111-1111-1111-1111-111111111111');
+
+select odtest.equals('no e-mail address outlives the archive it was given to',
+  $$select count(*)::text from public.user_emails$$, '1');
+
+-- The one that turns an erased department into a hijacked one if it goes the
+-- other way: an unclaimed department hands administrator rights to whoever
+-- signs up next.
+select odtest.equals('the door is shut behind it, not reopened',
+  $$select claimed::text || open_join::text from public.settings where id$$,
+  'truefalse');
+
+select odtest.equals('the erasure itself is the only thing left in the log',
+  $$select action from public.audit_log$$, 'department.purge');
+
+select odtest.equals('and it is the only thing left in the log',
+  $$select count(*)::text from public.audit_log$$, '1');
+
+-- The bytes are the caller's to remove through the storage API. The paths are
+-- the only way anything can still name them, so they have to come back --
+-- including the caller's own, which the "keep the caller" rule must not spare.
+select odtest.equals('every storage path came back so the objects can follow',
+  $$select jsonb_array_length(current_setting('odtest.purge')::jsonb -> 'storage_paths')::text$$,
+  '2');
+
+select odtest.equals('including the ones the caller filed themselves',
+  $$select (current_setting('odtest.purge')::jsonb -> 'storage_paths'
+            ? '11111111-1111-1111-1111-111111111111/mine.png')::text$$, 'true');
+
+-- ===========================================================================
 --  RESULTS
 -- ===========================================================================
 \o

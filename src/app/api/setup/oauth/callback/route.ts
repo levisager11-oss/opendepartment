@@ -2,10 +2,12 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createControlClient } from "@/lib/control/client";
 import {
   COOKIE_BASE,
+  RETURN_COOKIE,
   STATE_COOKIE,
   TOKEN_COOKIE,
   VERIFIER_COOKIE,
   oauthConfigured,
+  safeReturn,
   seal,
   unseal,
 } from "@/lib/setup/oauth-session";
@@ -21,18 +23,27 @@ import { requestOrigin } from "@/lib/setup/origin";
  */
 export async function GET(request: NextRequest) {
   const origin = requestOrigin(request.headers);
+  // Which screen started this: the setup wizard, or the account screen about to
+  // delete a department's project. Re-checked through safeReturn even though
+  // /oauth/start already wrote it -- the cookie is scoped to /api/setup rather
+  // than signed, and a redirect target is not something to take on trust from
+  // one.
+  const destination = safeReturn(request.cookies.get(RETURN_COOKIE)?.value);
+
   /**
-   * Back to the wizard, saying why.
+   * Back to whichever screen started this, saying why.
    *
    * `detail` is Supabase's own words about a refusal -- never a code, a secret
    * or a token, all of which stay in this function. It is carried in the query
-   * string because the wizard's state lives in that tab and this route cannot
-   * render into it; the wizard reads it once and strips it from the address bar.
+   * string because the caller's state lives in that tab and this route cannot
+   * render into it; the caller reads it once and strips it from the address bar.
    */
   const back = (why?: string, detail?: string) => {
     const query = new URLSearchParams({ oauth: why ?? "ok" });
     if (detail) query.set("detail", detail.slice(0, 300));
-    return NextResponse.redirect(`${origin}/new?${query}`);
+    const response = NextResponse.redirect(`${origin}${destination}?${query}`);
+    response.cookies.set(RETURN_COOKIE, "", { ...COOKIE_BASE, maxAge: 0 });
+    return response;
   };
 
   if (!oauthConfigured()) return back("unavailable");
