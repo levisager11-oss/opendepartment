@@ -27,16 +27,29 @@ import { requestOrigin } from "@/lib/setup/origin";
  * see safeReturn().
  */
 export async function GET(request: NextRequest) {
-  if (!CONTROL_CONFIGURED || !oauthConfigured()) {
-    return NextResponse.json({ error: "NOT_AVAILABLE" }, { status: 503 });
-  }
+  const origin = requestOrigin(request.headers);
+  /**
+   * Back to the wizard, saying why.
+   *
+   * This route is only ever reached as a top-level navigation -- it is the
+   * href of a button, and its success case is a redirect to Supabase. So its
+   * failure cases have to be redirects too. Answering a navigation with a JSON
+   * body puts `{"error":"NOT_SIGNED_IN"}` on screen as a bare document: a dead
+   * end with no wizard, no explanation and no way back except the back button.
+   * The callback route has always redirected on failure for this reason; this
+   * one was answering as though it were an API.
+   */
+  const back = (why: string) =>
+    NextResponse.redirect(`${origin}/new?oauth=${why}`);
+
+  if (!CONTROL_CONFIGURED || !oauthConfigured()) return back("unavailable");
 
   const {
     data: { user },
   } = await (await createControlClient()).auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "NOT_SIGNED_IN" }, { status: 401 });
-  }
+  // No OpenDepartment account -- the ordinary case in a fresh or private
+  // window, where there is no session cookie to find.
+  if (!user) return back("signin");
 
   const { verifier, challenge } = pkce();
   // Bound to this account, so a code that comes back for somebody else's

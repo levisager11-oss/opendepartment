@@ -252,6 +252,12 @@ export function SetupWizard({
 
       // A token that exchanged and is then refused by the very first call is
       // an OAuth app missing a scope, not a connection that did not happen.
+      // The status endpoint is the only thing that runs this early and knows
+      // whether there is an account. Without this, `signedIn` stayed null until
+      // step 5 and the connect step could not tell a signed-out visitor why the
+      // button was about to bounce them.
+      if (status.available) setSignedIn(status.reason !== "not_signed_in");
+
       if (status.reason === "expired") {
         // Aged out, not misconfigured. Connecting again is the whole fix.
         setOauthNote(t("setup.oauthExpired"));
@@ -301,6 +307,7 @@ export function SetupWizard({
       // Each of these is a different thing to go and fix, so each says which.
       const reasons: Record<string, TranslationKey> = {
         unavailable: "setup.oauthNotConfigured",
+        signin: "setup.signInFirst",
         declined: "setup.oauthDeclined",
         state: "setup.oauthState",
         expired: "setup.oauthExpiredFlow",
@@ -851,9 +858,12 @@ export function SetupWizard({
                   >
                     {t("setup.autoConnect")} ↗
                   </a>
-                  {!signedIn && (
+                  {signedIn === false && (
                     <p className="mt-2 text-xs text-ink-500">
-                      {t("setup.autoNeedsAccount")}
+                      {t("setup.autoNeedsAccount")}{" "}
+                      <Link href="/account/login" className="underline">
+                        {t("setup.signInLink")}
+                      </Link>
                     </p>
                   )}
                 </>
