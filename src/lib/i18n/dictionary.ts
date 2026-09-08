@@ -254,6 +254,7 @@ export const dictionary = {
     "setup.autoConnect": "Connect Supabase",
     "setup.autoNeedsAccount":
       "You will be asked to sign in to OpenDepartment first.",
+    "setup.signInLink": "Sign in or create an account.",
     "setup.autoOrg": "Which Supabase organisation",
     "setup.autoGo": "Create my project",
     "setup.autoResume": "Carry on where it stopped",
@@ -958,6 +959,7 @@ export const dictionary = {
     "setup.autoConnect": "Supabase verbinden",
     "setup.autoNeedsAccount":
       "Sie werden zuerst nach einer Anmeldung bei OpenDepartment gefragt.",
+    "setup.signInLink": "Anmelden oder Konto erstellen.",
     "setup.autoOrg": "Welche Supabase-Organisation",
     "setup.autoGo": "Projekt anlegen",
     "setup.autoResume": "Dort weitermachen, wo es aufgehört hat",

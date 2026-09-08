@@ -18,7 +18,16 @@ export async function GET(request: NextRequest) {
   const {
     data: { user },
   } = await (await createControlClient()).auth.getUser();
-  if (!user) return NextResponse.json({ available: true, connected: false });
+  // Said out loud rather than folded into a bare "not connected": it is the
+  // difference between "press the button" and "you need an account first", and
+  // the wizard cannot tell from the client which one it is looking at.
+  if (!user) {
+    return NextResponse.json({
+      available: true,
+      connected: false,
+      reason: "not_signed_in",
+    });
+  }
 
   const token = unseal(request.cookies.get(TOKEN_COOKIE)?.value);
   if (!token) {
