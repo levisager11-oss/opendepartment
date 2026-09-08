@@ -24,14 +24,23 @@ export function DeptHeader({
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [signOutFailed, setSignOutFailed] = useState(false);
 
   async function signOut() {
     setSigningOut(true);
+    setSignOutFailed(false);
     // Scoped to this department's cookie only: signing out of one archive
     // leaves your membership in every other one alone.
-    await supabase.auth.signOut();
-    router.push(href());
-    router.refresh();
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      router.push(href());
+      router.refresh();
+    } catch {
+      setSignOutFailed(true);
+    } finally {
+      setSigningOut(false);
+    }
   }
 
   const links = signedIn
@@ -199,6 +208,7 @@ export function DeptHeader({
           </nav>
         </div>
       )}
+      {signOutFailed && <p role="alert" className="notice notice-error mx-4 mb-3">{t("common.actionFailed")}</p>}
     </header>
   );
 }

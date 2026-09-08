@@ -14,8 +14,8 @@ export type LegalSection = { heading: string; body: string[] };
  *
  * The split matters and is the reason these pages have to exist at all. The
  * platform holds a slug, a Supabase URL and a public anon key; it has no
- * service_role key for anybody's project and cannot read a single file. So the
- * platform's notice can honestly say "we hold nothing", and it is the
+ * service_role key for anybody's project. It processes authorized member
+ * sessions and page data during rendering. It is the
  * department's own operator who is answerable for the archive -- which means
  * they are the one who owes readers an imprint and a privacy notice, naming
  * themselves.
@@ -67,7 +67,7 @@ export function getDeptLegalDoc(
               contact
                 ? `Wenden Sie sich zuerst an die oben genannte Kontaktadresse: ${contact}.`
                 : "Wenden Sie sich zuerst an die Administration dieses Departements.",
-              `Führt das zu nichts, kann die Plattform, auf der dieses Departement gehostet wird, erreicht werden unter ${platformOperator.email}. Die Plattform kann ein Departement abschalten; auf dessen Daten hat sie keinen Zugriff.`,
+              `Führt das zu nichts, kann die Plattform, auf der dieses Departement gehostet wird, erreicht werden unter ${platformOperator.email}. Die Plattform kann den Verzeichniseintrag sperren. Die Administration der Inhalte liegt bei der verantwortlichen Stelle dieses Departements.`,
             ],
           },
         ],
@@ -85,7 +85,7 @@ export function getDeptLegalDoc(
             heading: "Wo diese Daten liegen",
             body: [
               `${name} läuft in einer eigenen Supabase-Datenbank, die von der oben genannten Stelle kontrolliert wird. Dateien, Kommentare, Stimmen und Mitgliederkonten liegen dort.`,
-              "OpenDepartment, die Plattform, speichert von diesem Departement nur die Adresse, die Projekt-URL und einen öffentlichen Anon-Key. Die Plattform besitzt keinen Schlüssel, mit dem sie Inhalte dieses Departements lesen könnte.",
+              "Die Plattform speichert die Verzeichnisangaben dieses Departements und keinen dauerhaften Administrator-Schlüssel. Zur Seitendarstellung verarbeitet ihr Server Ihre Mitgliedssitzung, autorisierte Metadaten und zeitlich begrenzte Datei-Links.",
             ],
           },
           {
@@ -171,7 +171,7 @@ export function getDeptLegalDoc(
             contact
               ? `Write to the address above first: ${contact}.`
               : "Write to this department's administrators first.",
-            `If that leads nowhere, the platform hosting this department can be reached at ${platformOperator.email}. The platform can take a department offline; it cannot read its data.`,
+            `If that leads nowhere, the platform hosting this department can be reached at ${platformOperator.email}. The platform can stop the department's address from resolving; archive moderation belongs to its administrators.`,
           ],
         },
       ],
@@ -189,7 +189,7 @@ export function getDeptLegalDoc(
           heading: "Where this data lives",
           body: [
             `${name} runs on its own Supabase database, controlled by the party named above. Files, comments, votes and member accounts live there.`,
-            "OpenDepartment, the platform, stores only this department's address, its project URL and a public anon key. The platform holds no key that could read anything inside this department.",
+            "OpenDepartment stores this department's directory details and holds no permanent tenant administrator key. To render pages, its server processes your member session, authorized metadata and temporary file links.",
           ],
         },
         {

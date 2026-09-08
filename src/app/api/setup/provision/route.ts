@@ -2,11 +2,12 @@ import { randomBytes } from "crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { createControlClient, CONTROL_CONFIGURED } from "@/lib/control/client";
 import { clientKey, rateLimit } from "@/lib/rate-limit";
+import { readJsonObject, sameOrigin, stringFields } from "@/lib/setup/request";
 import {
   COOKIE_BASE,
   TOKEN_COOKIE,
   oauthConfigured,
-  unseal,
+  managementToken,
 } from "@/lib/setup/oauth-session";
 import {
   anonKey,
@@ -52,6 +53,7 @@ const POLL_MS = 5_000;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export async function POST(request: NextRequest) {
+  if (!sameOrigin(request)) return NextResponse.json({ error: "BAD_ORIGIN" }, { status: 403 });
   if (!CONTROL_CONFIGURED || !oauthConfigured()) {
     return NextResponse.json({ error: "NOT_AVAILABLE" }, { status: 503 });
   }
@@ -72,12 +74,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 });
   }
 
-  const token = unseal(request.cookies.get(TOKEN_COOKIE)?.value);
+  const token = managementToken(request.cookies.get(TOKEN_COOKIE)?.value, user.id);
   if (!token) {
     return NextResponse.json({ error: "NOT_CONNECTED" }, { status: 401 });
   }
 
-  let body: {
+  const parsed = await readJsonObject(request, 450_000);
+  if (!parsed.ok) return parsed.response;
+  if (!stringFields(parsed.value, ["name", "slug", "org", "region", "sql", "ref"])) {
+    return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
+  }
+  const body = parsed.value as {
     name?: string;
     slug?: string;
     org?: string;
@@ -86,11 +93,6 @@ export async function POST(request: NextRequest) {
     /** Set when resuming a project that was created but was not up yet. */
     ref?: string;
   };
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
-  }
 
   const name = (body.name ?? "").trim().slice(0, 60) || "OpenDepartment";
   const slug = (body.slug ?? "").trim().toLowerCase();

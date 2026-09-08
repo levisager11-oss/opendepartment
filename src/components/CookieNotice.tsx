@@ -68,7 +68,7 @@ export function CookieNotice() {
     <div
       role="region"
       aria-label={t("cookies.title")}
-      className="fixed inset-x-0 bottom-0 z-50 p-3 sm:p-4"
+      className="sticky bottom-0 z-50 shrink-0 p-3 sm:p-4"
     >
       <div className="paper mx-auto flex max-w-3xl flex-col gap-3 p-4 shadow-lg sm:flex-row sm:items-center sm:gap-5">
         <div className="min-w-0 flex-1">

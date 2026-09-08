@@ -1,0 +1,22 @@
+flowchart LR
+  subgraph browser["Member browser - untrusted"]
+    M["Member"]
+    F["Upload form"]
+    M --> F
+  end
+  subgraph tenant["Tenant-owned upload boundary"]
+    G["Admission and bounded streaming gateway"]
+    D["Database reservations and lifecycle"]
+    S["Storage API and private objects"]
+    C["Cleanup worker"]
+  end
+  F -->|"authenticated upload; bounded body"| G
+  M -.->|"direct Storage write denied"| S
+  G -->|"reserve under member lock"| D
+  G -->|"counted bytes; tenant-only credential"| S
+  G -->|"trusted completion; same reservation"| D
+  A["Administrator browser"] -->|"request cleanup"| D
+  C -->|"claim deleting state under lock"| D
+  C -->|"delete bytes; retry safely"| S
+  C -->|"release budget after confirmed cleanup"| D
+

@@ -1,0 +1,207 @@
+{
+  "completeness": "partial",
+  "deferred": [
+    {
+      "candidate": {
+        "endLine": 723,
+        "evidence": "if not (public.is_admin() or owner = auth.uid()) then ... end if;",
+        "path": "db/tenant-schema.sql",
+        "severity": "high",
+        "startLine": 706,
+        "summary": "Anonymous auth.uid() returns NULL, causing the IF predicate to be NULL rather than true. delete_file retains default PUBLIC execution; deletion and cascades may proceed.",
+        "title": "Anonymous callers can delete tenant files"
+      },
+      "candidateId": "tenant-anonymous-delete",
+      "id": "tenant-anonymous-delete",
+      "reason": "Independent baseline candidate awaiting parent validation"
+    },
+    {
+      "candidate": {
+        "endLine": 20,
+        "path": "src/lib/tenant/client.ts",
+        "startLine": 18,
+        "summary": "createBrowserClient uses a module-wide cache. Both realm factories omit isSingleton:false, causing navigation to retain first project's client, cookies and request destination.",
+        "supportingPath": "node_modules/@supabase/ssr/src/createBrowserClient.ts:109-115",
+        "title": "Supabase browser singleton reuses credentials across departments and control plane"
+      },
+      "candidateId": "browser-realm-singleton",
+      "id": "browser-realm-singleton",
+      "reason": "Independent baseline candidate awaiting parent validation"
+    }
+  ],
+  "documentType": "codex-security.coverage",
+  "excludePaths": [],
+  "explicitExclusions": [
+    {
+      "pattern": "src/assets/fonts/*.ttf",
+      "reason": "Static third-party font binary internals excluded; local references and CSP reviewed."
+    },
+    {
+      "pattern": "package-lock.json",
+      "reason": "Dependency manifest/locked versions inspected and original dependency audit run; third-party package implementations are outside source review except supporting Supabase/Next client traces. Final online advisory refresh for added test dependencies blocked by automatic approval review."
+    }
+  ],
+  "includePaths": [
+    "."
+  ],
+  "inventoryStrategy": "repository",
+  "mode": "repository",
+  "openQuestions": [
+    {
+      "followUpPrompt": "Run the audit's disposable-project integration checklist using explicitly authorized test credentials.",
+      "question": "No hosted Supabase test credentials are configured. GoTrue signup metadata, email confirmations, Storage byte APIs, live OAuth, and concurrent multi-backend locking remain integration checks."
+    },
+    {
+      "followUpPrompt": "Verify deployment proxy configuration and pin inventory; process-local throttles and cache do not enforce global abuse limits.",
+      "question": "Does production sanitize forwarded Host/Proto/IP headers and avoid overlapping STATIC_DEPARTMENTS with registered/suspended slugs?"
+    },
+    {
+      "followUpPrompt": "Review the source-backed storage hardening proposal and validate a tenant-owned admission path with actual Storage semantics.",
+      "question": "Storage metadata accounting remains bypassable by direct uploads and client-reported sizes. Tactical fixes do not close storage-quota-bypass."
+    }
+  ],
+  "scanId": "360e089f-a106-44df-b1f1-f6a370934968",
+  "schemaVersion": "1.0",
+  "surfaces": [
+    {
+      "disposition": "reported",
+      "id": "surface_independent-repository-baseline",
+      "label": "Independent repository baseline",
+      "notes": "Reviewed 49 source/configuration files. Parent validation accepted 10 source-backed findings; original candidates, counterevidence, and immutable excerpts retained. Local SQL and browser isolation tests reproduced applicable failures.",
+      "receiptRefs": []
+    },
+    {
+      "candidate": {
+        "attackPath": [
+          "Anonymous public_directory returns the new public slug; resolve_department returns its URL and public key.",
+          "The attacker signs up directly against tenant Supabase Auth with their own credentials.",
+          "handle_new_user observes the locked unclaimed settings row, sets make_admin=true and claimed=true before entering the invite logic, then inserts an administrator profile.",
+          "The legitimate owner signs up later as an ordinary member for open_join=true or is refused for invite-only mode; listing ownership grants no corrective tenant authority."
+        ],
+        "attacker": {
+          "gains": "Tenant administrator rights, including future member-email access, member flag mutation, settings changes, invite creation and archive purge.",
+          "prerequisites": [
+            "A newly installed tenant with claimed=false and normal publicly registered wizard setup; attack must win the window before legitimate founder signup.",
+            "Tenant Auth signup must be enabled. Automatic provisioning explicitly enables mailer_autoconfirm; if confirmation remains required, the attacker needs a deliverable address they can confirm."
+          ],
+          "startsWith": "Anonymous internet access, an email address the attacker controls, and the ability to monitor the public directory. No control-plane login, invite, tenant membership, project-owner credential or OAuth token is needed."
+        },
+        "codeEvidence": [
+          {
+            "code": "  select not s.claimed, s.open_join\n    into unclaimed, open_door\n    from public.settings s where s.id for update;\n\n  if unclaimed then\n    -- The first account through the door founds the department.\n    make_admin := true;\n    update public.settings set claimed = true where id;\n\n  else\n    -- Named want_code, not code: `code` is also a column on public.invites,\n    -- and plpgsql refuses an ambiguous reference inside the lookup below.\n    want_code := upper(trim(coalesce(new.raw_user_meta_data ->> 'invite_code', '')));",
+            "endLine": 445,
+            "explanation": "The locked unclaimed branch grants administrator and marks claimed without founder proof.",
+            "id": "bootstrap-trigger",
+            "label": "First signup bypasses invite validation",
+            "path": "db/tenant-schema.sql",
+            "startLine": 433
+          },
+          {
+            "code": "      update public.invites i set uses = i.uses + 1 where i.code = inv.code;\n      make_admin := inv.grants_admin;\n    end if;\n  end if;\n\n  insert into public.profiles (id, is_admin) values (new.id, make_admin)\n  on conflict (id) do nothing;\n\n  insert into public.user_emails (user_id, email) values (new.id, clean_email)\n  on conflict (user_id) do update set email = excluded.email;",
+            "endLine": 481,
+            "explanation": "The selected administrator flag is inserted into the new member profile.",
+            "id": "bootstrap-profile",
+            "label": "Result becomes an administrator profile",
+            "path": "db/tenant-schema.sql",
+            "startLine": 472
+          },
+          {
+            "code": "    // 2. An already-claimed project means they pointed us at a department that\n    //    exists. Registering it here would hand its address to the wrong person.\n    if (probe.claimed) {\n      setError(t(\"setup.claimed\"));\n      setBusy(false);\n      return;\n    }\n\n    // 3. Register the slug. RLS ties the row to the signed-in operator.\n    const { error: rpcError } = await createControlBrowserClient().rpc(\n      \"register_department\",\n      {\n        want_slug: slug,\n        url: cleanUrl,\n        key: anonKey.trim(),\n        name: name.trim() || \"Untitled Department\",\n        tag: null,\n        vis: visibility,\n      }\n    );",
+            "endLine": 622,
+            "explanation": "Claimed projects are refused, then the unclaimed URL/key is registered with selected visibility.",
+            "id": "bootstrap-register",
+            "label": "Wizard publishes only while unclaimed",
+            "path": "src/components/setup/SetupWizard.tsx",
+            "startLine": 603
+          },
+          {
+            "code": "          {/* Ordered, because the order genuinely matters: whoever signs up\n              first becomes the administrator, and only an administrator can\n              mint the codes everybody else needs. */}\n          <ol className=\"space-y-3 text-sm leading-relaxed text-ink-700\">\n            <li className=\"flex gap-3\">\n              <span className=\"typewriter shrink-0 font-bold text-ink-900\">1.</span>\n              <span>{t(\"setup.next1\")}</span>\n            </li>\n            <li className=\"flex gap-3\">\n              <span className=\"typewriter shrink-0 font-bold text-ink-900\">2.</span>\n              <span>\n                {t(visibility === \"public\" ? \"setup.next2Open\" : \"setup.next2\")}\n              </span>\n            </li>\n            <li className=\"flex gap-3\">\n              <span className=\"typewriter shrink-0 font-bold text-ink-900\">3.</span>\n              <span>\n                {t(visibility === \"public\" ? \"setup.next3Open\" : \"setup.next3\")}\n              </span>\n            </li>\n          </ol>\n\n          <p className=\"notice notice-error text-xs text-ink-700\">\n            {t(\"email.reminder\")}\n          </p>\n\n          <div className=\"flex flex-wrap items-center justify-center gap-4 pt-1\">\n            <Link\n              href={`/d/${slug}`}\n              className=\"btn btn-lg btn-accent\"",
+            "endLine": 1247,
+            "explanation": "The completion page instructs first signup after the registration already succeeded.",
+            "id": "bootstrap-next",
+            "label": "Founder signup is deferred until after publication",
+            "path": "src/components/setup/SetupWizard.tsx",
+            "startLine": 1218
+          },
+          {
+            "code": "create or replace function public.resolve_department(want text)\nreturns table (slug text, supabase_url text, anon_key text,\n               display_name text, tagline text, visibility text)\nlanguage sql stable security definer set search_path = public as $fn$\n  select d.slug, d.supabase_url, d.anon_key, d.display_name, d.tagline, d.visibility\n    from public.departments d\n   where d.slug = lower(trim(want)) and d.status = 'active';\n$fn$;\n\ncreate or replace function public.public_directory(limit_to integer default 60)\nreturns table (slug text, display_name text, tagline text, created_at timestamptz)\nlanguage sql stable security definer set search_path = public as $fn$\n  select d.slug, d.display_name, d.tagline, d.created_at\n    from public.departments d\n   where d.visibility = 'public' and d.status = 'active'\n   order by d.created_at desc\n   limit greatest(1, least(coalesce(limit_to, 60), 200));",
+            "endLine": 349,
+            "explanation": "Public listing discovery and active slug resolution expose the target coordinates.",
+            "id": "bootstrap-discovery",
+            "label": "Anonymous directory and coordinate resolution",
+            "path": "db/control-plane.sql",
+            "startLine": 333
+          },
+          {
+            "code": "grant execute on function public.resolve_department(text) to anon, authenticated;\ngrant execute on function public.public_directory(integer) to anon, authenticated;\ngrant execute on function public.slug_available(text)      to anon, authenticated;\ngrant execute on function public.register_department(text, text, text, text, text, text)\n  to authenticated;",
+            "endLine": 423,
+            "explanation": "Directory and resolve RPCs are granted to anon.",
+            "id": "bootstrap-grants",
+            "label": "Anonymous callers can invoke discovery",
+            "path": "db/control-plane.sql",
+            "startLine": 419
+          },
+          {
+            "code": "  return call<unknown>(token, `/v1/projects/${ref}/config/auth`, {\n    method: \"PATCH\",\n    body: JSON.stringify({\n      site_url: opts.siteUrl,\n      uri_allow_list: opts.callbackUrl,\n      mailer_autoconfirm: true,\n    }),",
+            "endLine": 329,
+            "explanation": "The normal optional automatic path sets mailer_autoconfirm=true.",
+            "id": "bootstrap-autoconfirm",
+            "label": "Automatic setup enables immediate signup",
+            "path": "src/lib/setup/supabase-management.ts",
+            "startLine": 323
+          },
+          {
+            "code": "create or replace function public.admin_set_flag(target uuid, flag text, value boolean)\nreturns void language plpgsql security definer set search_path = public as $fn$\nbegin\n  if not public.is_admin() then raise exception 'NOT_ADMIN'; end if;\n  if target = auth.uid() then raise exception 'CANNOT_CHANGE_SELF'; end if;\n\n  if flag = 'is_admin' then\n    update public.profiles set is_admin = value where id = target;\n  elsif flag = 'is_banned' then\n    update public.profiles set is_banned = value where id = target;\n  else\n    raise exception 'UNKNOWN_FLAG';\n  end if;\n\n  insert into public.audit_log (actor_id, action, target, detail)\n  values (auth.uid(), 'member.' || flag, target::text, jsonb_build_object('value', value));",
+            "endLine": 740,
+            "explanation": "The new administrator can change other member admin/ban flags.",
+            "id": "bootstrap-admin-impact",
+            "label": "Admin flags can be changed by the resulting account",
+            "path": "db/tenant-schema.sql",
+            "startLine": 725
+          }
+        ],
+        "confidence": "high",
+        "counterEvidence": [
+          "First-account administrator behavior is openly documented, and the settings-row lock prevents two simultaneous founders. Neither proves the first request is the intended founder.",
+          "Unlisted is the default and reduces anonymous discovery, but public is a normal supported choice and known unlisted slugs are resolvable.",
+          "The archive is initially empty, so immediate disclosure of preexisting content is not claimed. Administrator persistence exposes later members/content or enables denial of service.",
+          "Project owners retain dashboard/SQL authority and can recover manually; attacker does not acquire the external Supabase account."
+        ],
+        "remediation": "Generate a high-entropy single-use bootstrap secret in the owner's browser; personalize only its SHA-256 hash into private tenant bootstrap state. Require a matching secret in the initial signup transaction and consume it under the existing lock. Fail closed if an unclaimed schema has no bootstrap secret. Transfer the raw secret through a client-read-and-cleared URL fragment to signup, not a server query or platform database. Preserve claimed tenant behavior and retain/recover the secret safely across wizard reloads.",
+        "rootCause": "The authority-granting auth.users trigger treats arrival order as founder authorization. The frontend deliberately rejects already-claimed projects before registering, so public registration precedes legitimate founder signup and exposes everything required to race it.",
+        "ruleId": "unauthenticated-bootstrap-admin",
+        "severity": "high",
+        "severityRationale": "High because an unauthenticated remote actor can obtain another operator's tenant administrative authority through the ordinary supported public setup sequence. The initial setup window and empty initial archive constrain likelihood and immediate data exposure; this is not platform-wide or external-account compromise.",
+        "sourceRevision": "ebe4fabb10b4ab8eb5dcc6eed4ede372f76a0c80",
+        "summary": "The normal public setup path publishes a tenant URL and public key while settings.claimed is false. The tenant Auth trigger grants the first signup administrator rights without proof that the signup belongs to the project/listing owner. An anonymous visitor can discover a just-created public listing and register their own tenant account first, acquiring administrator authority over another operator's archive.",
+        "taxonomy": {
+          "category": "Authorization",
+          "cwe": [
+            "CWE-306",
+            "CWE-862"
+          ]
+        },
+        "title": "Public registration exposes an unclaimed tenant before its founder can acquire administrator access",
+        "validation": {
+          "method": "Independent static source validation against immutable commit",
+          "performed": "Re-read wizard sequencing, anonymous registry RPC bodies/grants, auth trigger ordering/locking and downstream admin checks. Evaluated default-unlisted, external Auth confirmation and first-account documentation as counterevidence. No application execution or crafted attack requests.",
+          "result": "confirmed",
+          "runtime": "not performed"
+        }
+      },
+      "candidateId": "unauthenticated-bootstrap-admin",
+      "disposition": "reported",
+      "id": "surface_setup-authorization-and-founder-lifecycle",
+      "label": "Setup authorization and founder lifecycle",
+      "notes": "Independent focused review of 19 files. Bootstrap finding corroborates existing unclaimed-department-takeover and is merged by common control/remediation. OAuth account binding accepted as low severity due to shared-browser prerequisites. No remote arbitrary-SQL issue: own-token authority is intentional.",
+      "receiptRefs": []
+    },
+    {
+      "disposition": "no_issue_found",
+      "id": "surface_all-application-components-and-remaining-source",
+      "label": "All application components and remaining source",
+      "notes": "Supplemental source audit completed all 40 React components plus component types, routes, legal/SEO/i18n, configuration, schema generation, scripts and original tests. No additional authorization or XSS finding. UX integrity issues separately fixed: uncertain uploads, orphan race mitigation, readback and error handling. Third-party Ko-fi script remains explicitly trusted.",
+      "receiptRefs": []
+    }
+  ]
+}

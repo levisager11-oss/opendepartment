@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n/provider";
 import {
@@ -9,6 +9,8 @@ import {
 } from "@/lib/control/browser";
 import { Spinner } from "@/components/Spinner";
 import type { TranslationKey } from "@/lib/i18n/dictionary";
+import { founderLink, generateBootstrapSecret, hashBootstrapSecret, isBootstrapSecret, saveBootstrapSecret } from "@/lib/setup/bootstrap";
+import { personalizeTenantSchema } from "@/lib/setup/personalize";
 import { ControlAuthPanel } from "./ControlAuthPanel";
 import {
   looksLikeSecretKey,
@@ -19,79 +21,19 @@ type Step = 1 | 2 | 3 | 4 | 5 | 6;
 
 const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])$/;
 
-/** Single-quote a value for inlining into SQL. */
-function q(value: string): string {
-  return `'${value.replace(/'/g, "''")}'`;
-}
-
-/**
- * The wizard hands out the schema with the owner's choices already applied.
- *
- * The alternative would be to write these settings over the API after the
- * department is registered -- but `settings` is admin-only, and at that point
- * the department has no administrator yet, because the first person to sign up
- * becomes one. Personalising the SQL sidesteps the ordering problem entirely
- * and means the very first page load already says the right name.
- */
-function personalize(
-  schema: string,
-  opts: {
-    name: string;
-    subjectLabel: string;
-    docket: string;
-    openJoin: boolean;
-    operatorName: string;
-    operatorContact: string;
-  }
-): string {
-  const name = opts.name.trim() || "The Department";
-  const subject = opts.subjectLabel.trim() || "Case";
-  const docket = opts.docket.trim().toUpperCase() || "CF";
-  const operatorName = opts.operatorName.trim();
-  const operatorContact = opts.operatorContact.trim();
-
-  return `${schema}
--- ---------------------------------------------------------------------------
---  Your choices from the OpenDepartment setup wizard.
---
---  open_join is the door: ${
-    opts.openJoin
-      ? "you chose a public department, so anybody may\n--  create an account. Invite codes still work -- they are how somebody\n--  arrives as an administrator."
-      : "you chose an unlisted department, so an invite\n--  code is required to sign up. Change it here or under Administration."
-  }
---
---  operator_name and operator_contact are what your department's own imprint,
---  terms and privacy pages say. They were previously left null by the wizard,
---  which meant every new department published three legal pages that could not
---  name anybody -- and the imprint is the page a stranger reads precisely to
---  find out who to complain to. Both are editable later under Administration.
--- ---------------------------------------------------------------------------
-update public.settings set
-  department_name  = ${q(name)},
-  subject_label    = ${q(subject)},
-  docket_prefix    = ${q(docket)},
-  seal_top         = ${q(name.toUpperCase())},
-  seal_bottom      = ${q("OFFICIAL USE ONLY")},
-  operator_name    = ${operatorName ? q(operatorName) : "operator_name"},
-  operator_contact = ${operatorContact ? q(operatorContact) : "operator_contact"},
-  open_join        = ${opts.openJoin}
-where id;
-`;
-}
-
 /**
  * Everything the wizard would be sorry to lose to a reload.
  *
  * Losing it was easy and expensive: the connect step needs an OpenDepartment
  * account, creating one can send you to your inbox and back, and returning to
  * an empty form after you have already run the SQL against a real project is
- * the worst moment in the whole flow -- the project is now claimed, so
- * starting over does not work either.
+ * the worst moment in the whole flow: its founder link must still match the
+ * verifier already installed in that project.
  *
  * sessionStorage rather than localStorage: this is one sitting, not a saved
- * document. Nothing here is secret -- the anon key is published on the
- * department's own front door -- but it is still not worth leaving behind on a
- * shared machine after the tab closes.
+ * document. The founder capability is secret and stays in this tab until
+ * signup consumes it. Only its digest goes into SQL; do not log this draft
+ * or send it to the platform server.
  */
 const DRAFT_KEY = "od.setup.draft.v1";
 
@@ -112,6 +54,9 @@ type Draft = {
    * automatic path started cannot lead to a second one on somebody's account.
    */
   projectRef: string;
+  bootstrapSecret?: string;
+  completed?: boolean;
+  founderClaimed?: boolean;
 };
 
 export function SetupWizard({
@@ -129,8 +74,9 @@ export function SetupWizard({
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
   const [slugState, setSlugState] = useState<
-    "idle" | "checking" | "free" | "taken" | "invalid"
+    "idle" | "checking" | "free" | "taken" | "invalid" | "failed"
   >("idle");
+  const [slugRetry, setSlugRetry] = useState(0);
   const [subjectLabel, setSubjectLabel] = useState("Case");
   const [docket, setDocket] = useState("CF");
   const [visibility, setVisibility] = useState<"unlisted" | "public">(
@@ -155,6 +101,11 @@ export function SetupWizard({
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
   /** Nothing is written back until the saved draft has been read. */
   const [restored, setRestored] = useState(false);
+  const [bootstrapSecret, setBootstrapSecret] = useState("");
+  const [bootstrapHash, setBootstrapHash] = useState("");
+  const [bootstrapNotice, setBootstrapNotice] = useState<string | null>(null);
+  const [completed, setCompleted] = useState(false);
+  const [founderClaimed, setFounderClaimed] = useState(false);
 
   // --- one-click setup ------------------------------------------------
   /**
@@ -195,33 +146,63 @@ export function SetupWizard({
    * make the first client render disagree with the HTML that was sent.
    */
   useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem(DRAFT_KEY);
-      if (raw) {
-        const draft = JSON.parse(raw) as Partial<Draft>;
-        if (draft.name) setName(draft.name);
-        if (draft.slug) setSlug(draft.slug);
+    let canceled = false;
+    async function restore() {
+      let draft: Partial<Draft> | null = null;
+      try { draft = JSON.parse(sessionStorage.getItem(DRAFT_KEY) ?? "null"); } catch { /* fresh draft */ }
+      const savedSecret = isBootstrapSecret(draft?.bootstrapSecret) ? draft.bootstrapSecret : null;
+      try {
+        setBootstrapSecret(savedSecret ?? (draft?.founderClaimed ? "" : generateBootstrapSecret()));
+      } catch { setBootstrapNotice(t("setup.bootstrapUnavailable")); }
+      if (draft) {
+        if (typeof draft.name === "string") setName(draft.name);
+        if (typeof draft.slug === "string") setSlug(draft.slug);
         if (draft.slugTouched) setSlugTouched(true);
-        if (draft.subjectLabel) setSubjectLabel(draft.subjectLabel);
-        if (draft.docket) setDocket(draft.docket);
-        if (draft.visibility) setVisibility(draft.visibility);
-        if (draft.operatorName) setOperatorName(draft.operatorName);
-        if (draft.operatorContact) setOperatorContact(draft.operatorContact);
-        if (draft.url) setUrl(draft.url);
-        if (draft.anonKey) setAnonKey(draft.anonKey);
-        if (draft.projectRef) setProjectRef(draft.projectRef);
-        // Never restore straight onto the done screen: step 6 is a claim about
-        // a department that exists, and a stale draft is not evidence of one.
-        if (draft.step && draft.step >= 1 && draft.step <= 5) {
-          setStep(draft.step as Step);
+        if (typeof draft.subjectLabel === "string") setSubjectLabel(draft.subjectLabel);
+        if (typeof draft.docket === "string") setDocket(draft.docket);
+        if (draft.visibility === "public" || draft.visibility === "unlisted") setVisibility(draft.visibility);
+        if (typeof draft.operatorName === "string") setOperatorName(draft.operatorName);
+        if (typeof draft.operatorContact === "string") setOperatorContact(draft.operatorContact);
+        if (typeof draft.url === "string") setUrl(draft.url);
+        if (typeof draft.anonKey === "string") setAnonKey(draft.anonKey);
+        if (typeof draft.projectRef === "string") setProjectRef(draft.projectRef);
+        setFounderClaimed(Boolean(draft.founderClaimed));
+        setCompleted(Boolean(draft.completed));
+        if (draft.step && draft.step >= 1 && draft.step <= 5) setStep(draft.step);
+        // An old/lost capability must never silently accompany an already installed schema.
+        if (!savedSecret && !draft.founderClaimed && (draft.url || draft.projectRef || (draft.step ?? 1) >= 3)) {
+          setStep(3);
+          setBootstrapNotice(t("setup.bootstrapRefresh"));
+        }
+        if (draft.completed && (savedSecret || draft.founderClaimed) && draft.slug && draft.url && CONTROL_READY) {
+          setStep(5);
+          try {
+            const { data } = await createControlBrowserClient().from("departments")
+              .select("slug, supabase_url").eq("slug", draft.slug).maybeSingle();
+            if (!canceled && data?.slug === draft.slug && data.supabase_url === draft.url.replace(/\/+$/, "")) {
+              setCompleted(true);
+              setStep(6);
+              if (savedSecret) saveBootstrapSecret(draft.slug, draft.url, savedSecret);
+            }
+          } catch { /* account/network recovery stays on the saved form */ }
         }
       }
-    } catch {
-      // Private mode, or a draft written by an older version of this page.
-      // Either way an empty form is the right fallback.
+      if (!canceled) setRestored(true);
     }
-    setRestored(true);
+    void restore();
+    return () => { canceled = true; };
   }, []);
+
+  useEffect(() => {
+    let canceled = false;
+    setBootstrapHash("");
+    if (bootstrapSecret) {
+      void hashBootstrapSecret(bootstrapSecret).then((hash) => {
+        if (!canceled) setBootstrapHash(hash);
+      }).catch(() => { if (!canceled) setBootstrapNotice(t("setup.bootstrapUnavailable")); });
+    }
+    return () => { canceled = true; };
+  }, [bootstrapSecret]);
 
   /** ...and keep it current. */
   useEffect(() => {
@@ -230,13 +211,14 @@ export function SetupWizard({
       const draft: Draft = {
         name, slug, slugTouched, subjectLabel, docket, visibility,
         operatorName, operatorContact, url, anonKey, step, projectRef,
+        bootstrapSecret: bootstrapSecret || undefined, completed, founderClaimed,
       };
       sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
     } catch {
       // Storage full or refused. The wizard still works; it just forgets.
     }
   }, [restored, name, slug, slugTouched, subjectLabel, docket, visibility,
-      operatorName, operatorContact, url, anonKey, step, projectRef]);
+      operatorName, operatorContact, url, anonKey, step, projectRef, bootstrapSecret, completed, founderClaimed]);
 
   /**
    * What the one-click path can do here, asked once the wizard is past naming.
@@ -327,11 +309,25 @@ export function SetupWizard({
 
   /** Only the connect step needs an account, so the check waits until then. */
   useEffect(() => {
-    if (step !== 5 || signedIn || !CONTROL_READY) return;
-    createControlBrowserClient()
-      .auth.getUser()
-      .then(({ data }) => setSignedIn(Boolean(data.user)));
-  }, [step, signedIn]);
+    if (step !== 5 || signedIn !== null || !CONTROL_READY) return;
+    let canceled = false;
+    async function checkAccount() {
+      try {
+        const { data, error } = await createControlBrowserClient().auth.getUser();
+        if (!canceled) {
+          setSignedIn(Boolean(data.user));
+          if (error) setError(t("common.actionFailed"));
+        }
+      } catch {
+        if (!canceled) {
+          setSignedIn(false);
+          setError(t("common.actionFailed"));
+        }
+      }
+    }
+    void checkAccount();
+    return () => { canceled = true; };
+  }, [step, signedIn, t]);
 
   /** Auto-derive the address from the name until the user edits it directly. */
   useEffect(() => {
@@ -357,26 +353,33 @@ export function SetupWizard({
     if (!CONTROL_READY) return setSlugState("free");
 
     setSlugState("checking");
+    let active = true;
     const timer = setTimeout(async () => {
+      try {
       const { data, error: rpcError } = await createControlBrowserClient().rpc(
         "slug_available",
         { want: slug }
       );
-      if (rpcError) return setSlugState("idle");
+      if (!active) return;
+      if (rpcError) return setSlugState("failed");
       setSlugState(data ? "free" : "taken");
+      } catch {
+        if (active) setSlugState("failed");
+      }
     }, 350);
 
-    return () => clearTimeout(timer);
-  }, [slug]);
+    return () => { active = false; clearTimeout(timer); };
+  }, [slug, slugRetry]);
 
-  const fullSql = personalize(schemaSql, {
+  const fullSql = bootstrapHash ? personalizeTenantSchema(schemaSql, {
     name,
     subjectLabel,
     docket,
     openJoin: visibility === "public",
     operatorName,
     operatorContact,
-  });
+    bootstrapHash,
+  }) : "";
 
   /**
    * The clipboard can refuse: an insecure origin, a browser that wants a
@@ -386,6 +389,7 @@ export function SetupWizard({
    * The download below is the way out that does not need permission.
    */
   const copySql = useCallback(async () => {
+    if (!fullSql) return;
     try {
       await navigator.clipboard.writeText(fullSql);
       setCopied(true);
@@ -397,6 +401,7 @@ export function SetupWizard({
   }, [fullSql]);
 
   const downloadSql = useCallback(() => {
+    if (!fullSql) return;
     const blob = new Blob([fullSql], { type: "application/sql" });
     const href = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -462,6 +467,7 @@ export function SetupWizard({
    * manual path does.
    */
   async function provision() {
+    if (!bootstrapHash) return;
     setProvisioning(true);
     setError(null);
     setProvisionStep(t("setup.provisionCreating"));
@@ -549,10 +555,23 @@ export function SetupWizard({
   }
 
   async function verifyAndCreate() {
+    if (!bootstrapHash && !founderClaimed) return;
     setBusy(true);
     setError(null);
 
     const cleanUrl = url.trim().replace(/\/+$/, "");
+    if (completed) {
+      try {
+        const { data } = await createControlBrowserClient().from("departments")
+          .select("slug, supabase_url").eq("slug", slug).maybeSingle();
+        if (data?.slug === slug && data.supabase_url === cleanUrl) {
+          if (bootstrapSecret) saveBootstrapSecret(slug, cleanUrl, bootstrapSecret);
+          setStep(6);
+        } else setError(t("setup.bootstrapResume"));
+      } catch { setError(t("setup.bootstrapResume")); }
+      setBusy(false);
+      return;
+    }
 
     // 1. Does their project answer, and is the schema in place?
     //
@@ -583,11 +602,8 @@ export function SetupWizard({
         UNREACHABLE: t("setup.unreachable"),
         BAD_URL: t("setup.unreachable"),
         BAD_KEY: t("setup.unreachable"),
-        // The probe needs an account -- it reports whether a project is
-        // unclaimed, and an unclaimed project is one signup away from
-        // belonging to whoever finds it. The button below is disabled until
-        // `signedIn`, so this is the session having expired mid-wizard rather
-        // than a step out of order.
+        // The probe needs a control account. The button below is disabled
+        // until signed in, so this can be a session expiring mid-wizard.
         NOT_SIGNED_IN: t("setup.signInFirst"),
         NO_CONTROL_PLANE: t("setup.noControlPlane"),
         RATE_LIMITED: t("setup.rateLimited"),
@@ -609,17 +625,26 @@ export function SetupWizard({
     }
 
     // 3. Register the slug. RLS ties the row to the signed-in operator.
-    const { error: rpcError } = await createControlBrowserClient().rpc(
-      "register_department",
-      {
-        want_slug: slug,
-        url: cleanUrl,
-        key: anonKey.trim(),
-        name: name.trim() || "Untitled Department",
-        tag: null,
-        vis: visibility,
-      }
-    );
+    let rpcError: { message: string } | null;
+    try {
+      const result = await createControlBrowserClient().rpc(
+        "register_department",
+        {
+          want_slug: slug,
+          url: cleanUrl,
+          key: anonKey.trim(),
+          name: name.trim() || "Untitled Department",
+          tag: null,
+          vis: visibility,
+        }
+      );
+      rpcError = result.error;
+    } catch {
+      setError(t("common.actionFailed"));
+      return;
+    } finally {
+      setBusy(false);
+    }
 
     if (rpcError) {
       setBusy(false);
@@ -643,27 +668,35 @@ export function SetupWizard({
       return;
     }
 
-    // The department exists now, so the draft has nothing left to protect --
-    // and leaving it behind would offer to re-run a wizard whose slug is taken
-    // and whose project is claimed.
-    try {
-      sessionStorage.removeItem(DRAFT_KEY);
-    } catch {
-      // Nothing to clean up.
-    }
-
+    // Keep the capability after registration: completion reloads must not lose the founder link.
+    saveBootstrapSecret(slug, cleanUrl, bootstrapSecret);
+    setCompleted(true);
     setBusy(false);
     setStep(6);
   }
 
+  function startAnother() {
+    // Existing departments retain their own per-project handoff until signup.
+    setName(""); setSlug(""); setSlugTouched(false); setSubjectLabel("Case"); setDocket("CF");
+    setVisibility("unlisted"); setOperatorName(""); setOperatorContact("");
+    setUrl(""); setAnonKey(""); setPasted(""); setProjectRef("");
+    setPasteNote(null); setPasteOk(false); setCopied(false); setCopyFailed(false); setCallbackCopied(false);
+    setCompleted(false); setFounderClaimed(false); setError(null); setBootstrapNotice(null);
+    setAuthAutoConfigured(false); setBootstrapHash(""); setStep(1);
+    try { setBootstrapSecret(generateBootstrapSecret()); }
+    catch { setBootstrapSecret(""); setBootstrapNotice(t("setup.bootstrapUnavailable")); }
+  }
+
   const canLeaveStep1 =
-    name.trim().length > 0 && slugState === "free" && docket.trim().length > 0;
+    name.trim().length > 0 && slugState === "free" && docket.trim().length > 0 && Boolean(bootstrapHash);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 sm:py-10">
       <h1 className="mb-1 font-serif text-2xl font-black break-words text-ink-900 sm:text-3xl">
         {t("setup.title")}
       </h1>
+      {bootstrapNotice && <p role="alert" className="notice notice-error mb-4">{bootstrapNotice}</p>}
+      {!bootstrapHash && !founderClaimed && !bootstrapNotice && <p role="status">{t("setup.bootstrapPreparing")}</p>}
       {step < 6 && (
         <p className="docket mb-8 text-2xs text-ink-500">{t("setup.step", { n: step, total: 5 })}</p>
       )}
@@ -680,7 +713,7 @@ export function SetupWizard({
           />
 
           <div>
-            <label className="mb-1 block text-sm font-semibold text-ink-900">
+            <label htmlFor="setup-slug" className="mb-1 block text-sm font-semibold text-ink-900">
               {t("setup.slug")}
             </label>
             <div className="flex items-center border border-paper-400 bg-white">
@@ -695,6 +728,8 @@ export function SetupWizard({
                 <span className="hidden sm:inline">{origin}</span>/d/
               </span>
               <input
+                id="setup-slug"
+                aria-describedby="setup-slug-help setup-slug-state"
                 value={slug}
                 onChange={(e) => {
                   setSlugTouched(true);
@@ -707,12 +742,22 @@ export function SetupWizard({
                 spellCheck={false}
               />
             </div>
-            <p className="mt-1 text-xs text-ink-500">
+            <p id="setup-slug-help" className="mt-1 text-xs text-ink-500">
               <span className="typewriter text-ink-400 sm:hidden">
                 {origin}/d/
               </span>{" "}
               {t("setup.slugHelp")}
             </p>
+            <div id="setup-slug-state" role="status">
+            {slugState === "checking" && <p className="mt-1 text-xs text-ink-500">{t("setup.slugChecking")}</p>}
+            {slugState === "failed" && (
+              <div className="mt-1 text-xs text-stamp-red">
+                <p>{t("setup.slugCheckFailed")}</p>
+                <button type="button" className="mt-1 underline" onClick={() => setSlugRetry((n) => n + 1)}>
+                  {t("common.retry")}
+                </button>
+              </div>
+            )}
             {slugState === "taken" && (
               <p className="mt-1 text-xs text-stamp-red">
                 {t("setup.slugTaken")}
@@ -728,6 +773,7 @@ export function SetupWizard({
                 {t("setup.slugFree")}
               </p>
             )}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -757,7 +803,8 @@ export function SetupWizard({
             {(["unlisted", "public"] as const).map((v) => (
               <label key={v} className="mb-2 flex items-start gap-2 text-sm">
                 <input
-                  type="radio"
+                    type="radio"
+                    name="setup-visibility"
                   checked={visibility === v}
                   onChange={() => setVisibility(v)}
                   className="mt-1"
@@ -892,7 +939,7 @@ export function SetupWizard({
                   <button
                     type="button"
                     onClick={provision}
-                    disabled={provisioning}
+                    disabled={provisioning || !bootstrapHash}
                     aria-busy={provisioning}
                     className="btn btn-primary"
                   >
@@ -959,6 +1006,7 @@ export function SetupWizard({
             <button
               type="button"
               onClick={copySql}
+              disabled={!bootstrapHash}
               className="absolute right-2 top-2 btn btn-sm btn-accent"
             >
               {copied ? t("setup.sqlCopied") : t("setup.copySql")}
@@ -980,6 +1028,7 @@ export function SetupWizard({
             <button
               type="button"
               onClick={downloadSql}
+              disabled={!bootstrapHash}
               className="cursor-pointer text-xs text-gov-800 underline underline-offset-2"
             >
               {t("setup.downloadSql")}
@@ -1179,7 +1228,7 @@ export function SetupWizard({
           )}
 
           {error && (
-            <p className="border border-stamp-red bg-stamp-red/5 p-3 text-sm text-stamp-red">
+            <p role="alert" className="border border-stamp-red bg-stamp-red/5 p-3 text-sm text-stamp-red">
               {error}
             </p>
           )}
@@ -1188,6 +1237,7 @@ export function SetupWizard({
             <button
               type="button"
               onClick={() => setStep(4)}
+              aria-label={t("common.back")}
               className="px-4 py-2 text-sm text-ink-500 underline"
             >
               ←
@@ -1195,7 +1245,7 @@ export function SetupWizard({
             <button
               type="button"
               onClick={verifyAndCreate}
-              disabled={busy || !url || !anonKey || !signedIn}
+              disabled={busy || !url || !anonKey || !signedIn || (!bootstrapHash && !founderClaimed)}
               className="btn btn-primary ml-auto"
             >
               {busy ? t("setup.verifying") : t("setup.verify")}
@@ -1215,9 +1265,7 @@ export function SetupWizard({
             {origin}/d/{slug}
           </code>
 
-          {/* Ordered, because the order genuinely matters: whoever signs up
-              first becomes the administrator, and only an administrator can
-              mint the codes everybody else needs. */}
+          {!founderClaimed && <p className="notice notice-ok text-sm">{t("setup.bootstrapPrivate")}</p>}
           <ol className="space-y-3 text-sm leading-relaxed text-ink-700">
             <li className="flex gap-3">
               <span className="typewriter shrink-0 font-bold text-ink-900">1.</span>
@@ -1243,7 +1291,7 @@ export function SetupWizard({
 
           <div className="flex flex-wrap items-center justify-center gap-4 pt-1">
             <Link
-              href={`/d/${slug}`}
+              href={founderClaimed ? `/d/${slug}` : founderLink(slug, bootstrapSecret)}
               className="btn btn-lg btn-accent"
             >
               {t("setup.openDept")}
@@ -1254,6 +1302,7 @@ export function SetupWizard({
             >
               {t("account.title")}
             </Link>
+            <button type="button" className="btn btn-sm" onClick={startAnother}>{t("setup.createAnother")}</button>
           </div>
         </div>
       )}
@@ -1278,12 +1327,15 @@ function Field({
   placeholder?: string;
   mono?: boolean;
 }) {
+  const id = useId();
   return (
     <div>
-      <label className="mb-1 block text-sm font-semibold text-ink-900">
+      <label htmlFor={id} className="mb-1 block text-sm font-semibold text-ink-900">
         {label}
       </label>
       <input
+        id={id}
+        aria-describedby={help ? `${id}-help` : undefined}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
@@ -1292,17 +1344,19 @@ function Field({
           mono ? "typewriter" : ""
         }`}
       />
-      {help && <p className="mt-1 text-xs text-ink-500">{help}</p>}
+      {help && <p id={`${id}-help`} className="mt-1 text-xs text-ink-500">{help}</p>}
     </div>
   );
 }
 
 function Next({ disabled, onClick }: { disabled: boolean; onClick: () => void }) {
+  const { t } = useI18n();
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
+      aria-label={t("common.next")}
       className="btn btn-primary w-full"
     >
       →
@@ -1319,11 +1373,13 @@ function Nav({
   onNext: () => void;
   nextLabel?: string;
 }) {
+  const { t } = useI18n();
   return (
     <div className="flex items-center gap-3 pt-2">
       <button
         type="button"
         onClick={onBack}
+        aria-label={t("common.back")}
         className="px-4 py-2 text-sm text-ink-500 underline"
       >
         ←
@@ -1331,6 +1387,7 @@ function Nav({
       <button
         type="button"
         onClick={onNext}
+        aria-label={nextLabel ?? t("common.next")}
         className="btn btn-primary ml-auto"
       >
         {nextLabel ?? "→"}

@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { resolveDepartment } from "@/lib/control/departments";
 import { createTenantClient } from "@/lib/tenant/server";
+import { safeLocalPath } from "@/lib/navigation";
+import { requestOrigin } from "@/lib/setup/origin";
 
 /**
  * E-mail-link landing point for one department.
@@ -14,7 +16,7 @@ export async function GET(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
 
   const code = searchParams.get("code");
   const errorDescription = searchParams.get("error_description");
@@ -23,9 +25,7 @@ export async function GET(
   // send people to an unreachable address after signing in. The forwarded
   // headers carry what the browser actually used, and deriving it per request
   // means preview deployments work without extra configuration.
-  const forwardedHost = request.headers.get("x-forwarded-host");
-  const forwardedProto = request.headers.get("x-forwarded-proto") ?? "https";
-  const base = forwardedHost ? `${forwardedProto}://${forwardedHost}` : origin;
+  const base = requestOrigin(request.headers);
 
   const home = `${base}/d/${slug}`;
 
@@ -33,10 +33,7 @@ export async function GET(
   // matters: a bare prefix test also accepts /d/<slug>-other, which is a
   // different department's front door.
   const requested = searchParams.get("next") ?? `/d/${slug}/vault`;
-  const safeNext =
-    requested === `/d/${slug}` || requested.startsWith(`/d/${slug}/`)
-      ? requested
-      : `/d/${slug}/vault`;
+  const safeNext = safeLocalPath(requested, `/d/${slug}/vault`, `/d/${slug}`);
 
   if (errorDescription) {
     return NextResponse.redirect(`${home}/access-denied`);

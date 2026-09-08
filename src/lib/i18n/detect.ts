@@ -30,12 +30,12 @@ export async function detectLocale(): Promise<Locale> {
         ?.slice(2);
       return { tag: tag.toLowerCase(), q: q ? Number(q) : 1 };
     })
-    .filter((entry) => entry.tag)
+    .filter((entry) => entry.tag && Number.isFinite(entry.q) && entry.q > 0 && entry.q <= 1)
     .sort((a, b) => b.q - a.q);
 
   for (const { tag } of ranked) {
-    if (tag.startsWith("de")) return "de";
-    if (tag.startsWith("en")) return "en";
+    if (tag === "de" || tag.startsWith("de-")) return "de";
+    if (tag === "en" || tag.startsWith("en-")) return "en";
   }
 
   return "en";

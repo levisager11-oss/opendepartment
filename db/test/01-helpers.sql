@@ -60,8 +60,12 @@ create or replace function odtest.denied(name text, stmt text)
 returns void language plpgsql as $$
 begin
   execute stmt;
-  perform odtest.record(name, false, 'statement was ALLOWED but should have been refused');
+  -- Roll back an unexpectedly successful attack before recording its failure.
+  -- Otherwise one missing guard can delete the fixtures used by later tests.
+  raise sqlstate 'P9001' using message = 'statement was ALLOWED';
 exception
+  when sqlstate 'P9001' then
+    perform odtest.record(name, false, 'statement was ALLOWED but should have been refused');
   when insufficient_privilege or check_violation or raise_exception
     or unique_violation or foreign_key_violation then
     perform odtest.record(name, true, sqlstate);

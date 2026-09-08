@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useI18n } from "@/lib/i18n/provider";
 import { Spinner } from "@/components/Spinner";
 import { useTenant, useTenantClient } from "@/lib/tenant/context";
 import type { TranslationKey } from "@/lib/i18n/dictionary";
+import { safeLocalPath } from "@/lib/navigation";
+import { forgetBootstrapSecret, isBootstrapSecret, loadBootstrapSecret, saveBootstrapSecret } from "@/lib/setup/bootstrap";
 
 type Mode = "signin" | "signup" | "reset";
 
@@ -28,6 +30,7 @@ function mapAuthError(
 ): string {
   const m = message.toLowerCase();
 
+  if (m.includes("dept_bad_bootstrap")) return t("auth.bootstrapInvalid");
   if (m.includes("dept_no_invite")) return t("invite.required");
   if (m.includes("dept_bad_invite")) return t("invite.invalid");
   if (m.includes("dept_invite_expired")) return t("invite.expired");
@@ -54,7 +57,7 @@ export function DeptLoginForm({
   presetInvite?: string;
 }) {
   const { t } = useI18n();
-  const { href, slug, branding } = useTenant();
+  const { href, slug, branding, supabaseUrl } = useTenant();
   const supabase = useTenantClient();
   const router = useRouter();
   const params = useSearchParams();
@@ -62,11 +65,7 @@ export function DeptLoginForm({
   // Same rule as the auth callback: inside this department, or nowhere. A
   // bare prefix test would also let /d/<slug>-other through.
   const nextParam = params.get("next");
-  const next =
-    nextParam &&
-    (nextParam === `/d/${slug}` || nextParam.startsWith(`/d/${slug}/`))
-      ? nextParam
-      : href("vault");
+  const next = safeLocalPath(nextParam, href("vault"), `/d/${slug}`);
 
   const [mode, setMode] = useState<Mode>(initialMode);
   const [email, setEmail] = useState("");
@@ -78,8 +77,35 @@ export function DeptLoginForm({
     Boolean(presetInvite) || !branding.openJoin
   );
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    params.get("error") === "auth" ? t("auth.linkInvalid") : null
+  );
   const [info, setInfo] = useState<string | null>(null);
+  const [bootstrapSecret, setBootstrapSecret] = useState<string | null>(null);
+
+  useEffect(() => {
+    function readFounderLink() {
+      const fragment = new URLSearchParams(window.location.hash.slice(1));
+      if (fragment.has("bootstrap")) {
+        const secret = fragment.get("bootstrap");
+        // Fragments never reach the server. Remove it before subsequent navigation/sharing.
+        window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}`);
+        if (!isBootstrapSecret(secret)) {
+          setBootstrapSecret(null);
+          setError(t("auth.bootstrapInvalid"));
+          return;
+        }
+        saveBootstrapSecret(slug, supabaseUrl, secret);
+        setBootstrapSecret(secret);
+        setMode("signup");
+      } else {
+        setBootstrapSecret(loadBootstrapSecret(slug, supabaseUrl));
+      }
+    }
+    readFounderLink();
+    window.addEventListener("hashchange", readFounderLink);
+    return () => window.removeEventListener("hashchange", readFounderLink);
+  }, [slug, supabaseUrl, t]);
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const callback = `${origin}/d/${slug}/auth/callback?next=${encodeURIComponent(next)}`;
@@ -93,11 +119,12 @@ export function DeptLoginForm({
 
     try {
       if (mode === "reset") {
-        await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
           redirectTo: `${origin}/d/${slug}/auth/callback?next=${encodeURIComponent(
             href("auth/update-password")
           )}`,
         });
+        if (resetError) throw resetError;
         // Deliberately always the same message: never reveal who is a member.
         setInfo(t("auth.resetSent"));
         setMode("signin");
@@ -113,10 +140,17 @@ export function DeptLoginForm({
             // Read by handle_new_user() out of raw_user_meta_data. Sending it
             // as metadata is what lets the trigger check the code in the same
             // transaction that creates the user.
-            data: invite.trim() ? { invite_code: invite.trim().toUpperCase() } : {},
+            data: {
+              ...(invite.trim() ? { invite_code: invite.trim().toUpperCase() } : {}),
+              ...(bootstrapSecret ? { bootstrap_secret: bootstrapSecret } : {}),
+            },
           },
         });
         if (error) throw error;
+        if (bootstrapSecret) {
+          forgetBootstrapSecret(slug, supabaseUrl);
+          setBootstrapSecret(null);
+        }
 
         if (data.session) {
           router.push(next);
@@ -137,7 +171,7 @@ export function DeptLoginForm({
       router.refresh();
     } catch (err) {
       const message = err instanceof Error ? err.message : t("auth.genericError");
-      setError(mapAuthError(message, t, Boolean(invite.trim())));
+      setError(mode === "reset" ? t("common.actionFailed") : mapAuthError(message, t, Boolean(invite.trim())));
     } finally {
       setBusy(false);
     }
@@ -145,6 +179,9 @@ export function DeptLoginForm({
 
   return (
     <div>
+      {bootstrapSecret && mode === "signup" && (
+        <p role="status" className="notice notice-ok mb-4">{t("setup.bootstrapPrivate")}</p>
+      )}
       <form onSubmit={submit} className="flex flex-col gap-4">
         <div>
           <label className="label" htmlFor="email">
@@ -171,7 +208,7 @@ export function DeptLoginForm({
               id="password"
               type="password"
               required
-              minLength={8}
+              minLength={mode === "signup" ? 8 : undefined}
               autoComplete={mode === "signup" ? "new-password" : "current-password"}
               className="field"
               value={password}
@@ -185,7 +222,7 @@ export function DeptLoginForm({
             password. The code field is still reachable, because a code is the
             only way to arrive as an administrator -- it just stops being the
             first thing a newcomer is confronted with. */}
-        {mode === "signup" && !showInvite && (
+        {mode === "signup" && !bootstrapSecret && !showInvite && (
           <button
             type="button"
             onClick={() => setShowInvite(true)}
@@ -195,7 +232,7 @@ export function DeptLoginForm({
           </button>
         )}
 
-        {mode === "signup" && showInvite && (
+        {mode === "signup" && !bootstrapSecret && showInvite && (
           <div>
             <label className="label" htmlFor="invite">
               {t(branding.openJoin ? "invite.codeOptional" : "invite.code")}
@@ -252,19 +289,21 @@ export function DeptLoginForm({
       <div className="mt-5 flex flex-col items-center gap-2 text-xs">
         <button
           type="button"
+          disabled={busy}
           onClick={() => {
-            setMode(mode === "signup" ? "signin" : "signup");
+            setMode(mode === "signin" ? "signup" : "signin");
             setError(null);
             setInfo(null);
           }}
           className="cursor-pointer py-1.5 text-gov-800 underline underline-offset-2 hover:text-gov-600 sm:py-0"
         >
-          {mode === "signup" ? t("auth.toSignin") : t("auth.toSignup")}
+          {mode === "signin" ? t("auth.toSignup") : t("auth.toSignin")}
         </button>
 
         {mode !== "reset" && (
           <button
             type="button"
+            disabled={busy}
             onClick={() => {
               setMode("reset");
               setError(null);

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useI18n } from "@/lib/i18n/provider";
 import { createControlBrowserClient } from "@/lib/control/browser";
 
@@ -25,6 +25,7 @@ export function ControlAuthPanel({
   initialMode?: "signin" | "signup";
 }) {
   const { t } = useI18n();
+  const id = useId();
   const [mode, setMode] = useState<"signin" | "signup">(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -44,34 +45,45 @@ export function ControlAuthPanel({
     setBusy(true);
     setError(null);
 
-    const supabase = createControlBrowserClient();
-    const creds = { email: email.trim(), password };
+    try {
+      const supabase = createControlBrowserClient();
+      const creds = { email: email.trim(), password };
 
-    const { data, error: authError } =
-      mode === "signup"
-        ? await supabase.auth.signUp(creds)
-        : await supabase.auth.signInWithPassword(creds);
+      const { data, error: authError } =
+        mode === "signup"
+          ? await supabase.auth.signUp(creds)
+          : await supabase.auth.signInWithPassword(creds);
 
-    setBusy(false);
+      setBusy(false);
 
-    if (authError) {
-      setError(authError.message);
-      return;
+      if (authError) {
+        setError(authError.message);
+        return;
+      }
+
+      // Sign-up with e-mail confirmation on returns a user but no session.
+      if (!data.session) {
+        setCheckEmail(true);
+        return;
+      }
+
+      onSignedIn();
+    } catch {
+      setError(t("common.actionFailed"));
+    } finally {
+      setBusy(false);
     }
-
-    // Sign-up with e-mail confirmation on returns a user but no session.
-    if (!data.session) {
-      setCheckEmail(true);
-      return;
-    }
-
-    onSignedIn();
   }
 
   if (checkEmail) {
     return (
       <div className="border border-gov-700 bg-gov-100/40 p-4 text-sm text-ink-900">
-        {t("auth.checkEmail")}
+        <p role="status">{t("auth.checkEmail")}</p>
+        <button type="button" className="btn btn-primary mt-3" onClick={() => {
+          setCheckEmail(false);
+          setMode("signin");
+          setPassword("");
+        }}>{t("auth.toSignin")}</button>
       </div>
     );
   }
@@ -88,7 +100,9 @@ export function ControlAuthPanel({
         {t("account.signInBody")}
       </p>
 
+      <label className="label" htmlFor={`${id}-email`}>{t("auth.email")}</label>
       <input
+        id={`${id}-email`}
         type="email"
         required
         autoComplete="email"
@@ -97,10 +111,12 @@ export function ControlAuthPanel({
         placeholder={t("auth.email")}
         className="field"
       />
+      <label className="label" htmlFor={`${id}-password`}>{t("auth.password")}</label>
       <input
+        id={`${id}-password`}
         type="password"
         required
-        minLength={8}
+        minLength={mode === "signup" ? 8 : undefined}
         autoComplete={mode === "signup" ? "new-password" : "current-password"}
         value={password}
         onChange={(e) => setPassword(e.target.value)}
@@ -142,19 +158,24 @@ export function ControlAuthPanel({
         </label>
       )}
 
-      {error && <p className="text-xs text-stamp-red">{error}</p>}
+      {error && <p role="alert" className="text-xs text-stamp-red">{error}</p>}
 
       <div className="flex items-center gap-3">
         <button
           type="submit"
           disabled={busy}
+          aria-busy={busy}
           className="btn btn-primary"
         >
           {mode === "signup" ? t("auth.signup") : t("auth.signin")}
         </button>
         <button
           type="button"
-          onClick={() => setMode(mode === "signup" ? "signin" : "signup")}
+          disabled={busy}
+          onClick={() => {
+            setMode(mode === "signup" ? "signin" : "signup");
+            setError(null);
+          }}
           className="py-1.5 text-xs text-ink-500 underline sm:py-0"
         >
           {mode === "signup" ? t("auth.toSignin") : t("auth.toSignup")}

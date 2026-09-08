@@ -24,10 +24,11 @@ export default async function VaultPage({
   const member = await requireMember(slug);
 
   const supabase = await createTenantClient(member.dept);
-  const { data: subjects } = await supabase
+  const { data: subjects, error } = await supabase
     .from("subjects")
     .select("id, name")
     .order("name");
+  if (error) throw new Error("Could not load subjects.");
 
   return (
     <VaultBrowser

@@ -1,0 +1,2260 @@
+{
+  "documentType": "codex-security.findings",
+  "findings": [
+    {
+      "attackPath": {
+        "dataflow": {
+          "evidenceRefs": [
+            "evidence-1",
+            "evidence-2",
+            "evidence-3",
+            "evidence-4"
+          ],
+          "outcome": "Unauthorized destruction of exhibit metadata and cascading comments, votes, reports, subject links and view records; disclosure of the storage path. Storage bytes remain because object deletion is a separate operation. The same function also permits banned owners to delete their own exhibits because it never checks active membership.",
+          "sink": "db/tenant-schema.sql",
+          "source": "Signed-out remote caller holding the public tenant anon key and a known exhibit UUID; a former member can retain UUIDs before removal.",
+          "summary": "Public tenant coordinates expose the anon key to visitors. delete_file(target, why) is SECURITY DEFINER and retains PostgreSQL's default PUBLIC EXECUTE privilege. For an anonymous caller auth.uid() is NULL and is_admin() is false. NOT (false OR owner = NULL) evaluates to NULL; PL/pgSQL IF does not enter its rejection branch. The function inserts an audit row with nullable actor_id, deletes the exhibit as table owner, and returns the storage path."
+        },
+        "limitations": [
+          "RLS prevents anonymous table reads/deletes and storage object deletion; requireMember gates UI pages. Neither applies inside this SECURITY DEFINER RPC. UUID guessing is unnecessary for a former member or recipient of an exhibit link."
+        ],
+        "reachability": {
+          "attacker": "Signed-out remote caller holding the public tenant anon key and a known exhibit UUID; a former member can retain UUIDs before removal.",
+          "entrypoint": "db/tenant-schema.sql",
+          "outcome": "Unauthorized destruction of exhibit metadata and cascading comments, votes, reports, subject links and view records; disclosure of the storage path. Storage bytes remain because object deletion is a separate operation. The same function also permits banned owners to delete their own exhibits because it never checks active membership.",
+          "summary": "Signed-out remote caller holding the public tenant anon key and a known exhibit UUID; a former member can retain UUIDs before removal."
+        },
+        "summary": "Public tenant coordinates expose the anon key to visitors. delete_file(target, why) is SECURITY DEFINER and retains PostgreSQL's default PUBLIC EXECUTE privilege. For an anonymous caller auth.uid() is NULL and is_admin() is false. NOT (false OR owner = NULL) evaluates to NULL; PL/pgSQL IF does not enter its rejection branch. The function inserts an audit row with nullable actor_id, deletes the exhibit as table owner, and returns the storage path."
+      },
+      "codeEvidence": [
+        {
+          "code": "create or replace function public.delete_file(target uuid, why text default null)\nreturns text language plpgsql security definer set search_path = public as $fn$\ndeclare path text; owner uuid;\nbegin\n  select f.storage_path, f.owner_id into path, owner from public.files f where f.id = target;\n  if path is null then raise exception 'NOT_FOUND'; end if;\n\n  if not (public.is_admin() or owner = auth.uid()) then\n    raise exception 'NOT_ALLOWED';\n  end if;\n\n  insert into public.audit_log (actor_id, action, target, detail)\n  values (auth.uid(), 'file.delete', target::text,\n          jsonb_build_object('storage_path', path, 'reason', why));\n\n  delete from public.files where id = target;\n  return path;\nend; $fn$;",
+          "endLine": 723,
+          "explanation": "returns text language plpgsql security definer ... if not (public.is_admin() or owner = auth.uid()) then ... delete from public.files where id = target; return path;",
+          "id": "evidence-1",
+          "label": "Entry point and control",
+          "path": "db/tenant-schema.sql",
+          "role": "root_control",
+          "startLine": 706
+        },
+        {
+          "code": "-- 9. AUDIT LOG -- every deletion and moderation action is recorded.\ncreate table if not exists public.audit_log (\n  id          bigserial primary key,\n  actor_id    uuid references public.profiles(id) on delete set null,\n  action      text not null,\n  target      text,\n  detail      jsonb,\n  created_at  timestamptz not null default now()\n);",
+          "endLine": 372,
+          "explanation": "audit_log.actor_id uuid references public.profiles(id) on delete set null",
+          "id": "evidence-2",
+          "label": "Supporting control",
+          "path": "db/tenant-schema.sql",
+          "role": "propagation",
+          "startLine": 364
+        },
+        {
+          "code": "create or replace function public.is_admin()\nreturns boolean language sql stable security definer set search_path = public as $fn$\n  select coalesce(\n    (select p.is_admin and not p.is_banned\n       from public.profiles p where p.id = auth.uid()),\n    false);\n$fn$;",
+          "endLine": 399,
+          "explanation": "is_admin() returns coalesce(..., false)",
+          "id": "evidence-3",
+          "label": "Supporting control",
+          "path": "db/tenant-schema.sql",
+          "role": "propagation",
+          "startLine": 393
+        },
+        {
+          "code": "-- Stricter than its neighbours on purpose. The other admin RPCs rely on\n-- Postgres granting EXECUTE to PUBLIC and on their own is_admin() check, which\n-- is enough when the worst a refused caller can do is read nothing. This one\n-- deletes an archive, so the signed-out role does not get to reach the check\n-- at all.\nrevoke execute on function public.purge_department(text) from anon, public;\ngrant  execute on function public.purge_department(text) to authenticated;",
+          "endLine": 926,
+          "explanation": "Neighbor purge_department explicitly revokes EXECUTE from anon, public; delete_file has no corresponding revoke.",
+          "id": "evidence-4",
+          "label": "Supporting control",
+          "path": "db/tenant-schema.sql",
+          "role": "propagation",
+          "startLine": 920
+        }
+      ],
+      "confidence": {
+        "level": "high",
+        "rationale": "Independently traced against the audited source; local regression failures confirm applicable SQL and browser-client behaviors."
+      },
+      "findingId": "csf_f3353f28e572d117a2f9a5e2",
+      "fingerprints": {
+        "algorithm": "codex-security/v1",
+        "primary": "codex-security/v1:sha256:f6b3666974eaa6da7c1012f7b2be3754f0db69899409927c33ee503c0a7e9884"
+      },
+      "identity": {
+        "anchor": "anonymous-callers-can-delete-exhibits-through-a-nullable-authorization-check"
+      },
+      "locations": [
+        {
+          "endLine": 723,
+          "path": "db/tenant-schema.sql",
+          "role": "root_control",
+          "startLine": 706
+        },
+        {
+          "endLine": 372,
+          "path": "db/tenant-schema.sql",
+          "startLine": 364
+        },
+        {
+          "endLine": 399,
+          "path": "db/tenant-schema.sql",
+          "startLine": 393
+        },
+        {
+          "endLine": 926,
+          "path": "db/tenant-schema.sql",
+          "startLine": 920
+        }
+      ],
+      "occurrenceId": "occ_518950b71f34c9e34f861e9e",
+      "provenance": {
+        "candidateId": "baseline-1",
+        "originalCandidates": [
+          {
+            "attacker": "Signed-out remote caller holding the public tenant anon key and a known exhibit UUID; a former member can retain UUIDs before removal.",
+            "confidence": "high",
+            "counterevidence": "RLS prevents anonymous table reads/deletes and storage object deletion; requireMember gates UI pages. Neither applies inside this SECURITY DEFINER RPC. UUID guessing is unnecessary for a former member or recipient of an exhibit link.",
+            "cwe": [
+              "CWE-862",
+              "CWE-703"
+            ],
+            "id": "BASE-01",
+            "impact": "Unauthorized destruction of exhibit metadata and cascading comments, votes, reports, subject links and view records; disclosure of the storage path. Storage bytes remain because object deletion is a separate operation. The same function also permits banned owners to delete their own exhibits because it never checks active membership.",
+            "invariant": "Only an active exhibit owner or active administrator may delete an exhibit and its associated records.",
+            "locations": [
+              {
+                "end_line": 723,
+                "evidence": "returns text language plpgsql security definer ... if not (public.is_admin() or owner = auth.uid()) then ... delete from public.files where id = target; return path;",
+                "file": "db/tenant-schema.sql",
+                "start_line": 706
+              },
+              {
+                "end_line": 372,
+                "evidence": "audit_log.actor_id uuid references public.profiles(id) on delete set null",
+                "file": "db/tenant-schema.sql",
+                "start_line": 364
+              },
+              {
+                "end_line": 399,
+                "evidence": "is_admin() returns coalesce(..., false)",
+                "file": "db/tenant-schema.sql",
+                "start_line": 393
+              },
+              {
+                "end_line": 926,
+                "evidence": "Neighbor purge_department explicitly revokes EXECUTE from anon, public; delete_file has no corresponding revoke.",
+                "file": "db/tenant-schema.sql",
+                "start_line": 920
+              }
+            ],
+            "remediation": "Require non-null auth.uid() and is_active_member() before lookup/mutation, use null-safe ownership checks, revoke EXECUTE from PUBLIC and anon, grant only authenticated, and add explicit signed-out, banned-owner, other-member and valid-owner regression assertions.",
+            "rule": "Reject missing identity before security-definer mutation",
+            "severity": "high",
+            "source_to_sink": [
+              "Public tenant coordinates expose the anon key to visitors.",
+              "delete_file(target, why) is SECURITY DEFINER and retains PostgreSQL's default PUBLIC EXECUTE privilege.",
+              "For an anonymous caller auth.uid() is NULL and is_admin() is false.",
+              "NOT (false OR owner = NULL) evaluates to NULL; PL/pgSQL IF does not enter its rejection branch.",
+              "The function inserts an audit row with nullable actor_id, deletes the exhibit as table owner, and returns the storage path."
+            ],
+            "title": "Anonymous callers can delete exhibits through a nullable authorization check",
+            "validation_status": "Statically established; no SQL executed by this auditor."
+          }
+        ],
+        "source": "baseline"
+      },
+      "remediation": "Require non-null auth.uid() and is_active_member() before lookup/mutation, use null-safe ownership checks, revoke EXECUTE from PUBLIC and anon, grant only authenticated, and add explicit signed-out, banned-owner, other-member and valid-owner regression assertions.",
+      "remediationTests": [
+        "Only an active exhibit owner or active administrator may delete an exhibit and its associated records."
+      ],
+      "rootCause": {
+        "evidenceRefs": [
+          "evidence-1",
+          "evidence-2",
+          "evidence-3",
+          "evidence-4"
+        ],
+        "summary": "Public tenant coordinates expose the anon key to visitors. delete_file(target, why) is SECURITY DEFINER and retains PostgreSQL's default PUBLIC EXECUTE privilege. For an anonymous caller auth.uid() is NULL and is_admin() is false. NOT (false OR owner = NULL) evaluates to NULL; PL/pgSQL IF does not enter its rejection branch. The function inserts an audit row with nullable actor_id, deletes the exhibit as table owner, and returns the storage path."
+      },
+      "ruleId": "anonymous-file-deletion",
+      "severity": {
+        "changeConditions": "RLS prevents anonymous table reads/deletes and storage object deletion; requireMember gates UI pages. Neither applies inside this SECURITY DEFINER RPC. UUID guessing is unnecessary for a former member or recipient of an exhibit link.",
+        "level": "high",
+        "rationale": "Signed-out remote caller holding the public tenant anon key and a known exhibit UUID; a former member can retain UUIDs before removal. Unauthorized destruction of exhibit metadata and cascading comments, votes, reports, subject links and view records; disclosure of the storage path. Storage bytes remain because object deletion is a separate operation. The same function also permits banned owners to delete their own exhibits because it never checks active membership."
+      },
+      "summary": "Unauthorized destruction of exhibit metadata and cascading comments, votes, reports, subject links and view records; disclosure of the storage path. Storage bytes remain because object deletion is a separate operation. The same function also permits banned owners to delete their own exhibits because it never checks active membership.",
+      "taxonomy": {
+        "category": "authorization",
+        "cwe": [
+          "CWE-862",
+          "CWE-703"
+        ]
+      },
+      "title": "Anonymous callers can delete exhibits through a nullable authorization check",
+      "validation": {
+        "evidenceRefs": [
+          "evidence-1",
+          "evidence-2",
+          "evidence-3",
+          "evidence-4"
+        ],
+        "limitations": [
+          "No deployed Supabase service was probed; source evidence describes audited revision ebe4fabb."
+        ],
+        "method": "parent source trace and applicable local regression tests",
+        "summary": "Public tenant coordinates expose the anon key to visitors. delete_file(target, why) is SECURITY DEFINER and retains PostgreSQL's default PUBLIC EXECUTE privilege. For an anonymous caller auth.uid() is NULL and is_admin() is false. NOT (false OR owner = NULL) evaluates to NULL; PL/pgSQL IF does not enter its rejection branch. The function inserts an audit row with nullable actor_id, deletes the exhibit as table owner, and returns the storage path. Counterevidence: RLS prevents anonymous table reads/deletes and storage object deletion; requireMember gates UI pages. Neither applies inside this SECURITY DEFINER RPC. UUID guessing is unnecessary for a former member or recipient of an exhibit link."
+      }
+    },
+    {
+      "attackPath": {
+        "dataflow": {
+          "evidenceRefs": [
+            "evidence-1",
+            "evidence-2",
+            "evidence-3",
+            "evidence-4",
+            "evidence-5",
+            "evidence-6"
+          ],
+          "outcome": "Credentials, email addresses and invite codes intended for one realm are sent to another project; signup can create an account in an attacker-owned project, exposing stored invite metadata and password hashes there. Browser reads and actions also run against stale project/session state. Do not infer that the Supabase project owner automatically sees plaintext passwords in auth logs.",
+          "sink": "src/lib/tenant/client.ts",
+          "source": "Malicious department owner whose department is opened before the visitor navigates within the same application document to another department or platform account form.",
+          "summary": "DeptHeader instantiates useTenantClient even for signed-out department front doors. Both tenant and control browser factories call createBrowserClient without isSingleton:false. Installed @supabase/ssr caches one module-global browser client and returns it before inspecting later URL/key/cookie arguments. Next Link navigation retains that module instance while changing rendered branding and forms. DeptLoginForm.signUp/signInWithPassword and ControlAuthPanel then send the visitor's credentials and, for tenant signup, invite_code metadata to the previously selected project."
+        },
+        "limitations": [
+          "Full document navigation resets the singleton; server-side clients are separately constructed and SQL RLS still applies. React useMemo does not fix the issue because the library factory itself ignores subsequent options. Raw plaintext password visibility to the tenant operator was not established."
+        ],
+        "reachability": {
+          "attacker": "Malicious department owner whose department is opened before the visitor navigates within the same application document to another department or platform account form.",
+          "entrypoint": "src/lib/tenant/client.ts",
+          "outcome": "Credentials, email addresses and invite codes intended for one realm are sent to another project; signup can create an account in an attacker-owned project, exposing stored invite metadata and password hashes there. Browser reads and actions also run against stale project/session state. Do not infer that the Supabase project owner automatically sees plaintext passwords in auth logs.",
+          "summary": "Malicious department owner whose department is opened before the visitor navigates within the same application document to another department or platform account form."
+        },
+        "summary": "DeptHeader instantiates useTenantClient even for signed-out department front doors. Both tenant and control browser factories call createBrowserClient without isSingleton:false. Installed @supabase/ssr caches one module-global browser client and returns it before inspecting later URL/key/cookie arguments. Next Link navigation retains that module instance while changing rendered branding and forms. DeptLoginForm.signUp/signInWithPassword and ControlAuthPanel then send the visitor's credentials and, for tenant signup, invite_code metadata to the previously selected project."
+      },
+      "codeEvidence": [
+        {
+          "code": "export function createTenantBrowserClient(opts: {\n  slug: string;\n  supabaseUrl: string;\n  anonKey: string;\n}) {\n  return createBrowserClient(opts.supabaseUrl, opts.anonKey, {\n    cookieOptions: tenantCookieConfig(opts.slug),\n  });",
+          "endLine": 20,
+          "explanation": "return createBrowserClient(opts.supabaseUrl, opts.anonKey, { cookieOptions: tenantCookieConfig(opts.slug) });",
+          "id": "evidence-1",
+          "label": "Entry point and control",
+          "path": "src/lib/tenant/client.ts",
+          "role": "root_control",
+          "startLine": 13
+        },
+        {
+          "code": "export function createControlBrowserClient() {\n  return createBrowserClient(\n    process.env.NEXT_PUBLIC_CONTROL_SUPABASE_URL!,\n    process.env.NEXT_PUBLIC_CONTROL_SUPABASE_ANON_KEY!\n  );",
+          "endLine": 16,
+          "explanation": "return createBrowserClient(NEXT_PUBLIC_CONTROL_SUPABASE_URL, NEXT_PUBLIC_CONTROL_SUPABASE_ANON_KEY);",
+          "id": "evidence-2",
+          "label": "Supporting control",
+          "path": "src/lib/control/browser.ts",
+          "role": "propagation",
+          "startLine": 12
+        },
+        {
+          "code": "  const { t } = useI18n();\n  const { branding, href, slug } = useTenant();\n  const supabase = useTenantClient();",
+          "endLine": 22,
+          "explanation": "const supabase = useTenantClient();",
+          "id": "evidence-3",
+          "label": "Supporting control",
+          "path": "src/components/dept/DeptHeader.tsx",
+          "role": "propagation",
+          "startLine": 20
+        },
+        {
+          "code": "      if (mode === \"signup\") {\n        const { data, error } = await supabase.auth.signUp({\n          email: email.trim().toLowerCase(),\n          password,\n          options: {\n            emailRedirectTo: callback,\n            // Read by handle_new_user() out of raw_user_meta_data. Sending it\n            // as metadata is what lets the trigger check the code in the same\n            // transaction that creates the user.\n            data: invite.trim() ? { invite_code: invite.trim().toUpperCase() } : {},\n          },\n        });",
+          "endLine": 118,
+          "explanation": "supabase.auth.signUp({ email, password, options: { ... data: { invite_code: ... } } })",
+          "id": "evidence-4",
+          "label": "Supporting control",
+          "path": "src/components/dept/DeptLoginForm.tsx",
+          "role": "propagation",
+          "startLine": 107
+        },
+        {
+          "code": "    const supabase = createControlBrowserClient();\n    const creds = { email: email.trim(), password };\n\n    const { data, error: authError } =\n      mode === \"signup\"\n        ? await supabase.auth.signUp(creds)\n        : await supabase.auth.signInWithPassword(creds);",
+          "endLine": 53,
+          "explanation": "createControlBrowserClient(); ... signUp(creds) : signInWithPassword(creds)",
+          "id": "evidence-5",
+          "label": "Supporting control",
+          "path": "src/components/setup/ControlAuthPanel.tsx",
+          "role": "propagation",
+          "startLine": 47
+        },
+        {
+          "code": "  // singleton client is created only if isSingleton is set to true, or if isSingleton is not defined and we detect a browser\n  const shouldUseSingleton =\n    options?.isSingleton === true ||\n    ((!options || !(\"isSingleton\" in options)) && isBrowser());\n\n  if (shouldUseSingleton && cachedBrowserClient) {\n    return cachedBrowserClient;",
+          "endLine": 115,
+          "explanation": "shouldUseSingleton = options?.isSingleton === true || ((!options || !(\"isSingleton\" in options)) && isBrowser()); if (shouldUseSingleton && cachedBrowserClient) return cachedBrowserClient;",
+          "id": "evidence-6",
+          "label": "Supporting control",
+          "path": "node_modules/@supabase/ssr/src/createBrowserClient.ts",
+          "role": "propagation",
+          "startLine": 109
+        }
+      ],
+      "confidence": {
+        "level": "high",
+        "rationale": "Independently traced against the audited source; local regression failures confirm applicable SQL and browser-client behaviors."
+      },
+      "findingId": "csf_2369f95467fc1cc63c1a91c8",
+      "fingerprints": {
+        "algorithm": "codex-security/v1",
+        "primary": "codex-security/v1:sha256:f7d134d510a6191209737b6bed056b28e53ac727dbcd7032533e05ad47043e19"
+      },
+      "identity": {
+        "anchor": "a-global-supabase-browser-singleton-mixes-department-and-platform-credentials"
+      },
+      "locations": [
+        {
+          "endLine": 20,
+          "path": "src/lib/tenant/client.ts",
+          "role": "root_control",
+          "startLine": 13
+        },
+        {
+          "endLine": 16,
+          "path": "src/lib/control/browser.ts",
+          "startLine": 12
+        },
+        {
+          "endLine": 22,
+          "path": "src/components/dept/DeptHeader.tsx",
+          "startLine": 20
+        },
+        {
+          "endLine": 118,
+          "path": "src/components/dept/DeptLoginForm.tsx",
+          "startLine": 107
+        },
+        {
+          "endLine": 53,
+          "path": "src/components/setup/ControlAuthPanel.tsx",
+          "startLine": 47
+        },
+        {
+          "endLine": 115,
+          "path": "node_modules/@supabase/ssr/src/createBrowserClient.ts",
+          "startLine": 109
+        }
+      ],
+      "occurrenceId": "occ_7f06fb17dbd2b736d1db806c",
+      "provenance": {
+        "candidateId": "baseline-2",
+        "originalCandidates": [
+          {
+            "attacker": "Malicious department owner whose department is opened before the visitor navigates within the same application document to another department or platform account form.",
+            "confidence": "high",
+            "counterevidence": "Full document navigation resets the singleton; server-side clients are separately constructed and SQL RLS still applies. React useMemo does not fix the issue because the library factory itself ignores subsequent options. Raw plaintext password visibility to the tenant operator was not established.",
+            "cwe": [
+              "CWE-441",
+              "CWE-488"
+            ],
+            "id": "BASE-02",
+            "impact": "Credentials, email addresses and invite codes intended for one realm are sent to another project; signup can create an account in an attacker-owned project, exposing stored invite metadata and password hashes there. Browser reads and actions also run against stale project/session state. Do not infer that the Supabase project owner automatically sees plaintext passwords in auth logs.",
+            "invariant": "Each department and the control plane must use their own Supabase URL, key, cookie namespace and session.",
+            "locations": [
+              {
+                "end_line": 20,
+                "evidence": "return createBrowserClient(opts.supabaseUrl, opts.anonKey, { cookieOptions: tenantCookieConfig(opts.slug) });",
+                "file": "src/lib/tenant/client.ts",
+                "start_line": 13
+              },
+              {
+                "end_line": 16,
+                "evidence": "return createBrowserClient(NEXT_PUBLIC_CONTROL_SUPABASE_URL, NEXT_PUBLIC_CONTROL_SUPABASE_ANON_KEY);",
+                "file": "src/lib/control/browser.ts",
+                "start_line": 12
+              },
+              {
+                "end_line": 22,
+                "evidence": "const supabase = useTenantClient();",
+                "file": "src/components/dept/DeptHeader.tsx",
+                "start_line": 20
+              },
+              {
+                "end_line": 118,
+                "evidence": "supabase.auth.signUp({ email, password, options: { ... data: { invite_code: ... } } })",
+                "file": "src/components/dept/DeptLoginForm.tsx",
+                "start_line": 107
+              },
+              {
+                "end_line": 53,
+                "evidence": "createControlBrowserClient(); ... signUp(creds) : signInWithPassword(creds)",
+                "file": "src/components/setup/ControlAuthPanel.tsx",
+                "start_line": 47
+              },
+              {
+                "end_line": 115,
+                "evidence": "shouldUseSingleton = options?.isSingleton === true || ((!options || !(\"isSingleton\" in options)) && isBrowser()); if (shouldUseSingleton && cachedBrowserClient) return cachedBrowserClient;",
+                "file": "node_modules/@supabase/ssr/src/createBrowserClient.ts",
+                "start_line": 109
+              }
+            ],
+            "remediation": "Pass isSingleton:false for every browser factory and maintain separate bounded caches keyed by realm, slug, URL and key, or otherwise maintain one client per validated realm. Verify control-to-tenant and tenant-to-tenant navigation plus signup/invite destination.",
+            "rule": "Bind clients and authentication state to the selected trust realm",
+            "severity": "high",
+            "source_to_sink": [
+              "DeptHeader instantiates useTenantClient even for signed-out department front doors.",
+              "Both tenant and control browser factories call createBrowserClient without isSingleton:false.",
+              "Installed @supabase/ssr caches one module-global browser client and returns it before inspecting later URL/key/cookie arguments.",
+              "Next Link navigation retains that module instance while changing rendered branding and forms.",
+              "DeptLoginForm.signUp/signInWithPassword and ControlAuthPanel then send the visitor's credentials and, for tenant signup, invite_code metadata to the previously selected project."
+            ],
+            "title": "A global Supabase browser singleton mixes department and platform credentials",
+            "validation_status": "Statically established against installed dependency source."
+          }
+        ],
+        "source": "baseline"
+      },
+      "remediation": "Pass isSingleton:false for every browser factory and maintain separate bounded caches keyed by realm, slug, URL and key, or otherwise maintain one client per validated realm. Verify control-to-tenant and tenant-to-tenant navigation plus signup/invite destination.",
+      "remediationTests": [
+        "Each department and the control plane must use their own Supabase URL, key, cookie namespace and session."
+      ],
+      "rootCause": {
+        "evidenceRefs": [
+          "evidence-1",
+          "evidence-2",
+          "evidence-3",
+          "evidence-4",
+          "evidence-5",
+          "evidence-6"
+        ],
+        "summary": "DeptHeader instantiates useTenantClient even for signed-out department front doors. Both tenant and control browser factories call createBrowserClient without isSingleton:false. Installed @supabase/ssr caches one module-global browser client and returns it before inspecting later URL/key/cookie arguments. Next Link navigation retains that module instance while changing rendered branding and forms. DeptLoginForm.signUp/signInWithPassword and ControlAuthPanel then send the visitor's credentials and, for tenant signup, invite_code metadata to the previously selected project."
+      },
+      "ruleId": "browser-project-confusion",
+      "severity": {
+        "changeConditions": "Full document navigation resets the singleton; server-side clients are separately constructed and SQL RLS still applies. React useMemo does not fix the issue because the library factory itself ignores subsequent options. Raw plaintext password visibility to the tenant operator was not established.",
+        "level": "high",
+        "rationale": "Malicious department owner whose department is opened before the visitor navigates within the same application document to another department or platform account form. Credentials, email addresses and invite codes intended for one realm are sent to another project; signup can create an account in an attacker-owned project, exposing stored invite metadata and password hashes there. Browser reads and actions also run against stale project/session state. Do not infer that the Supabase project owner automatically sees plaintext passwords in auth logs."
+      },
+      "summary": "Credentials, email addresses and invite codes intended for one realm are sent to another project; signup can create an account in an attacker-owned project, exposing stored invite metadata and password hashes there. Browser reads and actions also run against stale project/session state. Do not infer that the Supabase project owner automatically sees plaintext passwords in auth logs.",
+      "taxonomy": {
+        "category": "tenant-isolation",
+        "cwe": [
+          "CWE-441",
+          "CWE-488"
+        ]
+      },
+      "title": "A global Supabase browser singleton mixes department and platform credentials",
+      "validation": {
+        "evidenceRefs": [
+          "evidence-1",
+          "evidence-2",
+          "evidence-3",
+          "evidence-4",
+          "evidence-5",
+          "evidence-6"
+        ],
+        "limitations": [
+          "No deployed Supabase service was probed; source evidence describes audited revision ebe4fabb."
+        ],
+        "method": "parent source trace and applicable local regression tests",
+        "summary": "DeptHeader instantiates useTenantClient even for signed-out department front doors. Both tenant and control browser factories call createBrowserClient without isSingleton:false. Installed @supabase/ssr caches one module-global browser client and returns it before inspecting later URL/key/cookie arguments. Next Link navigation retains that module instance while changing rendered branding and forms. DeptLoginForm.signUp/signInWithPassword and ControlAuthPanel then send the visitor's credentials and, for tenant signup, invite_code metadata to the previously selected project. Counterevidence: Full document navigation resets the singleton; server-side clients are separately constructed and SQL RLS still applies. React useMemo does not fix the issue because the library factory itself ignores subsequent options. Raw plaintext password visibility to the tenant operator was not established."
+      }
+    },
+    {
+      "attackPath": {
+        "dataflow": {
+          "evidenceRefs": [
+            "evidence-1",
+            "evidence-2",
+            "evidence-3",
+            "evidence-4"
+          ],
+          "outcome": "An attacker wins initial department administration and can read subsequently added member emails, change admission rules, issue privileged invites, delete content or purge the archive. Owner recovery requires direct Supabase administration.",
+          "sink": "db/tenant-schema.sql",
+          "source": "Unauthenticated visitor monitoring newly public directory entries, or anyone who learns an unlisted slug before its owner finishes first signup.",
+          "summary": "SetupWizard rejects already claimed projects, then registers the directory row while the tenant remains unclaimed. public_directory and resolve_department expose new public slugs and their tenant coordinates before the founder creates a tenant account. Any caller can submit a Supabase signup with the published anon key. handle_new_user sees settings.claimed=false, skips invite validation, and sets make_admin=true."
+        },
+        "limitations": [
+          "This is explicitly documented behavior, including a warning that the first signup must be the owner. The settings row lock prevents two simultaneous founders; it does not establish who is entitled to found the department. Unlisted random slugs reduce discoverability but public directory entries have no such protection."
+        ],
+        "reachability": {
+          "attacker": "Unauthenticated visitor monitoring newly public directory entries, or anyone who learns an unlisted slug before its owner finishes first signup.",
+          "entrypoint": "db/tenant-schema.sql",
+          "outcome": "An attacker wins initial department administration and can read subsequently added member emails, change admission rules, issue privileged invites, delete content or purge the archive. Owner recovery requires direct Supabase administration.",
+          "summary": "Unauthenticated visitor monitoring newly public directory entries, or anyone who learns an unlisted slug before its owner finishes first signup."
+        },
+        "summary": "SetupWizard rejects already claimed projects, then registers the directory row while the tenant remains unclaimed. public_directory and resolve_department expose new public slugs and their tenant coordinates before the founder creates a tenant account. Any caller can submit a Supabase signup with the published anon key. handle_new_user sees settings.claimed=false, skips invite validation, and sets make_admin=true."
+      },
+      "codeEvidence": [
+        {
+          "code": "  select not s.claimed, s.open_join\n    into unclaimed, open_door\n    from public.settings s where s.id for update;\n\n  if unclaimed then\n    -- The first account through the door founds the department.\n    make_admin := true;\n    update public.settings set claimed = true where id;",
+          "endLine": 440,
+          "explanation": "select not s.claimed ... for update; if unclaimed then make_admin := true; update public.settings set claimed = true;",
+          "id": "evidence-1",
+          "label": "Entry point and control",
+          "path": "db/tenant-schema.sql",
+          "role": "root_control",
+          "startLine": 433
+        },
+        {
+          "code": "  insert into public.profiles (id, is_admin) values (new.id, make_admin)\n  on conflict (id) do nothing;",
+          "endLine": 478,
+          "explanation": "insert into public.profiles (id, is_admin) values (new.id, make_admin)",
+          "id": "evidence-2",
+          "label": "Supporting control",
+          "path": "db/tenant-schema.sql",
+          "role": "propagation",
+          "startLine": 477
+        },
+        {
+          "code": "    // 2. An already-claimed project means they pointed us at a department that\n    //    exists. Registering it here would hand its address to the wrong person.\n    if (probe.claimed) {\n      setError(t(\"setup.claimed\"));\n      setBusy(false);\n      return;\n    }\n\n    // 3. Register the slug. RLS ties the row to the signed-in operator.\n    const { error: rpcError } = await createControlBrowserClient().rpc(\n      \"register_department\",\n      {\n        want_slug: slug,\n        url: cleanUrl,\n        key: anonKey.trim(),\n        name: name.trim() || \"Untitled Department\",\n        tag: null,\n        vis: visibility,\n      }",
+          "endLine": 621,
+          "explanation": "if (probe.claimed) ... return; ... rpc('register_department', ... vis: visibility)",
+          "id": "evidence-3",
+          "label": "Supporting control",
+          "path": "src/components/setup/SetupWizard.tsx",
+          "role": "propagation",
+          "startLine": 603
+        },
+        {
+          "code": "create or replace function public.resolve_department(want text)\nreturns table (slug text, supabase_url text, anon_key text,\n               display_name text, tagline text, visibility text)\nlanguage sql stable security definer set search_path = public as $fn$\n  select d.slug, d.supabase_url, d.anon_key, d.display_name, d.tagline, d.visibility\n    from public.departments d\n   where d.slug = lower(trim(want)) and d.status = 'active';\n$fn$;\n\ncreate or replace function public.public_directory(limit_to integer default 60)\nreturns table (slug text, display_name text, tagline text, created_at timestamptz)\nlanguage sql stable security definer set search_path = public as $fn$\n  select d.slug, d.display_name, d.tagline, d.created_at\n    from public.departments d\n   where d.visibility = 'public' and d.status = 'active'\n   order by d.created_at desc\n   limit greatest(1, least(coalesce(limit_to, 60), 200));\n$fn$;",
+          "endLine": 350,
+          "explanation": "resolve_department returns supabase_url, anon_key; public_directory exposes active public slugs",
+          "id": "evidence-4",
+          "label": "Supporting control",
+          "path": "db/control-plane.sql",
+          "role": "propagation",
+          "startLine": 333
+        }
+      ],
+      "confidence": {
+        "level": "high",
+        "rationale": "Independently traced against the audited source; local regression failures confirm applicable SQL and browser-client behaviors."
+      },
+      "findingId": "csf_47c95477f6ce48df58aed834",
+      "fingerprints": {
+        "algorithm": "codex-security/v1",
+        "primary": "codex-security/v1:sha256:139fd1d02e526c74e0642b27d9358d4fc79b50a5022428a463ac5a202ff7828e"
+      },
+      "identity": {
+        "anchor": "newly-published-departments-can-be-claimed-by-the-first-stranger-to-sign-up"
+      },
+      "locations": [
+        {
+          "endLine": 440,
+          "path": "db/tenant-schema.sql",
+          "role": "root_control",
+          "startLine": 433
+        },
+        {
+          "endLine": 478,
+          "path": "db/tenant-schema.sql",
+          "startLine": 477
+        },
+        {
+          "endLine": 621,
+          "path": "src/components/setup/SetupWizard.tsx",
+          "startLine": 603
+        },
+        {
+          "endLine": 350,
+          "path": "db/control-plane.sql",
+          "startLine": 333
+        }
+      ],
+      "occurrenceId": "occ_1805e3c89a7109b4112ca26d",
+      "provenance": {
+        "candidateId": "baseline-3",
+        "originalCandidates": [
+          {
+            "attacker": "Unauthenticated visitor monitoring newly public directory entries, or anyone who learns an unlisted slug before its owner finishes first signup.",
+            "confidence": "high",
+            "counterevidence": "This is explicitly documented behavior, including a warning that the first signup must be the owner. The settings row lock prevents two simultaneous founders; it does not establish who is entitled to found the department. Unlisted random slugs reduce discoverability but public directory entries have no such protection.",
+            "cwe": [
+              "CWE-862"
+            ],
+            "id": "BASE-03",
+            "impact": "An attacker wins initial department administration and can read subsequently added member emails, change admission rules, issue privileged invites, delete content or purge the archive. Owner recovery requires direct Supabase administration.",
+            "invariant": "The intended department founder, rather than an arbitrary first requester, should receive initial administrative rights.",
+            "locations": [
+              {
+                "end_line": 440,
+                "evidence": "select not s.claimed ... for update; if unclaimed then make_admin := true; update public.settings set claimed = true;",
+                "file": "db/tenant-schema.sql",
+                "start_line": 433
+              },
+              {
+                "end_line": 478,
+                "evidence": "insert into public.profiles (id, is_admin) values (new.id, make_admin)",
+                "file": "db/tenant-schema.sql",
+                "start_line": 477
+              },
+              {
+                "end_line": 621,
+                "evidence": "if (probe.claimed) ... return; ... rpc('register_department', ... vis: visibility)",
+                "file": "src/components/setup/SetupWizard.tsx",
+                "start_line": 603
+              },
+              {
+                "end_line": 350,
+                "evidence": "resolve_department returns supabase_url, anon_key; public_directory exposes active public slugs",
+                "file": "db/control-plane.sql",
+                "start_line": 333
+              }
+            ],
+            "remediation": "Create a high-entropy one-use founder capability during schema generation/provisioning, store only its verifier, and require it in the initial signup; complete founder claim before public listing. Preserve a deliberate local administrative recovery path.",
+            "rule": "Require proof of founder authorization before assigning initial administrator privileges",
+            "severity": "high",
+            "source_to_sink": [
+              "SetupWizard rejects already claimed projects, then registers the directory row while the tenant remains unclaimed.",
+              "public_directory and resolve_department expose new public slugs and their tenant coordinates before the founder creates a tenant account.",
+              "Any caller can submit a Supabase signup with the published anon key.",
+              "handle_new_user sees settings.claimed=false, skips invite validation, and sets make_admin=true."
+            ],
+            "title": "Newly published departments can be claimed by the first stranger to sign up",
+            "validation_status": "Static architecture finding; exposure requires an unclaimed tenant during the documented setup sequence."
+          }
+        ],
+        "source": "baseline"
+      },
+      "remediation": "Create a high-entropy one-use founder capability during schema generation/provisioning, store only its verifier, and require it in the initial signup; complete founder claim before public listing. Preserve a deliberate local administrative recovery path.",
+      "remediationTests": [
+        "The intended department founder, rather than an arbitrary first requester, should receive initial administrative rights."
+      ],
+      "rootCause": {
+        "evidenceRefs": [
+          "evidence-1",
+          "evidence-2",
+          "evidence-3",
+          "evidence-4"
+        ],
+        "summary": "SetupWizard rejects already claimed projects, then registers the directory row while the tenant remains unclaimed. public_directory and resolve_department expose new public slugs and their tenant coordinates before the founder creates a tenant account. Any caller can submit a Supabase signup with the published anon key. handle_new_user sees settings.claimed=false, skips invite validation, and sets make_admin=true."
+      },
+      "ruleId": "unclaimed-department-takeover",
+      "severity": {
+        "changeConditions": "This is explicitly documented behavior, including a warning that the first signup must be the owner. The settings row lock prevents two simultaneous founders; it does not establish who is entitled to found the department. Unlisted random slugs reduce discoverability but public directory entries have no such protection.",
+        "level": "high",
+        "rationale": "Unauthenticated visitor monitoring newly public directory entries, or anyone who learns an unlisted slug before its owner finishes first signup. An attacker wins initial department administration and can read subsequently added member emails, change admission rules, issue privileged invites, delete content or purge the archive. Owner recovery requires direct Supabase administration."
+      },
+      "summary": "An attacker wins initial department administration and can read subsequently added member emails, change admission rules, issue privileged invites, delete content or purge the archive. Owner recovery requires direct Supabase administration.",
+      "taxonomy": {
+        "category": "authentication",
+        "cwe": [
+          "CWE-862"
+        ]
+      },
+      "title": "Newly published departments can be claimed by the first stranger to sign up",
+      "validation": {
+        "evidenceRefs": [
+          "evidence-1",
+          "evidence-2",
+          "evidence-3",
+          "evidence-4"
+        ],
+        "limitations": [
+          "No deployed Supabase service was probed; source evidence describes audited revision ebe4fabb."
+        ],
+        "method": "parent source trace and applicable local regression tests",
+        "summary": "SetupWizard rejects already claimed projects, then registers the directory row while the tenant remains unclaimed. public_directory and resolve_department expose new public slugs and their tenant coordinates before the founder creates a tenant account. Any caller can submit a Supabase signup with the published anon key. handle_new_user sees settings.claimed=false, skips invite validation, and sets make_admin=true. Counterevidence: This is explicitly documented behavior, including a warning that the first signup must be the owner. The settings row lock prevents two simultaneous founders; it does not establish who is entitled to found the department. Unlisted random slugs reduce discoverability but public directory entries have no such protection."
+      }
+    },
+    {
+      "attackPath": {
+        "dataflow": {
+          "evidenceRefs": [
+            "evidence-1",
+            "evidence-2",
+            "evidence-3",
+            "evidence-4"
+          ],
+          "outcome": "The operator clears the platform suspension and suspended_note, then restores the same slug as active using the same account and tenant coordinates.",
+          "sink": "db/control-plane.sql",
+          "source": "Authenticated platform operator whose department has been suspended.",
+          "summary": "operators_self grants FOR ALL to the owner's own operator row. Deleting that row cascades through departments.operator_id. Foreign-key cascade deletion is not filtered by the departments_delete_own RLS predicate. The same authenticated user can insert their operator row again and call register_department for the now-free slug."
+        },
+        "limitations": [
+          "Direct deletion or status modification of the suspended department is blocked correctly. The bypass uses its parent operator row; it does not require changing auth.users or possessing a service role key."
+        ],
+        "reachability": {
+          "attacker": "Authenticated platform operator whose department has been suspended.",
+          "entrypoint": "db/control-plane.sql",
+          "outcome": "The operator clears the platform suspension and suspended_note, then restores the same slug as active using the same account and tenant coordinates.",
+          "summary": "Authenticated platform operator whose department has been suspended."
+        },
+        "summary": "operators_self grants FOR ALL to the owner's own operator row. Deleting that row cascades through departments.operator_id. Foreign-key cascade deletion is not filtered by the departments_delete_own RLS predicate. The same authenticated user can insert their operator row again and call register_department for the now-free slug."
+      },
+      "codeEvidence": [
+        {
+          "code": "create table if not exists public.departments (\n  slug           text primary key\n                   check (slug ~ '^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])$'),\n  operator_id    uuid not null references public.operators(id) on delete cascade,",
+          "endLine": 54,
+          "explanation": "operator_id uuid not null references public.operators(id) on delete cascade",
+          "id": "evidence-1",
+          "label": "Entry point and control",
+          "path": "db/control-plane.sql",
+          "role": "root_control",
+          "startLine": 51
+        },
+        {
+          "code": "drop policy if exists operators_self on public.operators;\ncreate policy operators_self on public.operators\n  for all to authenticated using (id = auth.uid()) with check (id = auth.uid());",
+          "endLine": 214,
+          "explanation": "create policy operators_self ... for all to authenticated using (id = auth.uid()) with check (id = auth.uid())",
+          "id": "evidence-2",
+          "label": "Supporting control",
+          "path": "db/control-plane.sql",
+          "role": "propagation",
+          "startLine": 212
+        },
+        {
+          "code": "drop policy if exists departments_delete_own on public.departments;\ncreate policy departments_delete_own on public.departments\n  for delete to authenticated\n  using (operator_id = auth.uid() and status <> 'suspended');",
+          "endLine": 249,
+          "explanation": "departments_delete_own ... using (operator_id = auth.uid() and status <> 'suspended')",
+          "id": "evidence-3",
+          "label": "Supporting control",
+          "path": "db/control-plane.sql",
+          "role": "propagation",
+          "startLine": 246
+        },
+        {
+          "code": "-- ------------------------------------------------- Supabase default grants\n-- Applied to whatever public.* exists now and to anything created later, which\n-- is what a real project does.\ngrant select, insert, update, delete on all tables    in schema public to anon, authenticated;\ngrant usage,  select                 on all sequences in schema public to anon, authenticated;\n\nalter default privileges in schema public\n  grant select, insert, update, delete on tables to anon, authenticated;\nalter default privileges in schema public\n  grant usage, select on sequences to anon, authenticated;",
+          "endLine": 95,
+          "explanation": "Repository models Supabase default authenticated INSERT/UPDATE/DELETE grants.",
+          "id": "evidence-4",
+          "label": "Supporting control",
+          "path": "db/test/00-shim.sql",
+          "role": "propagation",
+          "startLine": 86
+        }
+      ],
+      "confidence": {
+        "level": "high",
+        "rationale": "Independently traced against the audited source; local regression failures confirm applicable SQL and browser-client behaviors."
+      },
+      "findingId": "csf_7abac90d5536985a9de18665",
+      "fingerprints": {
+        "algorithm": "codex-security/v1",
+        "primary": "codex-security/v1:sha256:f508d095d51ed61aa044b4dfa540903fabf3e172792e15e3ffa9e51ae8c40293"
+      },
+      "identity": {
+        "anchor": "deleting-an-operator-profile-bypasses-department-suspension"
+      },
+      "locations": [
+        {
+          "endLine": 54,
+          "path": "db/control-plane.sql",
+          "role": "root_control",
+          "startLine": 51
+        },
+        {
+          "endLine": 214,
+          "path": "db/control-plane.sql",
+          "startLine": 212
+        },
+        {
+          "endLine": 249,
+          "path": "db/control-plane.sql",
+          "startLine": 246
+        },
+        {
+          "endLine": 95,
+          "path": "db/test/00-shim.sql",
+          "startLine": 86
+        }
+      ],
+      "occurrenceId": "occ_4ad2ddf0e62bd3239a327e74",
+      "provenance": {
+        "candidateId": "baseline-4",
+        "originalCandidates": [
+          {
+            "attacker": "Authenticated platform operator whose department has been suspended.",
+            "confidence": "high",
+            "counterevidence": "Direct deletion or status modification of the suspended department is blocked correctly. The bypass uses its parent operator row; it does not require changing auth.users or possessing a service role key.",
+            "cwe": [
+              "CWE-863"
+            ],
+            "id": "BASE-04",
+            "impact": "The operator clears the platform suspension and suspended_note, then restores the same slug as active using the same account and tenant coordinates.",
+            "invariant": "A suspended listing cannot be removed and re-registered by its operator to clear suspension.",
+            "locations": [
+              {
+                "end_line": 54,
+                "evidence": "operator_id uuid not null references public.operators(id) on delete cascade",
+                "file": "db/control-plane.sql",
+                "start_line": 51
+              },
+              {
+                "end_line": 214,
+                "evidence": "create policy operators_self ... for all to authenticated using (id = auth.uid()) with check (id = auth.uid())",
+                "file": "db/control-plane.sql",
+                "start_line": 212
+              },
+              {
+                "end_line": 249,
+                "evidence": "departments_delete_own ... using (operator_id = auth.uid() and status <> 'suspended')",
+                "file": "db/control-plane.sql",
+                "start_line": 246
+              },
+              {
+                "end_line": 95,
+                "evidence": "Repository models Supabase default authenticated INSERT/UPDATE/DELETE grants.",
+                "file": "db/test/00-shim.sql",
+                "start_line": 86
+              }
+            ],
+            "remediation": "Restrict operator profiles to SELECT and allowed-column UPDATE, revoke direct INSERT/DELETE as appropriate, and retain moderation tombstones independently of deletable account records. Add a suspended-parent-delete regression.",
+            "rule": "Enforce moderation restrictions across cascading parent mutations",
+            "severity": "medium",
+            "source_to_sink": [
+              "operators_self grants FOR ALL to the owner's own operator row.",
+              "Deleting that row cascades through departments.operator_id.",
+              "Foreign-key cascade deletion is not filtered by the departments_delete_own RLS predicate.",
+              "The same authenticated user can insert their operator row again and call register_department for the now-free slug."
+            ],
+            "title": "Deleting an operator profile bypasses department suspension",
+            "validation_status": "Statically established from RLS, grants model and foreign-key cascade."
+          }
+        ],
+        "source": "baseline"
+      },
+      "remediation": "Restrict operator profiles to SELECT and allowed-column UPDATE, revoke direct INSERT/DELETE as appropriate, and retain moderation tombstones independently of deletable account records. Add a suspended-parent-delete regression.",
+      "remediationTests": [
+        "A suspended listing cannot be removed and re-registered by its operator to clear suspension."
+      ],
+      "rootCause": {
+        "evidenceRefs": [
+          "evidence-1",
+          "evidence-2",
+          "evidence-3",
+          "evidence-4"
+        ],
+        "summary": "operators_self grants FOR ALL to the owner's own operator row. Deleting that row cascades through departments.operator_id. Foreign-key cascade deletion is not filtered by the departments_delete_own RLS predicate. The same authenticated user can insert their operator row again and call register_department for the now-free slug."
+      },
+      "ruleId": "suspension-cascade-bypass",
+      "severity": {
+        "changeConditions": "Direct deletion or status modification of the suspended department is blocked correctly. The bypass uses its parent operator row; it does not require changing auth.users or possessing a service role key.",
+        "level": "medium",
+        "rationale": "Authenticated platform operator whose department has been suspended. The operator clears the platform suspension and suspended_note, then restores the same slug as active using the same account and tenant coordinates."
+      },
+      "summary": "The operator clears the platform suspension and suspended_note, then restores the same slug as active using the same account and tenant coordinates.",
+      "taxonomy": {
+        "category": "authorization",
+        "cwe": [
+          "CWE-863"
+        ]
+      },
+      "title": "Deleting an operator profile bypasses department suspension",
+      "validation": {
+        "evidenceRefs": [
+          "evidence-1",
+          "evidence-2",
+          "evidence-3",
+          "evidence-4"
+        ],
+        "limitations": [
+          "No deployed Supabase service was probed; source evidence describes audited revision ebe4fabb."
+        ],
+        "method": "parent source trace and applicable local regression tests",
+        "summary": "operators_self grants FOR ALL to the owner's own operator row. Deleting that row cascades through departments.operator_id. Foreign-key cascade deletion is not filtered by the departments_delete_own RLS predicate. The same authenticated user can insert their operator row again and call register_department for the now-free slug. Counterevidence: Direct deletion or status modification of the suspended department is blocked correctly. The bypass uses its parent operator row; it does not require changing auth.users or possessing a service role key."
+      }
+    },
+    {
+      "attackPath": {
+        "dataflow": {
+          "evidenceRefs": [
+            "evidence-1",
+            "evidence-2",
+            "evidence-3",
+            "evidence-4"
+          ],
+          "outcome": "One member can exhaust the tenant's storage allowance or generate costs despite a configured per-member cap, preventing legitimate members from uploading.",
+          "sink": "db/tenant-schema.sql",
+          "source": "Any active tenant member, including self-registered members of an open department.",
+          "summary": "Storage insert policy allows arbitrary objects inside the caller's folder if the caller is active. The quota trigger only runs when a separate public.files row is inserted. A direct Storage API client can omit that row entirely, or record size_bytes=0, and keep uploading objects. The ordinary browser rollback is optional from the attacker's perspective."
+        },
+        "limitations": [
+          "The source explicitly describes the cap as bounding the ordinary case and acknowledges that sizes are client claims. Bucket file_size_limit constrains each object, not total usage. Null quota intentionally means unlimited; this finding concerns departments with a configured cap."
+        ],
+        "reachability": {
+          "attacker": "Any active tenant member, including self-registered members of an open department.",
+          "entrypoint": "db/tenant-schema.sql",
+          "outcome": "One member can exhaust the tenant's storage allowance or generate costs despite a configured per-member cap, preventing legitimate members from uploading.",
+          "summary": "Any active tenant member, including self-registered members of an open department."
+        },
+        "summary": "Storage insert policy allows arbitrary objects inside the caller's folder if the caller is active. The quota trigger only runs when a separate public.files row is inserted. A direct Storage API client can omit that row entirely, or record size_bytes=0, and keep uploading objects. The ordinary browser rollback is optional from the attacker's perspective."
+      },
+      "codeEvidence": [
+        {
+          "code": "create or replace function public.enforce_member_quota()\nreturns trigger language plpgsql security definer set search_path = public as $fn$\ndeclare cap_mb integer; used bigint;\nbegin\n  select s.max_member_storage_mb into cap_mb from public.settings s where s.id;\n  if cap_mb is null then return new; end if;\n\n  select coalesce(sum(f.size_bytes), 0) into used\n    from public.files f where f.owner_id = new.owner_id;\n\n  if used + new.size_bytes > cap_mb::bigint * 1024 * 1024 then\n    raise exception 'QUOTA_EXCEEDED'\n      using hint = 'This account has reached the storage limit for this department.';\n  end if;\n\n  return new;\nend; $fn$;\n\nrevoke execute on function public.enforce_member_quota() from anon, authenticated, public;\n\ndrop trigger if exists files_quota_check on public.files;\ncreate trigger files_quota_check\n  before insert on public.files\n  for each row execute function public.enforce_member_quota();",
+          "endLine": 576,
+          "explanation": "before insert on public.files ... sum(f.size_bytes) ... used + new.size_bytes > cap_mb",
+          "id": "evidence-1",
+          "label": "Entry point and control",
+          "path": "db/tenant-schema.sql",
+          "role": "root_control",
+          "startLine": 553
+        },
+        {
+          "code": "drop policy if exists \"dept upload own folder\" on storage.objects;\ncreate policy \"dept upload own folder\" on storage.objects\n  for insert to authenticated\n  with check (\n    bucket_id = 'department-files'\n    and (storage.foldername(name))[1] = auth.uid()::text\n    and public.is_active_member()\n  );",
+          "endLine": 1223,
+          "explanation": "Storage insert check only bucket_id, foldername(name)[1] = auth.uid(), is_active_member()",
+          "id": "evidence-2",
+          "label": "Supporting control",
+          "path": "db/tenant-schema.sql",
+          "role": "propagation",
+          "startLine": 1216
+        },
+        {
+          "code": "    try {\n      const { error: uploadError } = await supabase.storage\n        .from(STORAGE_BUCKET)\n        .upload(path, file, {\n          contentType: file.type,\n          upsert: false,\n        });\n      if (uploadError) throw uploadError;\n\n      const { data: row, error: insertError } = await supabase\n        .from(\"files\")\n        .insert({\n          owner_id: userId,\n          title: title.trim().slice(0, 200),\n          description: description.trim().slice(0, 2000) || null,\n          category,\n          storage_path: path,\n          original_name: file.name.slice(0, 200),\n          mime_type: file.type,\n          size_bytes: file.size,\n          kind: kindFromMime(file.type),\n        })\n        .select(\"id\")\n        .single();\n\n      if (insertError) {\n        // Do not leave an orphaned object behind if the row could not be made.\n        // This covers the storage quota too: the cap is a trigger on this\n        // INSERT, so a refusal arrives here with the object already uploaded,\n        // and without this the upload would spend the allowance it was\n        // refused for.\n        await supabase.storage.from(STORAGE_BUCKET).remove([path]);\n        throw insertError;",
+          "endLine": 163,
+          "explanation": "Storage upload precedes files.insert; removal after quota failure happens only in client code.",
+          "id": "evidence-3",
+          "label": "Supporting control",
+          "path": "src/components/dept/UploadForm.tsx",
+          "role": "propagation",
+          "startLine": 131
+        },
+        {
+          "code": "alter table public.files drop constraint if exists files_size_sane;\nalter table public.files\n  add constraint files_size_sane\n  check (size_bytes between 0 and 52428800) not valid;",
+          "endLine": 271,
+          "explanation": "files_size_sane permits size_bytes=0",
+          "id": "evidence-4",
+          "label": "Supporting control",
+          "path": "db/tenant-schema.sql",
+          "role": "propagation",
+          "startLine": 268
+        }
+      ],
+      "confidence": {
+        "level": "high",
+        "rationale": "Independently traced against the audited source; local regression failures confirm applicable SQL and browser-client behaviors."
+      },
+      "findingId": "csf_53e73fe895730496e2d0a51e",
+      "fingerprints": {
+        "algorithm": "codex-security/v1",
+        "primary": "codex-security/v1:sha256:c89894097547c38f873646d3cad9022e0d38a700d7eb4b1b1273cc594ca19d8c"
+      },
+      "identity": {
+        "anchor": "members-can-bypass-the-configured-storage-quota-through-direct-uploads"
+      },
+      "locations": [
+        {
+          "endLine": 576,
+          "path": "db/tenant-schema.sql",
+          "role": "root_control",
+          "startLine": 553
+        },
+        {
+          "endLine": 1223,
+          "path": "db/tenant-schema.sql",
+          "startLine": 1216
+        },
+        {
+          "endLine": 163,
+          "path": "src/components/dept/UploadForm.tsx",
+          "startLine": 131
+        },
+        {
+          "endLine": 271,
+          "path": "db/tenant-schema.sql",
+          "startLine": 268
+        }
+      ],
+      "occurrenceId": "occ_4a562df0ebf14901da62374e",
+      "provenance": {
+        "candidateId": "baseline-5",
+        "originalCandidates": [
+          {
+            "attacker": "Any active tenant member, including self-registered members of an open department.",
+            "confidence": "high",
+            "counterevidence": "The source explicitly describes the cap as bounding the ordinary case and acknowledges that sizes are client claims. Bucket file_size_limit constrains each object, not total usage. Null quota intentionally means unlimited; this finding concerns departments with a configured cap.",
+            "cwe": [
+              "CWE-770",
+              "CWE-602"
+            ],
+            "id": "BASE-05",
+            "impact": "One member can exhaust the tenant's storage allowance or generate costs despite a configured per-member cap, preventing legitimate members from uploading.",
+            "invariant": "A configured max_member_storage_mb limit should bound actual bytes an individual member can allocate.",
+            "locations": [
+              {
+                "end_line": 576,
+                "evidence": "before insert on public.files ... sum(f.size_bytes) ... used + new.size_bytes > cap_mb",
+                "file": "db/tenant-schema.sql",
+                "start_line": 553
+              },
+              {
+                "end_line": 1223,
+                "evidence": "Storage insert check only bucket_id, foldername(name)[1] = auth.uid(), is_active_member()",
+                "file": "db/tenant-schema.sql",
+                "start_line": 1216
+              },
+              {
+                "end_line": 163,
+                "evidence": "Storage upload precedes files.insert; removal after quota failure happens only in client code.",
+                "file": "src/components/dept/UploadForm.tsx",
+                "start_line": 131
+              },
+              {
+                "end_line": 271,
+                "evidence": "files_size_sane permits size_bytes=0",
+                "file": "db/tenant-schema.sql",
+                "start_line": 268
+              }
+            ],
+            "remediation": "Reserve quota atomically before authorizing uploads and reconcile against trusted storage metadata, enforce aggregate usage at the storage allocation boundary, and include orphaned objects. Serialize per-member reservations.",
+            "rule": "Enforce quotas against authoritative resource consumption at allocation time",
+            "severity": "medium",
+            "source_to_sink": [
+              "Storage insert policy allows arbitrary objects inside the caller's folder if the caller is active.",
+              "The quota trigger only runs when a separate public.files row is inserted.",
+              "A direct Storage API client can omit that row entirely, or record size_bytes=0, and keep uploading objects.",
+              "The ordinary browser rollback is optional from the attacker's perspective."
+            ],
+            "title": "Members can bypass the configured storage quota through direct uploads",
+            "validation_status": "Static architecture finding; no live Storage API calls."
+          }
+        ],
+        "source": "baseline"
+      },
+      "remediation": "Reserve quota atomically before authorizing uploads and reconcile against trusted storage metadata, enforce aggregate usage at the storage allocation boundary, and include orphaned objects. Serialize per-member reservations.",
+      "remediationTests": [
+        "A configured max_member_storage_mb limit should bound actual bytes an individual member can allocate."
+      ],
+      "rootCause": {
+        "evidenceRefs": [
+          "evidence-1",
+          "evidence-2",
+          "evidence-3",
+          "evidence-4"
+        ],
+        "summary": "Storage insert policy allows arbitrary objects inside the caller's folder if the caller is active. The quota trigger only runs when a separate public.files row is inserted. A direct Storage API client can omit that row entirely, or record size_bytes=0, and keep uploading objects. The ordinary browser rollback is optional from the attacker's perspective."
+      },
+      "ruleId": "storage-quota-bypass",
+      "severity": {
+        "changeConditions": "The source explicitly describes the cap as bounding the ordinary case and acknowledges that sizes are client claims. Bucket file_size_limit constrains each object, not total usage. Null quota intentionally means unlimited; this finding concerns departments with a configured cap.",
+        "level": "medium",
+        "rationale": "Any active tenant member, including self-registered members of an open department. One member can exhaust the tenant's storage allowance or generate costs despite a configured per-member cap, preventing legitimate members from uploading."
+      },
+      "summary": "One member can exhaust the tenant's storage allowance or generate costs despite a configured per-member cap, preventing legitimate members from uploading.",
+      "taxonomy": {
+        "category": "resource-exhaustion",
+        "cwe": [
+          "CWE-770",
+          "CWE-602"
+        ]
+      },
+      "title": "Members can bypass the configured storage quota through direct uploads",
+      "validation": {
+        "evidenceRefs": [
+          "evidence-1",
+          "evidence-2",
+          "evidence-3",
+          "evidence-4"
+        ],
+        "limitations": [
+          "No deployed Supabase service was probed; source evidence describes audited revision ebe4fabb.",
+          "Hosted Storage enforcement is not reproduced by the SQL shim."
+        ],
+        "method": "parent source trace and applicable local regression tests",
+        "summary": "Storage insert policy allows arbitrary objects inside the caller's folder if the caller is active. The quota trigger only runs when a separate public.files row is inserted. A direct Storage API client can omit that row entirely, or record size_bytes=0, and keep uploading objects. The ordinary browser rollback is optional from the attacker's perspective. Counterevidence: The source explicitly describes the cap as bounding the ordinary case and acknowledges that sizes are client claims. Bucket file_size_limit constrains each object, not total usage. Null quota intentionally means unlimited; this finding concerns departments with a configured cap."
+      }
+    },
+    {
+      "attackPath": {
+        "dataflow": {
+          "evidenceRefs": [
+            "evidence-1",
+            "evidence-2",
+            "evidence-3",
+            "evidence-4"
+          ],
+          "outcome": "An ordinary member can manufacture prominent rankings and fabricated engagement/moderation indicators. Seeding view_count to the maximum integer also makes later increment_view operations overflow. Actual view page errors are caught, so this alone does not demonstrate a full page denial of service.",
+          "sink": "db/tenant-schema.sql",
+          "source": "Any active tenant member.",
+          "summary": "files_insert_own checks only owner_id and active membership. Authenticated retains table-wide INSERT while only UPDATE is reduced to descriptive columns. The caller can supply score, upvotes, downvotes, view_count, comment_count, report_count, case_number and created_at in an ordinary PostgREST insert. files_public and VaultBrowser trust and sort these stored values."
+        },
+        "limitations": [
+          "Direct UPDATE of counters is correctly denied. Vote/comment/report triggers eventually recalculate some counters when those events occur; an initial forged value can persist until such an event, and view_count increments rather than recomputes."
+        ],
+        "reachability": {
+          "attacker": "Any active tenant member.",
+          "entrypoint": "db/tenant-schema.sql",
+          "outcome": "An ordinary member can manufacture prominent rankings and fabricated engagement/moderation indicators. Seeding view_count to the maximum integer also makes later increment_view operations overflow. Actual view page errors are caught, so this alone does not demonstrate a full page denial of service.",
+          "summary": "Any active tenant member."
+        },
+        "summary": "files_insert_own checks only owner_id and active membership. Authenticated retains table-wide INSERT while only UPDATE is reduced to descriptive columns. The caller can supply score, upvotes, downvotes, view_count, comment_count, report_count, case_number and created_at in an ordinary PostgREST insert. files_public and VaultBrowser trust and sort these stored values."
+      },
+      "codeEvidence": [
+        {
+          "code": "  upvotes        integer not null default 0,\n  downvotes      integer not null default 0,\n  score          integer not null default 0,\n  comment_count  integer not null default 0,\n  report_count   integer not null default 0,\n  view_count     integer not null default 0,\n  case_number    bigserial,\n  created_at     timestamptz not null default now()",
+          "endLine": 230,
+          "explanation": "Server-maintained counters and case_number are writable columns with defaults.",
+          "id": "evidence-1",
+          "label": "Entry point and control",
+          "path": "db/tenant-schema.sql",
+          "role": "root_control",
+          "startLine": 223
+        },
+        {
+          "code": "drop policy if exists files_insert_own on public.files;\ncreate policy files_insert_own on public.files\n  for insert to authenticated with check (owner_id = auth.uid() and public.is_active_member());",
+          "endLine": 1065,
+          "explanation": "for insert ... with check (owner_id = auth.uid() and public.is_active_member())",
+          "id": "evidence-2",
+          "label": "Supporting control",
+          "path": "db/tenant-schema.sql",
+          "role": "propagation",
+          "startLine": 1063
+        },
+        {
+          "code": "revoke update on public.files from anon, authenticated;\ngrant  update (title, description, category) on public.files to authenticated;",
+          "endLine": 1087,
+          "explanation": "revoke update ... grant update(title,description,category); no INSERT column restriction",
+          "id": "evidence-3",
+          "label": "Supporting control",
+          "path": "db/tenant-schema.sql",
+          "role": "propagation",
+          "startLine": 1086
+        },
+        {
+          "code": "const SORTS: Record<SortKey, { column: string; ascending: boolean }> = {\n  top: { column: \"score\", ascending: false },\n  new: { column: \"created_at\", ascending: false },\n  worst: { column: \"score\", ascending: true },\n  views: { column: \"view_count\", ascending: false },\n  discussed: { column: \"comment_count\", ascending: false },",
+          "endLine": 23,
+          "explanation": "Sorts use score, created_at, view_count and comment_count.",
+          "id": "evidence-4",
+          "label": "Supporting control",
+          "path": "src/components/dept/VaultBrowser.tsx",
+          "role": "propagation",
+          "startLine": 18
+        }
+      ],
+      "confidence": {
+        "level": "high",
+        "rationale": "Independently traced against the audited source; local regression failures confirm applicable SQL and browser-client behaviors."
+      },
+      "findingId": "csf_628b34877c081d909b707595",
+      "fingerprints": {
+        "algorithm": "codex-security/v1",
+        "primary": "codex-security/v1:sha256:4c8e90544f2864a45c373bce6fedbda1edd95027e1d2b04aeec22dc7b0e205e2"
+      },
+      "identity": {
+        "anchor": "unrestricted-file-insert-columns-allow-forged-ranking-and-moderation-counters"
+      },
+      "locations": [
+        {
+          "endLine": 230,
+          "path": "db/tenant-schema.sql",
+          "role": "root_control",
+          "startLine": 223
+        },
+        {
+          "endLine": 1065,
+          "path": "db/tenant-schema.sql",
+          "startLine": 1063
+        },
+        {
+          "endLine": 1087,
+          "path": "db/tenant-schema.sql",
+          "startLine": 1086
+        },
+        {
+          "endLine": 23,
+          "path": "src/components/dept/VaultBrowser.tsx",
+          "startLine": 18
+        }
+      ],
+      "occurrenceId": "occ_2eaa2a59bc097de7c4108cb8",
+      "provenance": {
+        "candidateId": "baseline-6",
+        "originalCandidates": [
+          {
+            "attacker": "Any active tenant member.",
+            "confidence": "high",
+            "counterevidence": "Direct UPDATE of counters is correctly denied. Vote/comment/report triggers eventually recalculate some counters when those events occur; an initial forged value can persist until such an event, and view_count increments rather than recomputes.",
+            "cwe": [
+              "CWE-915"
+            ],
+            "id": "BASE-06",
+            "impact": "An ordinary member can manufacture prominent rankings and fabricated engagement/moderation indicators. Seeding view_count to the maximum integer also makes later increment_view operations overflow. Actual view page errors are caught, so this alone does not demonstrate a full page denial of service.",
+            "invariant": "Scores, vote totals, comment/view/report counters, case numbers and creation timestamps must be assigned by trusted database logic.",
+            "locations": [
+              {
+                "end_line": 230,
+                "evidence": "Server-maintained counters and case_number are writable columns with defaults.",
+                "file": "db/tenant-schema.sql",
+                "start_line": 223
+              },
+              {
+                "end_line": 1065,
+                "evidence": "for insert ... with check (owner_id = auth.uid() and public.is_active_member())",
+                "file": "db/tenant-schema.sql",
+                "start_line": 1063
+              },
+              {
+                "end_line": 1087,
+                "evidence": "revoke update ... grant update(title,description,category); no INSERT column restriction",
+                "file": "db/tenant-schema.sql",
+                "start_line": 1086
+              },
+              {
+                "end_line": 23,
+                "evidence": "Sorts use score, created_at, view_count and comment_count.",
+                "file": "src/components/dept/VaultBrowser.tsx",
+                "start_line": 18
+              }
+            ],
+            "remediation": "Revoke blanket INSERT and grant only uploader-supplied columns, or force protected defaults in a trusted insert function/trigger. Apply the same principle to reports.status, resolved_by and timestamps, which currently are also caller-settable on INSERT.",
+            "rule": "Protect server-maintained fields during insertion as well as update",
+            "severity": "medium",
+            "source_to_sink": [
+              "files_insert_own checks only owner_id and active membership.",
+              "Authenticated retains table-wide INSERT while only UPDATE is reduced to descriptive columns.",
+              "The caller can supply score, upvotes, downvotes, view_count, comment_count, report_count, case_number and created_at in an ordinary PostgREST insert.",
+              "files_public and VaultBrowser trust and sort these stored values."
+            ],
+            "title": "Unrestricted file INSERT columns allow forged ranking and moderation counters",
+            "validation_status": "Statically established; existing suite tests counter UPDATE rather than malicious INSERT."
+          }
+        ],
+        "source": "baseline"
+      },
+      "remediation": "Revoke blanket INSERT and grant only uploader-supplied columns, or force protected defaults in a trusted insert function/trigger. Apply the same principle to reports.status, resolved_by and timestamps, which currently are also caller-settable on INSERT.",
+      "remediationTests": [
+        "Scores, vote totals, comment/view/report counters, case numbers and creation timestamps must be assigned by trusted database logic."
+      ],
+      "rootCause": {
+        "evidenceRefs": [
+          "evidence-1",
+          "evidence-2",
+          "evidence-3",
+          "evidence-4"
+        ],
+        "summary": "files_insert_own checks only owner_id and active membership. Authenticated retains table-wide INSERT while only UPDATE is reduced to descriptive columns. The caller can supply score, upvotes, downvotes, view_count, comment_count, report_count, case_number and created_at in an ordinary PostgREST insert. files_public and VaultBrowser trust and sort these stored values."
+      },
+      "ruleId": "file-counter-mass-assignment",
+      "severity": {
+        "changeConditions": "Direct UPDATE of counters is correctly denied. Vote/comment/report triggers eventually recalculate some counters when those events occur; an initial forged value can persist until such an event, and view_count increments rather than recomputes.",
+        "level": "medium",
+        "rationale": "Any active tenant member. An ordinary member can manufacture prominent rankings and fabricated engagement/moderation indicators. Seeding view_count to the maximum integer also makes later increment_view operations overflow. Actual view page errors are caught, so this alone does not demonstrate a full page denial of service."
+      },
+      "summary": "An ordinary member can manufacture prominent rankings and fabricated engagement/moderation indicators. Seeding view_count to the maximum integer also makes later increment_view operations overflow. Actual view page errors are caught, so this alone does not demonstrate a full page denial of service.",
+      "taxonomy": {
+        "category": "data-integrity",
+        "cwe": [
+          "CWE-915"
+        ]
+      },
+      "title": "Unrestricted file INSERT columns allow forged ranking and moderation counters",
+      "validation": {
+        "evidenceRefs": [
+          "evidence-1",
+          "evidence-2",
+          "evidence-3",
+          "evidence-4"
+        ],
+        "limitations": [
+          "No deployed Supabase service was probed; source evidence describes audited revision ebe4fabb."
+        ],
+        "method": "parent source trace and applicable local regression tests",
+        "summary": "files_insert_own checks only owner_id and active membership. Authenticated retains table-wide INSERT while only UPDATE is reduced to descriptive columns. The caller can supply score, upvotes, downvotes, view_count, comment_count, report_count, case_number and created_at in an ordinary PostgREST insert. files_public and VaultBrowser trust and sort these stored values. Counterevidence: Direct UPDATE of counters is correctly denied. Vote/comment/report triggers eventually recalculate some counters when those events occur; an initial forged value can persist until such an event, and view_count increments rather than recomputes."
+      }
+    },
+    {
+      "attackPath": {
+        "dataflow": {
+          "evidenceRefs": [
+            "evidence-1",
+            "evidence-2",
+            "evidence-3"
+          ],
+          "outcome": "An attacker can send a user to an external phishing destination immediately after a successful login on the trusted site. This is a redirect flaw, not a demonstrated token leak.",
+          "sink": "src/app/account/login/page.tsx",
+          "source": "Remote attacker who sends a crafted platform login link to a victim.",
+          "summary": "The next query parameter is accepted when it starts with '/' but not '//'. A value beginning with slash-backslash, such as /\\attacker.example, passes that test. AccountLoginForm passes target to router.push after successful authentication. Next constructs a URL against window.location.href; WHATWG special-URL parsing normalizes backslash as slash, making the target a foreign authority."
+        },
+        "limitations": [
+          "Literal double-slash and javascript: destinations are rejected; tenant callbacks prepend an origin and department prefix. The exploitable path is the platform login target reaching client-side navigation."
+        ],
+        "reachability": {
+          "attacker": "Remote attacker who sends a crafted platform login link to a victim.",
+          "entrypoint": "src/app/account/login/page.tsx",
+          "outcome": "An attacker can send a user to an external phishing destination immediately after a successful login on the trusted site. This is a redirect flaw, not a demonstrated token leak.",
+          "summary": "Remote attacker who sends a crafted platform login link to a victim."
+        },
+        "summary": "The next query parameter is accepted when it starts with '/' but not '//'. A value beginning with slash-backslash, such as /\\attacker.example, passes that test. AccountLoginForm passes target to router.push after successful authentication. Next constructs a URL against window.location.href; WHATWG special-URL parsing normalizes backslash as slash, making the target a foreign authority."
+      },
+      "codeEvidence": [
+        {
+          "code": "  // Only same-site paths. An open redirect here would let a crafted link\n  // bounce someone off a trusted domain the instant they authenticate.\n  const target =\n    next && next.startsWith(\"/\") && !next.startsWith(\"//\") ? next : \"/account\";",
+          "endLine": 17,
+          "explanation": "next && next.startsWith('/') && !next.startsWith('//') ? next : '/account'",
+          "id": "evidence-1",
+          "label": "Entry point and control",
+          "path": "src/app/account/login/page.tsx",
+          "role": "root_control",
+          "startLine": 14
+        },
+        {
+          "code": "      onSignedIn={() => {\n        router.push(target);\n        router.refresh();",
+          "endLine": 19,
+          "explanation": "onSignedIn -> router.push(target)",
+          "id": "evidence-2",
+          "label": "Supporting control",
+          "path": "src/components/account/AccountLoginForm.tsx",
+          "role": "propagation",
+          "startLine": 17
+        },
+        {
+          "code": "        url = new URL((0, _addbasepath.addBasePath)(href), window.location.href);",
+          "endLine": 69,
+          "explanation": "url = new URL(addBasePath(href), window.location.href)",
+          "id": "evidence-3",
+          "label": "Supporting control",
+          "path": "node_modules/next/dist/client/components/app-router.js",
+          "role": "propagation",
+          "startLine": 69
+        }
+      ],
+      "confidence": {
+        "level": "high",
+        "rationale": "Independently traced against the audited source; local regression failures confirm applicable SQL and browser-client behaviors."
+      },
+      "findingId": "csf_fcd34680ffe9d8c5e2779782",
+      "fingerprints": {
+        "algorithm": "codex-security/v1",
+        "primary": "codex-security/v1:sha256:fd29052400014a0fc35b7df7779af101fa7e5a913dc5d2deb0887115b857f9ec"
+      },
+      "identity": {
+        "anchor": "backslash-redirect-targets-escape-the-account-login-same-origin-check"
+      },
+      "locations": [
+        {
+          "endLine": 17,
+          "path": "src/app/account/login/page.tsx",
+          "role": "root_control",
+          "startLine": 14
+        },
+        {
+          "endLine": 19,
+          "path": "src/components/account/AccountLoginForm.tsx",
+          "startLine": 17
+        },
+        {
+          "endLine": 69,
+          "path": "node_modules/next/dist/client/components/app-router.js",
+          "startLine": 69
+        }
+      ],
+      "occurrenceId": "occ_cea8d5716a13ceab1e502d7e",
+      "provenance": {
+        "candidateId": "baseline-7",
+        "originalCandidates": [
+          {
+            "attacker": "Remote attacker who sends a crafted platform login link to a victim.",
+            "confidence": "high",
+            "counterevidence": "Literal double-slash and javascript: destinations are rejected; tenant callbacks prepend an origin and department prefix. The exploitable path is the platform login target reaching client-side navigation.",
+            "cwe": [
+              "CWE-601"
+            ],
+            "id": "BASE-07",
+            "impact": "An attacker can send a user to an external phishing destination immediately after a successful login on the trusted site. This is a redirect flaw, not a demonstrated token leak.",
+            "invariant": "The post-login next destination must remain on the application origin.",
+            "locations": [
+              {
+                "end_line": 17,
+                "evidence": "next && next.startsWith('/') && !next.startsWith('//') ? next : '/account'",
+                "file": "src/app/account/login/page.tsx",
+                "start_line": 14
+              },
+              {
+                "end_line": 19,
+                "evidence": "onSignedIn -> router.push(target)",
+                "file": "src/components/account/AccountLoginForm.tsx",
+                "start_line": 17
+              },
+              {
+                "end_line": 69,
+                "evidence": "url = new URL(addBasePath(href), window.location.href)",
+                "file": "node_modules/next/dist/client/components/app-router.js",
+                "start_line": 69
+              }
+            ],
+            "remediation": "Reject backslashes/control characters, parse with a trusted base origin, and require exact origin equality before returning a normalized local pathname/search/hash. Add slash-backslash encoded regression cases.",
+            "rule": "Validate redirect targets after URL normalization",
+            "severity": "medium",
+            "source_to_sink": [
+              "The next query parameter is accepted when it starts with '/' but not '//'.",
+              "A value beginning with slash-backslash, such as /\\attacker.example, passes that test.",
+              "AccountLoginForm passes target to router.push after successful authentication.",
+              "Next constructs a URL against window.location.href; WHATWG special-URL parsing normalizes backslash as slash, making the target a foreign authority."
+            ],
+            "title": "Backslash redirect targets escape the account login same-origin check",
+            "validation_status": "Static source trace plus standardized URL parsing semantics; no browser execution by this auditor."
+          }
+        ],
+        "source": "baseline"
+      },
+      "remediation": "Reject backslashes/control characters, parse with a trusted base origin, and require exact origin equality before returning a normalized local pathname/search/hash. Add slash-backslash encoded regression cases.",
+      "remediationTests": [
+        "The post-login next destination must remain on the application origin."
+      ],
+      "rootCause": {
+        "evidenceRefs": [
+          "evidence-1",
+          "evidence-2",
+          "evidence-3"
+        ],
+        "summary": "The next query parameter is accepted when it starts with '/' but not '//'. A value beginning with slash-backslash, such as /\\attacker.example, passes that test. AccountLoginForm passes target to router.push after successful authentication. Next constructs a URL against window.location.href; WHATWG special-URL parsing normalizes backslash as slash, making the target a foreign authority."
+      },
+      "ruleId": "login-open-redirect",
+      "severity": {
+        "changeConditions": "Literal double-slash and javascript: destinations are rejected; tenant callbacks prepend an origin and department prefix. The exploitable path is the platform login target reaching client-side navigation.",
+        "level": "medium",
+        "rationale": "Remote attacker who sends a crafted platform login link to a victim. An attacker can send a user to an external phishing destination immediately after a successful login on the trusted site. This is a redirect flaw, not a demonstrated token leak."
+      },
+      "summary": "An attacker can send a user to an external phishing destination immediately after a successful login on the trusted site. This is a redirect flaw, not a demonstrated token leak.",
+      "taxonomy": {
+        "category": "redirect-validation",
+        "cwe": [
+          "CWE-601"
+        ]
+      },
+      "title": "Backslash redirect targets escape the account login same-origin check",
+      "validation": {
+        "evidenceRefs": [
+          "evidence-1",
+          "evidence-2",
+          "evidence-3"
+        ],
+        "limitations": [
+          "No deployed Supabase service was probed; source evidence describes audited revision ebe4fabb."
+        ],
+        "method": "parent source trace and applicable local regression tests",
+        "summary": "The next query parameter is accepted when it starts with '/' but not '//'. A value beginning with slash-backslash, such as /\\attacker.example, passes that test. AccountLoginForm passes target to router.push after successful authentication. Next constructs a URL against window.location.href; WHATWG special-URL parsing normalizes backslash as slash, making the target a foreign authority. Counterevidence: Literal double-slash and javascript: destinations are rejected; tenant callbacks prepend an origin and department prefix. The exploitable path is the platform login target reaching client-side navigation."
+      }
+    },
+    {
+      "attackPath": {
+        "dataflow": {
+          "evidenceRefs": [
+            "evidence-1",
+            "evidence-2",
+            "evidence-3",
+            "evidence-4"
+          ],
+          "outcome": "A member can fill storage and push legitimate older complaints out of the administrator's visible queue using reports that name no content. Arbitrary client-supplied creation timestamps can make the malicious rows remain first.",
+          "sink": "db/tenant-schema.sql",
+          "source": "Any active tenant member.",
+          "summary": "Both reports.file_id and reports.comment_id are nullable with no exactly-one-target CHECK. The insert policy checks only reporter_id and active membership. The uniqueness index only covers non-null file_id. A caller inserts unlimited rows with both targets NULL, or duplicates reports for a single comment. Administration selects only the newest 200 reports."
+        },
+        "limitations": [
+          "File reports are deduplicated, reasons/details are bounded, and nonmembers cannot insert. These controls do not cover NULL targets or duplicate comment targets."
+        ],
+        "reachability": {
+          "attacker": "Any active tenant member.",
+          "entrypoint": "db/tenant-schema.sql",
+          "outcome": "A member can fill storage and push legitimate older complaints out of the administrator's visible queue using reports that name no content. Arbitrary client-supplied creation timestamps can make the malicious rows remain first.",
+          "summary": "Any active tenant member."
+        },
+        "summary": "Both reports.file_id and reports.comment_id are nullable with no exactly-one-target CHECK. The insert policy checks only reporter_id and active membership. The uniqueness index only covers non-null file_id. A caller inserts unlimited rows with both targets NULL, or duplicates reports for a single comment. Administration selects only the newest 200 reports."
+      },
+      "codeEvidence": [
+        {
+          "code": "create table if not exists public.reports (\n  id           uuid primary key default gen_random_uuid(),\n  file_id      uuid references public.files(id) on delete cascade,\n  comment_id   uuid references public.comments(id) on delete cascade,\n  reporter_id  uuid not null references public.profiles(id) on delete cascade,\n  reason       text not null,\n  details      text,\n  status       text not null default 'open' check (status in ('open','resolved','dismissed')),\n  created_at   timestamptz not null default now(),\n  resolved_at  timestamptz,\n  resolved_by  uuid references public.profiles(id) on delete set null\n);",
+          "endLine": 332,
+          "explanation": "file_id uuid references ...; comment_id uuid references ...; both nullable",
+          "id": "evidence-1",
+          "label": "Entry point and control",
+          "path": "db/tenant-schema.sql",
+          "role": "root_control",
+          "startLine": 321
+        },
+        {
+          "code": "create unique index if not exists reports_one_per_file_idx\n  on public.reports (file_id, reporter_id) where file_id is not null;",
+          "endLine": 352,
+          "explanation": "unique ... (file_id, reporter_id) where file_id is not null",
+          "id": "evidence-2",
+          "label": "Supporting control",
+          "path": "db/tenant-schema.sql",
+          "role": "propagation",
+          "startLine": 351
+        },
+        {
+          "code": "drop policy if exists reports_insert on public.reports;\ncreate policy reports_insert on public.reports\n  for insert to authenticated with check (reporter_id = auth.uid() and public.is_active_member());",
+          "endLine": 1133,
+          "explanation": "reports_insert only requires reporter_id=auth.uid() and is_active_member()",
+          "id": "evidence-3",
+          "label": "Supporting control",
+          "path": "db/tenant-schema.sql",
+          "role": "propagation",
+          "startLine": 1131
+        },
+        {
+          "code": "    supabase\n      .from(\"reports\")\n      .select(\"id, file_id, reporter_id, reason, details, status, created_at\")\n      .order(\"created_at\", { ascending: false })\n      .limit(200),",
+          "endLine": 59,
+          "explanation": "reports order(created_at descending).limit(200)",
+          "id": "evidence-4",
+          "label": "Supporting control",
+          "path": "src/app/d/[slug]/admin/page.tsx",
+          "role": "propagation",
+          "startLine": 55
+        }
+      ],
+      "confidence": {
+        "level": "high",
+        "rationale": "Independently traced against the audited source; local regression failures confirm applicable SQL and browser-client behaviors."
+      },
+      "findingId": "csf_5ebbfe0bb260ed71c5db4e29",
+      "fingerprints": {
+        "algorithm": "codex-security/v1",
+        "primary": "codex-security/v1:sha256:9f505c9335e3dc03ae135add8cd184c086f55257988fbbf1f526298a5dedecfe"
+      },
+      "identity": {
+        "anchor": "targetless-reports-bypass-duplicate-protection-and-bury-the-moderation-queue"
+      },
+      "locations": [
+        {
+          "endLine": 332,
+          "path": "db/tenant-schema.sql",
+          "role": "root_control",
+          "startLine": 321
+        },
+        {
+          "endLine": 352,
+          "path": "db/tenant-schema.sql",
+          "startLine": 351
+        },
+        {
+          "endLine": 1133,
+          "path": "db/tenant-schema.sql",
+          "startLine": 1131
+        },
+        {
+          "endLine": 59,
+          "path": "src/app/d/[slug]/admin/page.tsx",
+          "startLine": 55
+        }
+      ],
+      "occurrenceId": "occ_8c7b7c073b7a7cedc016cb50",
+      "provenance": {
+        "candidateId": "baseline-8",
+        "originalCandidates": [
+          {
+            "attacker": "Any active tenant member.",
+            "confidence": "high",
+            "counterevidence": "File reports are deduplicated, reasons/details are bounded, and nonmembers cannot insert. These controls do not cover NULL targets or duplicate comment targets.",
+            "cwe": [
+              "CWE-770",
+              "CWE-20"
+            ],
+            "id": "BASE-08",
+            "impact": "A member can fill storage and push legitimate older complaints out of the administrator's visible queue using reports that name no content. Arbitrary client-supplied creation timestamps can make the malicious rows remain first.",
+            "invariant": "Each report must identify exactly one real exhibit or comment, and repeated complaints must not flood moderation.",
+            "locations": [
+              {
+                "end_line": 332,
+                "evidence": "file_id uuid references ...; comment_id uuid references ...; both nullable",
+                "file": "db/tenant-schema.sql",
+                "start_line": 321
+              },
+              {
+                "end_line": 352,
+                "evidence": "unique ... (file_id, reporter_id) where file_id is not null",
+                "file": "db/tenant-schema.sql",
+                "start_line": 351
+              },
+              {
+                "end_line": 1133,
+                "evidence": "reports_insert only requires reporter_id=auth.uid() and is_active_member()",
+                "file": "db/tenant-schema.sql",
+                "start_line": 1131
+              },
+              {
+                "end_line": 59,
+                "evidence": "reports order(created_at descending).limit(200)",
+                "file": "src/app/d/[slug]/admin/page.tsx",
+                "start_line": 55
+              }
+            ],
+            "remediation": "Require exactly one non-null target, add unique protection for comment reports, protect server-managed timestamps/status columns, and use a bounded submission RPC with pagination for administrator access.",
+            "rule": "Require a valid report target and bound report creation",
+            "severity": "medium",
+            "source_to_sink": [
+              "Both reports.file_id and reports.comment_id are nullable with no exactly-one-target CHECK.",
+              "The insert policy checks only reporter_id and active membership.",
+              "The uniqueness index only covers non-null file_id.",
+              "A caller inserts unlimited rows with both targets NULL, or duplicates reports for a single comment.",
+              "Administration selects only the newest 200 reports."
+            ],
+            "title": "Targetless reports bypass duplicate protection and bury the moderation queue",
+            "validation_status": "Statically established; no runtime database changes."
+          }
+        ],
+        "source": "baseline"
+      },
+      "remediation": "Require exactly one non-null target, add unique protection for comment reports, protect server-managed timestamps/status columns, and use a bounded submission RPC with pagination for administrator access.",
+      "remediationTests": [
+        "Each report must identify exactly one real exhibit or comment, and repeated complaints must not flood moderation."
+      ],
+      "rootCause": {
+        "evidenceRefs": [
+          "evidence-1",
+          "evidence-2",
+          "evidence-3",
+          "evidence-4"
+        ],
+        "summary": "Both reports.file_id and reports.comment_id are nullable with no exactly-one-target CHECK. The insert policy checks only reporter_id and active membership. The uniqueness index only covers non-null file_id. A caller inserts unlimited rows with both targets NULL, or duplicates reports for a single comment. Administration selects only the newest 200 reports."
+      },
+      "ruleId": "targetless-report-flood",
+      "severity": {
+        "changeConditions": "File reports are deduplicated, reasons/details are bounded, and nonmembers cannot insert. These controls do not cover NULL targets or duplicate comment targets.",
+        "level": "medium",
+        "rationale": "Any active tenant member. A member can fill storage and push legitimate older complaints out of the administrator's visible queue using reports that name no content. Arbitrary client-supplied creation timestamps can make the malicious rows remain first."
+      },
+      "summary": "A member can fill storage and push legitimate older complaints out of the administrator's visible queue using reports that name no content. Arbitrary client-supplied creation timestamps can make the malicious rows remain first.",
+      "taxonomy": {
+        "category": "resource-exhaustion",
+        "cwe": [
+          "CWE-770",
+          "CWE-20"
+        ]
+      },
+      "title": "Targetless reports bypass duplicate protection and bury the moderation queue",
+      "validation": {
+        "evidenceRefs": [
+          "evidence-1",
+          "evidence-2",
+          "evidence-3",
+          "evidence-4"
+        ],
+        "limitations": [
+          "No deployed Supabase service was probed; source evidence describes audited revision ebe4fabb."
+        ],
+        "method": "parent source trace and applicable local regression tests",
+        "summary": "Both reports.file_id and reports.comment_id are nullable with no exactly-one-target CHECK. The insert policy checks only reporter_id and active membership. The uniqueness index only covers non-null file_id. A caller inserts unlimited rows with both targets NULL, or duplicates reports for a single comment. Administration selects only the newest 200 reports. Counterevidence: File reports are deduplicated, reasons/details are bounded, and nonmembers cannot insert. These controls do not cover NULL targets or duplicate comment targets."
+      }
+    },
+    {
+      "attackPath": {
+        "dataflow": {
+          "evidenceRefs": [
+            "evidence-1",
+            "evidence-2",
+            "evidence-3"
+          ],
+          "outcome": "A single account reserves more slugs than the intended cap permits, undermining the repository's anti-squatting restriction.",
+          "sink": "db/control-plane.sql",
+          "source": "Authenticated platform operator sending concurrent registration RPCs for distinct available slugs.",
+          "summary": "register_department separately counts existing operator rows and checks the limit. No operator-row lock or advisory lock spans the count and insert. Concurrent transactions can all observe the same below-limit count and insert different slugs. The slug primary key only prevents duplicate slugs, not excess departments per operator."
+        },
+        "limitations": [
+          "Sequential requests hit the cap and duplicate-slug races are caught. This finding requires concurrent distinct-slug transactions; it is not proof of unlimited serial registration."
+        ],
+        "reachability": {
+          "attacker": "Authenticated platform operator sending concurrent registration RPCs for distinct available slugs.",
+          "entrypoint": "db/control-plane.sql",
+          "outcome": "A single account reserves more slugs than the intended cap permits, undermining the repository's anti-squatting restriction.",
+          "summary": "Authenticated platform operator sending concurrent registration RPCs for distinct available slugs."
+        },
+        "summary": "register_department separately counts existing operator rows and checks the limit. No operator-row lock or advisory lock spans the count and insert. Concurrent transactions can all observe the same below-limit count and insert different slugs. The slug primary key only prevents duplicate slugs, not excess departments per operator."
+      },
+      "codeEvidence": [
+        {
+          "code": "create or replace function public.max_departments_per_operator()\nreturns integer language sql immutable set search_path = public\nas $fn$ select 3; $fn$;",
+          "endLine": 370,
+          "explanation": "max_departments_per_operator returns 3",
+          "id": "evidence-1",
+          "label": "Entry point and control",
+          "path": "db/control-plane.sql",
+          "role": "root_control",
+          "startLine": 368
+        },
+        {
+          "code": "  if auth.uid() is null then raise exception 'NOT_SIGNED_IN'; end if;\n\n  select count(*) into owned\n    from public.departments d where d.operator_id = auth.uid();\n  if owned >= public.max_departments_per_operator() then\n    raise exception 'TOO_MANY_DEPARTMENTS';\n  end if;\n\n  if not public.slug_available(clean) then raise exception 'SLUG_UNAVAILABLE'; end if;\n\n  -- The constraint on the column would catch this anyway; raising here gives\n  -- the wizard the same named error it already knows how to explain, instead\n  -- of a check-constraint violation it would have to translate.\n  if public.looks_like_secret_key(trim(key)) then\n    raise exception 'SECRET_KEY';\n  end if;\n\n  insert into public.departments\n    (slug, operator_id, supabase_url, anon_key, display_name, tagline, visibility)\n  values (clean, auth.uid(), trim(url), trim(key), name, tag,\n          case when vis = 'public' then 'public' else 'unlisted' end);",
+          "endLine": 401,
+          "explanation": "count departments by auth.uid(); check count; independently insert requested slug",
+          "id": "evidence-2",
+          "label": "Supporting control",
+          "path": "db/control-plane.sql",
+          "role": "propagation",
+          "startLine": 381
+        },
+        {
+          "code": "exception\n  -- The check above is advisory: two people can pass it in the same instant\n  -- and both reach the INSERT. `slug` is the primary key, so the loser gets a\n  -- unique violation -- translated here into the same error the pre-check\n  -- raises, so the caller has one case to handle rather than two.\n  when unique_violation then\n    raise exception 'SLUG_UNAVAILABLE';",
+          "endLine": 411,
+          "explanation": "unique_violation handler protects slug uniqueness only",
+          "id": "evidence-3",
+          "label": "Supporting control",
+          "path": "db/control-plane.sql",
+          "role": "propagation",
+          "startLine": 405
+        }
+      ],
+      "confidence": {
+        "level": "high",
+        "rationale": "Independently traced against the audited source; local regression failures confirm applicable SQL and browser-client behaviors."
+      },
+      "findingId": "csf_f82cb95776db4011a6dfcbdb",
+      "fingerprints": {
+        "algorithm": "codex-security/v1",
+        "primary": "codex-security/v1:sha256:175b7c1f549b176779667e9faa9c980343a1f0e0c9c0fb3a9f479f459a10416b"
+      },
+      "identity": {
+        "anchor": "concurrent-registration-bypasses-the-three-department-account-cap"
+      },
+      "locations": [
+        {
+          "endLine": 370,
+          "path": "db/control-plane.sql",
+          "role": "root_control",
+          "startLine": 368
+        },
+        {
+          "endLine": 401,
+          "path": "db/control-plane.sql",
+          "startLine": 381
+        },
+        {
+          "endLine": 411,
+          "path": "db/control-plane.sql",
+          "startLine": 405
+        }
+      ],
+      "occurrenceId": "occ_b7d6b9b509b75f031585415f",
+      "provenance": {
+        "candidateId": "baseline-9",
+        "originalCandidates": [
+          {
+            "attacker": "Authenticated platform operator sending concurrent registration RPCs for distinct available slugs.",
+            "confidence": "high",
+            "counterevidence": "Sequential requests hit the cap and duplicate-slug races are caught. This finding requires concurrent distinct-slug transactions; it is not proof of unlimited serial registration.",
+            "cwe": [
+              "CWE-362",
+              "CWE-367"
+            ],
+            "id": "BASE-09",
+            "impact": "A single account reserves more slugs than the intended cap permits, undermining the repository's anti-squatting restriction.",
+            "invariant": "One operator may register no more than max_departments_per_operator() departments.",
+            "locations": [
+              {
+                "end_line": 370,
+                "evidence": "max_departments_per_operator returns 3",
+                "file": "db/control-plane.sql",
+                "start_line": 368
+              },
+              {
+                "end_line": 401,
+                "evidence": "count departments by auth.uid(); check count; independently insert requested slug",
+                "file": "db/control-plane.sql",
+                "start_line": 381
+              },
+              {
+                "end_line": 411,
+                "evidence": "unique_violation handler protects slug uniqueness only",
+                "file": "db/control-plane.sql",
+                "start_line": 405
+              }
+            ],
+            "remediation": "Lock the caller's operator row before counting and keep the lock through insertion, or use an equivalent per-operator transaction lock. Also inspect report_department's separate count/insert cap for the same concurrency shape.",
+            "rule": "Serialize authorization-relevant count-and-insert decisions",
+            "severity": "medium",
+            "source_to_sink": [
+              "register_department separately counts existing operator rows and checks the limit.",
+              "No operator-row lock or advisory lock spans the count and insert.",
+              "Concurrent transactions can all observe the same below-limit count and insert different slugs.",
+              "The slug primary key only prevents duplicate slugs, not excess departments per operator."
+            ],
+            "title": "Concurrent registration bypasses the three-department account cap",
+            "validation_status": "Static concurrency finding; not dynamically reproduced."
+          }
+        ],
+        "source": "baseline"
+      },
+      "remediation": "Lock the caller's operator row before counting and keep the lock through insertion, or use an equivalent per-operator transaction lock. Also inspect report_department's separate count/insert cap for the same concurrency shape.",
+      "remediationTests": [
+        "One operator may register no more than max_departments_per_operator() departments."
+      ],
+      "rootCause": {
+        "evidenceRefs": [
+          "evidence-1",
+          "evidence-2",
+          "evidence-3"
+        ],
+        "summary": "register_department separately counts existing operator rows and checks the limit. No operator-row lock or advisory lock spans the count and insert. Concurrent transactions can all observe the same below-limit count and insert different slugs. The slug primary key only prevents duplicate slugs, not excess departments per operator."
+      },
+      "ruleId": "registration-cap-race",
+      "severity": {
+        "changeConditions": "Sequential requests hit the cap and duplicate-slug races are caught. This finding requires concurrent distinct-slug transactions; it is not proof of unlimited serial registration.",
+        "level": "medium",
+        "rationale": "Authenticated platform operator sending concurrent registration RPCs for distinct available slugs. A single account reserves more slugs than the intended cap permits, undermining the repository's anti-squatting restriction."
+      },
+      "summary": "A single account reserves more slugs than the intended cap permits, undermining the repository's anti-squatting restriction.",
+      "taxonomy": {
+        "category": "concurrency",
+        "cwe": [
+          "CWE-362",
+          "CWE-367"
+        ]
+      },
+      "title": "Concurrent registration bypasses the three-department account cap",
+      "validation": {
+        "evidenceRefs": [
+          "evidence-1",
+          "evidence-2",
+          "evidence-3"
+        ],
+        "limitations": [
+          "No deployed Supabase service was probed; source evidence describes audited revision ebe4fabb.",
+          "Concurrency proof is static; local PostgreSQL WASM uses one backend."
+        ],
+        "method": "parent source trace and applicable local regression tests",
+        "summary": "register_department separately counts existing operator rows and checks the limit. No operator-row lock or advisory lock spans the count and insert. Concurrent transactions can all observe the same below-limit count and insert different slugs. The slug primary key only prevents duplicate slugs, not excess departments per operator. Counterevidence: Sequential requests hit the cap and duplicate-slug races are caught. This finding requires concurrent distinct-slug transactions; it is not proof of unlimited serial registration."
+      }
+    },
+    {
+      "attackPath": {
+        "dataflow": {
+          "evidenceRefs": [
+            "evidence-1",
+            "evidence-2",
+            "evidence-3"
+          ],
+          "outcome": "A banned user can continue changing the name displayed on their historic files/comments; members can choose overlong, whitespace or confusable names that bypass the intended identity rules. RLS still prevents flag escalation.",
+          "sink": "db/tenant-schema.sql",
+          "source": "Banned tenant member with a still-valid session, or any active member choosing a deceptive name.",
+          "summary": "claim_username checks active membership and the ASCII username pattern. profiles_update_self instead allows the caller's own row without an active-member check. Authenticated is explicitly granted direct username UPDATE and profiles_read permits signed-in reads. The profiles table lacks a matching username format/length CHECK."
+        },
+        "limitations": [
+          "Username uniqueness is enforced case-insensitively and flags cannot be directly updated. This is identity/moderation integrity, not administrator escalation or demonstrated XSS."
+        ],
+        "reachability": {
+          "attacker": "Banned tenant member with a still-valid session, or any active member choosing a deceptive name.",
+          "entrypoint": "db/tenant-schema.sql",
+          "outcome": "A banned user can continue changing the name displayed on their historic files/comments; members can choose overlong, whitespace or confusable names that bypass the intended identity rules. RLS still prevents flag escalation.",
+          "summary": "Banned tenant member with a still-valid session, or any active member choosing a deceptive name."
+        },
+        "summary": "claim_username checks active membership and the ASCII username pattern. profiles_update_self instead allows the caller's own row without an active-member check. Authenticated is explicitly granted direct username UPDATE and profiles_read permits signed-in reads. The profiles table lacks a matching username format/length CHECK."
+      },
+      "codeEvidence": [
+        {
+          "code": "create or replace function public.claim_username(desired text)\nreturns text language plpgsql security definer set search_path = public as $fn$\ndeclare clean text := trim(desired);\nbegin\n  -- Every other member RPC checks this. Without it a banned member could go on\n  -- renaming themselves -- and the name is the one thing of theirs that the\n  -- members who can still read the archive see.\n  if not public.is_active_member() then raise exception 'NOT_A_MEMBER'; end if;\n  if clean !~ '^[A-Za-z0-9_-]{3,20}$' then raise exception 'USERNAME_INVALID'; end if;\n  if exists (select 1 from public.profiles p\n              where lower(p.username) = lower(clean) and p.id <> auth.uid()) then\n    raise exception 'USERNAME_TAKEN';\n  end if;\n  update public.profiles set username = clean where id = auth.uid();\n  return clean;",
+          "endLine": 671,
+          "explanation": "claim_username checks is_active_member and ^[A-Za-z0-9_-]{3,20}$",
+          "id": "evidence-1",
+          "label": "Entry point and control",
+          "path": "db/tenant-schema.sql",
+          "role": "root_control",
+          "startLine": 657
+        },
+        {
+          "code": "drop policy if exists profiles_read on public.profiles;\ncreate policy profiles_read on public.profiles\n  for select to authenticated using (true);\n\ndrop policy if exists profiles_update_self on public.profiles;\ncreate policy profiles_update_self on public.profiles\n  for update to authenticated using (id = auth.uid()) with check (id = auth.uid());",
+          "endLine": 1019,
+          "explanation": "profiles_read using(true); profiles_update_self using(id=auth.uid())",
+          "id": "evidence-2",
+          "label": "Supporting control",
+          "path": "db/tenant-schema.sql",
+          "role": "propagation",
+          "startLine": 1013
+        },
+        {
+          "code": "revoke update on public.profiles from anon, authenticated;\ngrant  update (username) on public.profiles to authenticated;",
+          "endLine": 1038,
+          "explanation": "grant update(username) on public.profiles to authenticated",
+          "id": "evidence-3",
+          "label": "Supporting control",
+          "path": "db/tenant-schema.sql",
+          "role": "propagation",
+          "startLine": 1037
+        }
+      ],
+      "confidence": {
+        "level": "high",
+        "rationale": "Independently traced against the audited source; local regression failures confirm applicable SQL and browser-client behaviors."
+      },
+      "findingId": "csf_fbaf6ca7db24cede5fbb0b7c",
+      "fingerprints": {
+        "algorithm": "codex-security/v1",
+        "primary": "codex-security/v1:sha256:dae30feacbdfeb476876932ffa1d98b9699f5934e02d26f81bc107d121932ff0"
+      },
+      "identity": {
+        "anchor": "direct-profile-updates-bypass-banned-member-and-username-validation"
+      },
+      "locations": [
+        {
+          "endLine": 671,
+          "path": "db/tenant-schema.sql",
+          "role": "root_control",
+          "startLine": 657
+        },
+        {
+          "endLine": 1019,
+          "path": "db/tenant-schema.sql",
+          "startLine": 1013
+        },
+        {
+          "endLine": 1038,
+          "path": "db/tenant-schema.sql",
+          "startLine": 1037
+        }
+      ],
+      "occurrenceId": "occ_2216f801f0a62c1cf28b3d04",
+      "provenance": {
+        "candidateId": "baseline-10",
+        "originalCandidates": [
+          {
+            "attacker": "Banned tenant member with a still-valid session, or any active member choosing a deceptive name.",
+            "confidence": "high",
+            "counterevidence": "Username uniqueness is enforced case-insensitively and flags cannot be directly updated. This is identity/moderation integrity, not administrator escalation or demonstrated XSS.",
+            "cwe": [
+              "CWE-863",
+              "CWE-20"
+            ],
+            "id": "BASE-10",
+            "impact": "A banned user can continue changing the name displayed on their historic files/comments; members can choose overlong, whitespace or confusable names that bypass the intended identity rules. RLS still prevents flag escalation.",
+            "invariant": "Banned members cannot keep changing their displayed identity; usernames must follow claim_username's 3\u201320 ASCII-character rule.",
+            "locations": [
+              {
+                "end_line": 671,
+                "evidence": "claim_username checks is_active_member and ^[A-Za-z0-9_-]{3,20}$",
+                "file": "db/tenant-schema.sql",
+                "start_line": 657
+              },
+              {
+                "end_line": 1019,
+                "evidence": "profiles_read using(true); profiles_update_self using(id=auth.uid())",
+                "file": "db/tenant-schema.sql",
+                "start_line": 1013
+              },
+              {
+                "end_line": 1038,
+                "evidence": "grant update(username) on public.profiles to authenticated",
+                "file": "db/tenant-schema.sql",
+                "start_line": 1037
+              }
+            ],
+            "remediation": "Require active membership in the direct UPDATE policy and add a matching nullable username CHECK, or remove direct username UPDATE and route changes only through claim_username.",
+            "rule": "Enforce identity mutation rules on every database write path",
+            "severity": "low",
+            "source_to_sink": [
+              "claim_username checks active membership and the ASCII username pattern.",
+              "profiles_update_self instead allows the caller's own row without an active-member check.",
+              "Authenticated is explicitly granted direct username UPDATE and profiles_read permits signed-in reads.",
+              "The profiles table lacks a matching username format/length CHECK."
+            ],
+            "title": "Direct profile updates bypass banned-member and username validation",
+            "validation_status": "Statically established."
+          }
+        ],
+        "source": "baseline"
+      },
+      "remediation": "Require active membership in the direct UPDATE policy and add a matching nullable username CHECK, or remove direct username UPDATE and route changes only through claim_username.",
+      "remediationTests": [
+        "Banned members cannot keep changing their displayed identity; usernames must follow claim_username's 3\u201320 ASCII-character rule."
+      ],
+      "rootCause": {
+        "evidenceRefs": [
+          "evidence-1",
+          "evidence-2",
+          "evidence-3"
+        ],
+        "summary": "claim_username checks active membership and the ASCII username pattern. profiles_update_self instead allows the caller's own row without an active-member check. Authenticated is explicitly granted direct username UPDATE and profiles_read permits signed-in reads. The profiles table lacks a matching username format/length CHECK."
+      },
+      "ruleId": "profile-update-bypass",
+      "severity": {
+        "changeConditions": "Username uniqueness is enforced case-insensitively and flags cannot be directly updated. This is identity/moderation integrity, not administrator escalation or demonstrated XSS.",
+        "level": "low",
+        "rationale": "Banned tenant member with a still-valid session, or any active member choosing a deceptive name. A banned user can continue changing the name displayed on their historic files/comments; members can choose overlong, whitespace or confusable names that bypass the intended identity rules. RLS still prevents flag escalation."
+      },
+      "summary": "A banned user can continue changing the name displayed on their historic files/comments; members can choose overlong, whitespace or confusable names that bypass the intended identity rules. RLS still prevents flag escalation.",
+      "taxonomy": {
+        "category": "authorization",
+        "cwe": [
+          "CWE-863",
+          "CWE-20"
+        ]
+      },
+      "title": "Direct profile updates bypass banned-member and username validation",
+      "validation": {
+        "evidenceRefs": [
+          "evidence-1",
+          "evidence-2",
+          "evidence-3"
+        ],
+        "limitations": [
+          "No deployed Supabase service was probed; source evidence describes audited revision ebe4fabb."
+        ],
+        "method": "parent source trace and applicable local regression tests",
+        "summary": "claim_username checks active membership and the ASCII username pattern. profiles_update_self instead allows the caller's own row without an active-member check. Authenticated is explicitly granted direct username UPDATE and profiles_read permits signed-in reads. The profiles table lacks a matching username format/length CHECK. Counterevidence: Username uniqueness is enforced case-insensitively and flags cannot be directly updated. This is identity/moderation integrity, not administrator escalation or demonstrated XSS."
+      }
+    },
+    {
+      "attackPath": {
+        "dataflow": {
+          "evidenceRefs": [
+            "oauth-initial-binding",
+            "oauth-later-provision",
+            "oauth-later-status",
+            "oauth-later-delete",
+            "oauth-cookie",
+            "oauth-retention"
+          ],
+          "outcome": "Use of the previous operator's Management API authorization: organization names, project creation, arbitrary database changes to a known project accessible to that token, and potentially project deletion after creating an owned directory reference.",
+          "sink": "Supabase Management API consumers in setup routes",
+          "source": "A separate valid control-plane account and access to the same browser profile after the previous operator changes/clears their control account, while the /api/setup token cookie remains valid. No prior authority over the original operator's Supabase organization is assumed.",
+          "summary": "The cookie envelope omits originating user ID, purpose and server-checked expiry. Consumers check only that a current control user exists, then decrypt the raw token independently of that identity."
+        },
+        "limitations": [
+          "PKCE and state validation correctly prevent a callback from being completed under a different current account. The defect occurs only after that validation.",
+          "AES-GCM and httpOnly protect token modification and ordinary script reading; they do not bind later use to the authorizing account.",
+          "Without a surviving token cookie, logging into a separate control account grants no Supabase Management access.",
+          "A caller executing SQL with their own Management token already owns that authority; it is not classified as a vulnerability.",
+          "A person retaining an already-authenticated victim browser session already has authority; this finding specifically requires replacement/clearance of the original control identity with a separate account while the independent setup cookie remains. No public remote exploit is claimed."
+        ],
+        "reachability": {
+          "attacker": "A separate valid control-plane account and access to the same browser profile after the previous operator changes/clears their control account, while the /api/setup token cookie remains valid. No prior authority over the original operator's Supabase organization is assumed.",
+          "entrypoint": "/api/setup/oauth/status, /api/setup/provision, /api/setup/deprovision",
+          "outcome": "Use of the previous operator's Management API authorization: organization names, project creation, arbitrary database changes to a known project accessible to that token, and potentially project deletion after creating an owned directory reference.",
+          "summary": "OAuth setup is configured and the previous operator authorized it. The token remains because setup is unfinished, resumes, encounters one of the non-clearing early exits, or was acquired for deletion before use. The different account uses the same browser cookie jar before external access-token expiry. This is a shared-browser/account-switch condition, not an established remote session-stealing path."
+        },
+        "summary": "The OAuth callback binds initial state to a control user but seals only the resulting Management token. Later setup handlers accept that token alongside any authenticated control account. When a different person signs into their own control account in the same browser while the original setup token survives, they can use the previous person's Supabase authorization."
+      },
+      "codeEvidence": [
+        {
+          "code": "  if (!state || !expectedState || state !== expectedState) return back(\"state\");\n  if (!verifier) return back(\"expired\");\n\n  // The state seals the account id it was issued to. A code arriving in a\n  // different session is not this person's to redeem.\n  const {\n    data: { user },\n  } = await (await createControlClient()).auth.getUser();\n  const sealedFor = unseal(state)?.split(\":\")[0];\n  if (!user || !sealedFor || sealedFor !== user.id) return back(\"session\");\n\n  const exchanged = await exchangeCode({\n    code,\n    redirectUri: `${origin}/api/setup/oauth/callback`,\n    verifier,\n  });\n  if (!exchanged.ok) return back(\"exchange\", exchanged.message);\n\n  const response = back();\n  // An hour is longer than provisioning takes and shorter than anybody leaves\n  // a tab open on purpose. Cleared explicitly when setup finishes.\n  response.cookies.set(TOKEN_COOKIE, seal(exchanged.token), {\n    ...COOKIE_BASE,\n    maxAge: 3600,",
+          "endLine": 88,
+          "explanation": "The original account is checked, but only exchanged.token is sealed afterward.",
+          "id": "oauth-initial-binding",
+          "label": "Callback validates original control account",
+          "path": "src/app/api/setup/oauth/callback/route.ts",
+          "startLine": 65
+        },
+        {
+          "code": "  const {\n    data: { user },\n  } = await (await createControlClient()).auth.getUser();\n  if (!user) {\n    return NextResponse.json({ error: \"NOT_SIGNED_IN\" }, { status: 401 });\n  }\n\n  // Creating Supabase projects is the most expensive thing this app can be\n  // made to do on somebody else's account, so the ceiling here is much lower\n  // than the probe's.\n  const byAccount = rateLimit(`provision:${user.id}`, LIMIT, WINDOW_MS);\n  const byAddress = rateLimit(`provision-ip:${clientKey(request)}`, LIMIT, WINDOW_MS);\n  if (!byAccount.ok || !byAddress.ok) {\n    return NextResponse.json({ error: \"RATE_LIMITED\" }, { status: 429 });\n  }\n\n  const token = unseal(request.cookies.get(TOKEN_COOKIE)?.value);\n  if (!token) {\n    return NextResponse.json({ error: \"NOT_CONNECTED\" }, { status: 401 });",
+          "endLine": 77,
+          "explanation": "User existence and token decryption are separate; no identity equality is checked.",
+          "id": "oauth-later-provision",
+          "label": "Any current control user can use the surviving token",
+          "path": "src/app/api/setup/provision/route.ts",
+          "startLine": 59
+        },
+        {
+          "code": "  const {\n    data: { user },\n  } = await (await createControlClient()).auth.getUser();\n  // Said out loud rather than folded into a bare \"not connected\": it is the\n  // difference between \"press the button\" and \"you need an account first\", and\n  // the wizard cannot tell from the client which one it is looking at.\n  if (!user) {\n    return NextResponse.json({\n      available: true,\n      connected: false,\n      reason: \"not_signed_in\",\n    });\n  }\n\n  const token = unseal(request.cookies.get(TOKEN_COOKIE)?.value);\n  if (!token) {\n    return NextResponse.json({\n      available: true,\n      connected: false,\n      reason: \"no_token\",\n    });\n  }\n\n  // A token that no longer works is not a connection. Listing organisations is\n  // the cheapest call that proves it, and the wizard needs them anyway.\n  //\n  // Reporting WHY matters more here than anywhere else in this flow: a token\n  // that exchanged perfectly and is then refused by the first call is an\n  // OAuth app missing the Organizations scope, and without the status number\n  // that is indistinguishable from never having connected at all -- which is\n  // what it looked like.\n  const orgs = await listOrganizations(token);",
+          "endLine": 49,
+          "explanation": "The token is decrypted without reference to the authenticated user and used to list organizations.",
+          "id": "oauth-later-status",
+          "label": "Organizations disclosed under any current account",
+          "path": "src/app/api/setup/oauth/status/route.ts",
+          "startLine": 18
+        },
+        {
+          "code": "  const ref = PROJECT_URL.exec(department.supabase_url as string)?.[1];\n  if (!ref) {\n    // The column's CHECK constraint should make this unreachable. If it ever\n    // is reached, the honest answer is \"we cannot find the project from here\",\n    // not a request to the Management API built out of a URL we do not\n    // recognise.\n    return NextResponse.json({ error: \"NOT_SUPABASE\" }, { status: 409 });\n  }\n\n  const dashboard = `https://supabase.com/dashboard/project/${ref}`;\n\n  const token = unseal(request.cookies.get(TOKEN_COOKIE)?.value);\n  if (!token) {\n    // Recoverable, and the only exit the caller should offer a retry for:\n    // connect, then press the button again.\n    return NextResponse.json(\n      { error: \"NOT_CONNECTED\", ref, dashboard },\n      { status: 401 }\n    );\n  }\n\n  // Ask before deleting. A 404 here is the ordinary case of a project somebody\n  // already removed from their dashboard, and reporting that as a failure\n  // sends them back there to look for something that is not there.\n  const existing = await getProject(token, ref);",
+          "endLine": 120,
+          "explanation": "Directory-derived ref is checked, but token authority is not bound to the control account.",
+          "id": "oauth-later-delete",
+          "label": "Project deletion consumes raw authorization",
+          "path": "src/app/api/setup/deprovision/route.ts",
+          "startLine": 96
+        },
+        {
+          "code": "export const COOKIE_BASE = {\n  httpOnly: true,\n  sameSite: \"lax\" as const,\n  secure: process.env.NODE_ENV === \"production\",\n  path: \"/api/setup\",\n};",
+          "endLine": 124,
+          "explanation": "The setup cookie has its own path/lifecycle and SameSite=Lax.",
+          "id": "oauth-cookie",
+          "label": "Separate setup cookie lifecycle",
+          "path": "src/lib/setup/oauth-session.ts",
+          "startLine": 119
+        },
+        {
+          "code": "  if (refused) {\n    // The project exists, so the token stays: fixing whatever was refused and\n    // pressing the button again carries on with it rather than making a second.\n    return NextResponse.json(\n      { ...refusal(\"health\", refused.status, refused.message), ref, url: projectUrl, resumable: true },\n      { status: 502 }\n    );\n  }\n\n  if (!ready) {\n    // The project exists and will come up on its own. The token is KEPT here,\n    // alone among the exits: this is the one outcome the caller can carry on\n    // from, by sending the ref back once the project is up. Saying nothing\n    // happened would be worse than useless -- they would create a second one.\n    return NextResponse.json(\n      { error: \"STILL_STARTING\", ref, url: projectUrl, resumable: true },\n      { status: 202 }",
+          "endLine": 254,
+          "explanation": "Resumable/health refusal exits leave a still-present token for later requests.",
+          "id": "oauth-retention",
+          "label": "Health refusal retains token",
+          "path": "src/app/api/setup/provision/route.ts",
+          "startLine": 238
+        }
+      ],
+      "confidence": {
+        "level": "high",
+        "rationale": "All six source excerpts match audited HEAD. Parent traced the original callback and token consumers; post-fix tests reject another account, legacy envelopes, and expiry."
+      },
+      "findingId": "csf_ff1e42d427b974e9927eff53",
+      "fingerprints": {
+        "algorithm": "codex-security/v1",
+        "primary": "codex-security/v1:sha256:c06ff8107c2dcd1bed0796a853ad00f95770462caf3fc1de2dd2ca9beb313f7f"
+      },
+      "identity": {
+        "anchor": "setup-authorization-survives-replacement-of-the-control-plane-account"
+      },
+      "locations": [
+        {
+          "endLine": 88,
+          "path": "src/app/api/setup/oauth/callback/route.ts",
+          "role": "root_control",
+          "startLine": 65
+        },
+        {
+          "endLine": 77,
+          "path": "src/app/api/setup/provision/route.ts",
+          "startLine": 59
+        },
+        {
+          "endLine": 49,
+          "path": "src/app/api/setup/oauth/status/route.ts",
+          "startLine": 18
+        },
+        {
+          "endLine": 120,
+          "path": "src/app/api/setup/deprovision/route.ts",
+          "startLine": 96
+        },
+        {
+          "endLine": 124,
+          "path": "src/lib/setup/oauth-session.ts",
+          "startLine": 119
+        },
+        {
+          "endLine": 254,
+          "path": "src/app/api/setup/provision/route.ts",
+          "startLine": 238
+        }
+      ],
+      "occurrenceId": "occ_276fc670e667f89f9a14fe9d",
+      "provenance": {
+        "candidateId": "oauth-token-account-binding",
+        "originalCandidates": [
+          {
+            "attacker": {
+              "gains": "Use of the previous operator's Management API authorization: organization names, project creation, arbitrary database changes to a known project accessible to that token, and potentially project deletion after creating an owned directory reference.",
+              "prerequisites": [
+                "OAuth setup is configured and the previous operator authorized it.",
+                "The token remains because setup is unfinished, resumes, encounters one of the non-clearing early exits, or was acquired for deletion before use.",
+                "The different account uses the same browser cookie jar before external access-token expiry. This is a shared-browser/account-switch condition, not an established remote session-stealing path."
+              ],
+              "startsWith": "A separate valid control-plane account and access to the same browser profile after the previous operator changes/clears their control account, while the /api/setup token cookie remains valid. No prior authority over the original operator's Supabase organization is assumed."
+            },
+            "codeEvidence": [
+              {
+                "code": "  if (!state || !expectedState || state !== expectedState) return back(\"state\");\n  if (!verifier) return back(\"expired\");\n\n  // The state seals the account id it was issued to. A code arriving in a\n  // different session is not this person's to redeem.\n  const {\n    data: { user },\n  } = await (await createControlClient()).auth.getUser();\n  const sealedFor = unseal(state)?.split(\":\")[0];\n  if (!user || !sealedFor || sealedFor !== user.id) return back(\"session\");\n\n  const exchanged = await exchangeCode({\n    code,\n    redirectUri: `${origin}/api/setup/oauth/callback`,\n    verifier,\n  });\n  if (!exchanged.ok) return back(\"exchange\", exchanged.message);\n\n  const response = back();\n  // An hour is longer than provisioning takes and shorter than anybody leaves\n  // a tab open on purpose. Cleared explicitly when setup finishes.\n  response.cookies.set(TOKEN_COOKIE, seal(exchanged.token), {\n    ...COOKIE_BASE,\n    maxAge: 3600,",
+                "endLine": 88,
+                "explanation": "The original account is checked, but only exchanged.token is sealed afterward.",
+                "id": "oauth-initial-binding",
+                "label": "Callback validates original control account",
+                "path": "src/app/api/setup/oauth/callback/route.ts",
+                "startLine": 65
+              },
+              {
+                "code": "  const {\n    data: { user },\n  } = await (await createControlClient()).auth.getUser();\n  if (!user) {\n    return NextResponse.json({ error: \"NOT_SIGNED_IN\" }, { status: 401 });\n  }\n\n  // Creating Supabase projects is the most expensive thing this app can be\n  // made to do on somebody else's account, so the ceiling here is much lower\n  // than the probe's.\n  const byAccount = rateLimit(`provision:${user.id}`, LIMIT, WINDOW_MS);\n  const byAddress = rateLimit(`provision-ip:${clientKey(request)}`, LIMIT, WINDOW_MS);\n  if (!byAccount.ok || !byAddress.ok) {\n    return NextResponse.json({ error: \"RATE_LIMITED\" }, { status: 429 });\n  }\n\n  const token = unseal(request.cookies.get(TOKEN_COOKIE)?.value);\n  if (!token) {\n    return NextResponse.json({ error: \"NOT_CONNECTED\" }, { status: 401 });",
+                "endLine": 77,
+                "explanation": "User existence and token decryption are separate; no identity equality is checked.",
+                "id": "oauth-later-provision",
+                "label": "Any current control user can use the surviving token",
+                "path": "src/app/api/setup/provision/route.ts",
+                "startLine": 59
+              },
+              {
+                "code": "  const {\n    data: { user },\n  } = await (await createControlClient()).auth.getUser();\n  // Said out loud rather than folded into a bare \"not connected\": it is the\n  // difference between \"press the button\" and \"you need an account first\", and\n  // the wizard cannot tell from the client which one it is looking at.\n  if (!user) {\n    return NextResponse.json({\n      available: true,\n      connected: false,\n      reason: \"not_signed_in\",\n    });\n  }\n\n  const token = unseal(request.cookies.get(TOKEN_COOKIE)?.value);\n  if (!token) {\n    return NextResponse.json({\n      available: true,\n      connected: false,\n      reason: \"no_token\",\n    });\n  }\n\n  // A token that no longer works is not a connection. Listing organisations is\n  // the cheapest call that proves it, and the wizard needs them anyway.\n  //\n  // Reporting WHY matters more here than anywhere else in this flow: a token\n  // that exchanged perfectly and is then refused by the first call is an\n  // OAuth app missing the Organizations scope, and without the status number\n  // that is indistinguishable from never having connected at all -- which is\n  // what it looked like.\n  const orgs = await listOrganizations(token);",
+                "endLine": 49,
+                "explanation": "The token is decrypted without reference to the authenticated user and used to list organizations.",
+                "id": "oauth-later-status",
+                "label": "Organizations disclosed under any current account",
+                "path": "src/app/api/setup/oauth/status/route.ts",
+                "startLine": 18
+              },
+              {
+                "code": "  const ref = PROJECT_URL.exec(department.supabase_url as string)?.[1];\n  if (!ref) {\n    // The column's CHECK constraint should make this unreachable. If it ever\n    // is reached, the honest answer is \"we cannot find the project from here\",\n    // not a request to the Management API built out of a URL we do not\n    // recognise.\n    return NextResponse.json({ error: \"NOT_SUPABASE\" }, { status: 409 });\n  }\n\n  const dashboard = `https://supabase.com/dashboard/project/${ref}`;\n\n  const token = unseal(request.cookies.get(TOKEN_COOKIE)?.value);\n  if (!token) {\n    // Recoverable, and the only exit the caller should offer a retry for:\n    // connect, then press the button again.\n    return NextResponse.json(\n      { error: \"NOT_CONNECTED\", ref, dashboard },\n      { status: 401 }\n    );\n  }\n\n  // Ask before deleting. A 404 here is the ordinary case of a project somebody\n  // already removed from their dashboard, and reporting that as a failure\n  // sends them back there to look for something that is not there.\n  const existing = await getProject(token, ref);",
+                "endLine": 120,
+                "explanation": "Directory-derived ref is checked, but token authority is not bound to the control account.",
+                "id": "oauth-later-delete",
+                "label": "Project deletion consumes raw authorization",
+                "path": "src/app/api/setup/deprovision/route.ts",
+                "startLine": 96
+              },
+              {
+                "code": "export const COOKIE_BASE = {\n  httpOnly: true,\n  sameSite: \"lax\" as const,\n  secure: process.env.NODE_ENV === \"production\",\n  path: \"/api/setup\",\n};",
+                "endLine": 124,
+                "explanation": "The setup cookie has its own path/lifecycle and SameSite=Lax.",
+                "id": "oauth-cookie",
+                "label": "Separate setup cookie lifecycle",
+                "path": "src/lib/setup/oauth-session.ts",
+                "startLine": 119
+              },
+              {
+                "code": "  if (refused) {\n    // The project exists, so the token stays: fixing whatever was refused and\n    // pressing the button again carries on with it rather than making a second.\n    return NextResponse.json(\n      { ...refusal(\"health\", refused.status, refused.message), ref, url: projectUrl, resumable: true },\n      { status: 502 }\n    );\n  }\n\n  if (!ready) {\n    // The project exists and will come up on its own. The token is KEPT here,\n    // alone among the exits: this is the one outcome the caller can carry on\n    // from, by sending the ref back once the project is up. Saying nothing\n    // happened would be worse than useless -- they would create a second one.\n    return NextResponse.json(\n      { error: \"STILL_STARTING\", ref, url: projectUrl, resumable: true },\n      { status: 202 }",
+                "endLine": 254,
+                "explanation": "Resumable/health refusal exits leave a still-present token for later requests.",
+                "id": "oauth-retention",
+                "label": "Health refusal retains token",
+                "path": "src/app/api/setup/provision/route.ts",
+                "startLine": 238
+              }
+            ],
+            "confidence": "high",
+            "counterEvidence": [
+              "PKCE and state validation correctly prevent a callback from being completed under a different current account. The defect occurs only after that validation.",
+              "AES-GCM and httpOnly protect token modification and ordinary script reading; they do not bind later use to the authorizing account.",
+              "Without a surviving token cookie, logging into a separate control account grants no Supabase Management access.",
+              "A caller executing SQL with their own Management token already owns that authority; it is not classified as a vulnerability.",
+              "A person retaining an already-authenticated victim browser session already has authority; this finding specifically requires replacement/clearance of the original control identity with a separate account while the independent setup cookie remains. No public remote exploit is claimed."
+            ],
+            "remediation": "Seal a purpose-scoped token envelope containing the authenticated control user ID and absolute expiry; reject old, malformed, wrong-user or expired envelopes in status/provision/deprovision. Clear setup authorization on logout/account transitions and terminal workflow exits. The parent has independently started this hardening; this finding describes the immutable baseline.",
+            "rootCause": "The cookie envelope omits originating user ID, purpose and server-checked expiry. Consumers check only that a current control user exists, then decrypt the raw token independently of that identity.",
+            "ruleId": "oauth-token-account-binding",
+            "severity": "medium",
+            "severityRationale": "Medium reflects potentially broad external-account consequences but a narrow local/shared-browser account-switch prerequisite and limited token lifetime. It must not be described as unauthenticated remote arbitrary SQL.",
+            "sourceRevision": "ebe4fabb10b4ab8eb5dcc6eed4ede372f76a0c80",
+            "summary": "The OAuth callback binds initial state to a control user but seals only the resulting Management token. Later setup handlers accept that token alongside any authenticated control account. When a different person signs into their own control account in the same browser while the original setup token survives, they can use the previous person's Supabase authorization.",
+            "taxonomy": {
+              "category": "Session management",
+              "cwe": [
+                "CWE-613",
+                "CWE-863"
+              ]
+            },
+            "title": "Setup authorization survives replacement of the control-plane account",
+            "validation": {
+              "method": "Independent static source validation against immutable commit",
+              "performed": "Followed callback state binding through token serialization and all three consumers; examined account login and cookie lifecycle, token expiry documentation, and own-token counterexample. No runtime replay or browser attacks.",
+              "result": "confirmed with explicit shared-browser prerequisite",
+              "runtime": "not performed"
+            }
+          }
+        ],
+        "source": "focused-investigation"
+      },
+      "remediation": "Seal a purpose-scoped token envelope containing the authenticated control user ID and absolute expiry; reject old, malformed, wrong-user or expired envelopes in status/provision/deprovision. Clear setup authorization on logout/account transitions and terminal workflow exits. The parent has independently started this hardening; this finding describes the immutable baseline.",
+      "remediationTests": [
+        "Reject tokens from a different current control account, tampered or legacy envelopes, and expired authorization; accept an unexpired envelope for its issuing account."
+      ],
+      "rootCause": {
+        "evidenceRefs": [
+          "oauth-initial-binding",
+          "oauth-later-provision",
+          "oauth-later-status",
+          "oauth-later-delete",
+          "oauth-cookie",
+          "oauth-retention"
+        ],
+        "summary": "The cookie envelope omits originating user ID, purpose and server-checked expiry. Consumers check only that a current control user exists, then decrypt the raw token independently of that identity."
+      },
+      "ruleId": "oauth-token-account-binding",
+      "severity": {
+        "level": "low",
+        "rationale": "Medium reflects potentially broad external-account consequences but a narrow local/shared-browser account-switch prerequisite and limited token lifetime. It must not be described as unauthenticated remote arbitrary SQL. Calibrated to low for the required shared browser profile and surviving short-lived authorization; no remote exposure path was established."
+      },
+      "summary": "The OAuth callback binds initial state to a control user but seals only the resulting Management token. Later setup handlers accept that token alongside any authenticated control account. When a different person signs into their own control account in the same browser while the original setup token survives, they can use the previous person's Supabase authorization.",
+      "taxonomy": {
+        "category": "Session management",
+        "cwe": [
+          "CWE-613",
+          "CWE-863"
+        ]
+      },
+      "title": "Setup authorization survives replacement of the control-plane account",
+      "validation": {
+        "evidenceRefs": [
+          "oauth-initial-binding",
+          "oauth-later-provision",
+          "oauth-later-status",
+          "oauth-later-delete",
+          "oauth-cookie",
+          "oauth-retention"
+        ],
+        "limitations": [
+          "No live OAuth or shared-browser replay performed. The finding describes baseline commit ebe4fabb."
+        ],
+        "method": "source trace and local cryptographic/session regression",
+        "summary": "Followed callback state binding through token serialization and all three consumers; examined account login and cookie lifecycle, token expiry documentation, and own-token counterexample. No runtime replay or browser attacks. Current implementation tests confirm enforced account binding and lifetime."
+      }
+    }
+  ],
+  "scanId": "360e089f-a106-44df-b1f1-f6a370934968",
+  "schemaVersion": "1.0"
+}

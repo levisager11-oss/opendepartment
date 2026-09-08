@@ -35,9 +35,9 @@ export function contactLine(): string {
  *
  * The distinction is the whole point. OpenDepartment stores a slug, a Supabase
  * URL and a public anon key. Every file, comment and member address lives in a
- * database the department's own operator controls, and the platform holds no
- * key that can read it. So the platform's privacy notice is short and its
- * terms mostly say "the person who made that archive is answerable for it".
+ * database the department's own operator controls. Rendering private pages
+ * uses the visitor's authorized session, so the platform processes that data
+ * without retaining a permanent department administrator credential.
  *
  * Each department states its own operator in its own settings and footer.
  *
@@ -59,7 +59,7 @@ export function getLegalDoc(
     if (doc === "terms") {
       return {
         title: "Nutzungsbedingungen",
-        updated: "Stand: 25. August 2026",
+        updated: "Stand: 8. September 2026",
         description:
           "OpenDepartment ist ein Werkzeug für satirische, fiktive Archive und betreibt selbst keines. Wer ein Departement anlegt, verantwortet dessen Inhalt.",
         sections: [
@@ -75,14 +75,14 @@ export function getLegalDoc(
             body: [
               "Wer ein Departement erstellt, ist für dessen Inhalt allein verantwortlich. Das umfasst insbesondere die Persönlichkeitsrechte betroffener Personen (Art. 28 ZGB) und die Pflichten als verantwortliche Person im Sinne des revDSG.",
               "Wenn Sie ein Departement über eine reale Person erstellen, benennen Sie diese Person in einem öffentlich einsehbaren Archiv. Holen Sie deren Einverständnis ein, bevor Sie das tun.",
-              "OpenDepartment hat keinen Schlüssel, mit dem sich der Inhalt eines Departements lesen liesse, und kann Inhalte daher weder prüfen noch entfernen.",
+              "OpenDepartment hält keinen dauerhaften Administrator-Schlüssel für Ihr Departement. Zur Seitendarstellung verarbeitet der Server die Sitzung und die dadurch zugänglichen Daten des jeweiligen Mitglieds. Die Moderation im Departement liegt bei dessen Administration.",
             ],
           },
           {
             heading: "3. Was die Plattform tun kann",
             body: [
               "Die Plattform kann die Adresse eines Departements abschalten, sodass es unter opendepartment nicht mehr erreichbar ist. Die Daten bleiben dabei unverändert im Supabase-Projekt der betreibenden Person.",
-              "Ein Anspruch auf Verfügbarkeit des Dienstes besteht nicht. Der Betrieb kann jederzeit eingestellt werden; Ihre Daten bleiben Ihnen, weil sie nie bei uns lagen.",
+              "Ein Anspruch auf Verfügbarkeit des Dienstes besteht nicht. Wird die Plattform eingestellt, bleiben die Archivinhalte in Ihrem eigenen Supabase-Projekt, solange dieses weiter betrieben wird.",
             ],
           },
           {
@@ -95,7 +95,7 @@ export function getLegalDoc(
 
     return {
       title: "Datenschutzerklärung",
-      updated: "Stand: 25. August 2026",
+      updated: "Stand: 8. September 2026",
       description:
         "Was OpenDepartment speichert: Adresse, Supabase-URL, öffentlicher anon-Key und Anzeigename eines Departements. Dateien, Kommentare und Mitglieder liegen ausschliesslich in Ihrem eigenen Projekt.",
       sections: [
@@ -104,7 +104,7 @@ export function getLegalDoc(
           body: [
             "Für ein registriertes Departement: die gewählte Adresse (Slug), die URL Ihres Supabase-Projekts, dessen öffentlichen anon-Key, den Anzeigenamen und die Angabe, ob es gelistet ist.",
             "Für ein OpenDepartment-Konto: Ihre E-Mail-Adresse und Ihr Passwort-Hash, verwaltet durch Supabase Auth.",
-            "Das ist alles. Wir erhalten niemals Ihren service_role-Key und können den Inhalt Ihres Departements nicht lesen.",
+            "Wir speichern auch eingereichte Missbrauchsmeldungen mit den freiwillig angegebenen Kontaktdaten. Wir fragen keinen service_role-Key ab. Zur Seitendarstellung verarbeitet der Server Mitgliedssitzungen, autorisierte Metadaten und zeitlich begrenzte Datei-Links. Bei optionaler Supabase-Verbindung verarbeitet er vorübergehend einen verschlüsselt gespeicherten Management-API-Token.",
           ],
         },
         {
@@ -117,14 +117,14 @@ export function getLegalDoc(
         {
           heading: "3. Cookies",
           body: [
-            "Wir setzen ausschliesslich technisch notwendige Cookies: eines für Ihre Anmeldung am OpenDepartment-Konto (verwaltet durch Supabase Auth), eines für die gewählte Sprache und eines, das sich merkt, dass Sie den Cookie-Hinweis gelesen haben.",
-            "Es gibt keine Werbe-, Profiling- oder Drittanbieter-Tracking-Cookies. Die Zugriffsstatistik (Vercel Analytics) arbeitet ohne Cookies und ohne Personenbezug. Ein Departement, das Sie besuchen, setzt zusätzlich ein eigenes Sitzungs-Cookie, das nur an dieses Departement gesendet wird.",
+            "Cookies speichern Ihre Anmeldung am OpenDepartment-Konto, die gewählte Sprache und den gelesenen Cookie-Hinweis. Die optionale Supabase-Einrichtung verwendet ausserdem kurzlebige Cookies für den Verbindungsablauf und einen verschlüsselten, kontogebundenen Management-API-Token.",
+            "Die App bindet Vercel Analytics für Zugriffsstatistiken ein. Die Startseite kann ein Spenden-Widget von Ko-fi laden; dabei stellt Ihr Browser eine Verbindung zu Ko-fi her. Ein besuchtes Departement setzt ein eigenes Sitzungs-Cookie, das auf seinen URL-Pfad beschränkt ist.",
           ],
         },
         {
           heading: "4. Ihre Rechte",
           body: [
-            "Sie können Ihr Departement jederzeit aus dem Verzeichnis entfernen; damit sind alle bei uns gespeicherten Angaben dazu gelöscht. Für Auskunft oder Löschung Ihres OpenDepartment-Kontos wenden Sie sich an die untenstehende Adresse.",
+            "Sie können einen nicht gesperrten Verzeichniseintrag entfernen. Dies löscht weder Ihr Plattformkonto noch gespeicherte Missbrauchsmeldungen. Für Auskunft oder Löschung wenden Sie sich an die untenstehende Adresse.",
             contact,
           ],
         },
@@ -135,7 +135,7 @@ export function getLegalDoc(
   if (doc === "terms") {
     return {
       title: "Terms of use",
-      updated: "Last updated: 25 August 2026",
+      updated: "Last updated: 8 September 2026",
       description:
         "OpenDepartment is a tool for building satirical, fictional archives and runs none of them itself. Whoever creates a department is responsible for what is in it.",
       sections: [
@@ -151,14 +151,14 @@ export function getLegalDoc(
           body: [
             "Whoever creates a department is solely responsible for what is in it, including the personality rights of anyone named in it and any data-protection duties that follow from holding other people's information.",
             "If you build a department about a real person, you are naming that person in an archive other people can read. Get their agreement before you do it.",
-            "OpenDepartment holds no key capable of reading a department's contents, and therefore cannot review or remove them.",
+            "OpenDepartment holds no permanent tenant administrator key. To render pages, its server processes the current member's session and the data that session can access. Department administrators manage their archive's moderation.",
           ],
         },
         {
           heading: "3. What the platform can do",
           body: [
             "The platform can stop a department's address from resolving, so it is no longer reachable through OpenDepartment. The data itself is untouched and remains in its operator's own Supabase project.",
-            "There is no guarantee of availability. The service may be discontinued at any time; your data survives that, because it was never held here.",
+            "There is no guarantee of availability. If the platform is discontinued, archive content remains in your own Supabase project while that project is maintained.",
           ],
         },
         { heading: "4. Contact", body: [contact] },
@@ -168,7 +168,7 @@ export function getLegalDoc(
 
   return {
     title: "Privacy notice",
-    updated: "Last updated: 25 August 2026",
+    updated: "Last updated: 8 September 2026",
     description:
       "What OpenDepartment stores: a department's address, Supabase URL, public anon key and display name. Files, comments and member accounts live only in your own project.",
     sections: [
@@ -177,7 +177,7 @@ export function getLegalDoc(
         body: [
           "For a registered department: the chosen address (slug), your Supabase project URL, its public anon key, the display name, and whether it is listed.",
           "For an OpenDepartment account: your e-mail address and password hash, handled by Supabase Auth.",
-          "That is the complete list. We never receive your service_role key and cannot read your department's contents.",
+          "We also store submitted abuse reports and any contact details you choose to include. We do not request a service_role key. To render pages, our server processes member sessions, authorized metadata and temporary file links. Optional Supabase connection temporarily uses an encrypted Management API token.",
         ],
       },
       {
@@ -190,14 +190,14 @@ export function getLegalDoc(
       {
         heading: "3. Cookies",
         body: [
-          "Only cookies the site cannot work without: one for your OpenDepartment account session (handled by Supabase Auth), one remembering your chosen language, and one remembering that you have read the cookie notice.",
-          "There are no advertising, profiling or third-party tracking cookies. The traffic statistics (Vercel Analytics) work without cookies and without identifying anyone. A department you visit sets its own session cookie in addition, and the browser sends it to that department only.",
+          "Cookies keep your OpenDepartment account session, chosen language and dismissed notice. Optional Supabase setup also uses short-lived cookies for its connection flow and an encrypted, account-bound Management API token.",
+          "The app includes Vercel Analytics for traffic statistics. The homepage can load a Ko-fi donation widget, which connects your browser to Ko-fi. A department you visit sets its own session cookie, scoped to that department's URL path.",
         ],
       },
       {
         heading: "4. Your rights",
         body: [
-          "You can remove your department from the directory at any time, which deletes everything we hold about it. For access to or deletion of your OpenDepartment account, write to the address below.",
+          "You can remove a listing that is not suspended. This does not delete your platform account or stored abuse reports. For access or deletion requests, write to the address below.",
           contact,
         ],
       },

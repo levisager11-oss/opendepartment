@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n/provider";
 import { KindIcon } from "@/components/KindIcon";
 import type { FileKind } from "@/lib/tenant/types";
@@ -55,17 +56,26 @@ export function FileViewer({
   title: string;
 }) {
   const { t } = useI18n();
-  const [broken, setBroken] = useState(false);
+  const router = useRouter();
+  const [brokenUrl, setBrokenUrl] = useState<string | null>(null);
+  const [retrying, startTransition] = useTransition();
 
-  if (!url) {
+  if (!url || brokenUrl === url) {
     return (
       <Placeholder>
-        <p className="typewriter text-ink-500">{t("file.loadingPreview")}</p>
+        <p role="alert" className="text-sm text-ink-500">{t("file.previewFailed")}</p>
+        <button type="button" className="btn btn-ghost mt-4" disabled={retrying}
+          aria-busy={retrying} onClick={() => {
+            setBrokenUrl(null);
+            startTransition(() => router.refresh());
+          }}>
+          {retrying ? t("common.loading") : t("common.retry")}
+        </button>
       </Placeholder>
     );
   }
 
-  if (broken || kind === "other") {
+  if (kind === "other") {
     return (
       <Placeholder>
         <KindIcon kind={kind} size={40} className="text-ink-400" />
@@ -84,7 +94,7 @@ export function FileViewer({
           src={url}
           alt={title}
           decoding="async"
-          onError={() => setBroken(true)}
+          onError={() => setBrokenUrl(url)}
           className="max-h-full max-w-full object-contain"
         />
       </MediaFrame>
@@ -98,7 +108,7 @@ export function FileViewer({
           src={url}
           controls
           preload="metadata"
-          onError={() => setBroken(true)}
+          onError={() => setBrokenUrl(url)}
           className="max-h-full max-w-full"
         >
           <track kind="captions" />
@@ -117,7 +127,7 @@ export function FileViewer({
           src={url}
           controls
           preload="metadata"
-          onError={() => setBroken(true)}
+          onError={() => setBrokenUrl(url)}
           className="w-full max-w-md"
         />
       </div>

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n/provider";
-import { useTenant, useTenantClient } from "@/lib/tenant/context";
+import { useTenantClient } from "@/lib/tenant/context";
 import type { AdminUser } from "./types";
 
 export function AdminUsers({
@@ -17,6 +17,7 @@ export function AdminUsers({
   const supabase = useTenantClient();
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   /**
    * Routed through admin_set_flag rather than a direct update on `profiles`.
@@ -34,26 +35,28 @@ export function AdminUsers({
     if (!flag) return;
 
     setBusyId(id);
-    const { error } = await supabase.rpc("admin_set_flag", {
-      target: id,
-      flag,
-      value: Boolean(changes[flag]),
-    });
-    setBusyId(null);
-
-    if (error) {
-      alert(
-        error.message.includes("CANNOT_CHANGE_SELF")
+    setError(null);
+    try {
+      const { error: rpcError } = await supabase.rpc("admin_set_flag", {
+        target: id, flag, value: Boolean(changes[flag]),
+      });
+      if (rpcError) {
+        setError(rpcError.message.includes("CANNOT_CHANGE_SELF")
           ? t("admin.users.notSelf")
-          : t("common.error")
-      );
-      return;
+          : t("common.actionFailed"));
+        return;
+      }
+      router.refresh();
+    } catch {
+      setError(t("common.actionFailed"));
+    } finally {
+      setBusyId(null);
     }
-    router.refresh();
   }
 
   return (
     <div className="paper scroll-x">
+      {error && <p role="alert" className="notice notice-error m-3">{error}</p>}
       <table className="w-full min-w-3xl text-sm">
         <thead>
           <tr className="border-b border-paper-300 text-left">
@@ -115,7 +118,7 @@ export function AdminUsers({
                       <>
                         <button
                           type="button"
-                          disabled={busyId === user.id}
+                          disabled={Boolean(busyId)}
                           onClick={() =>
                             patch(user.id, { is_admin: !user.is_admin })
                           }
@@ -127,7 +130,7 @@ export function AdminUsers({
                         </button>
                         <button
                           type="button"
-                          disabled={busyId === user.id}
+                          disabled={Boolean(busyId)}
                           onClick={() =>
                             patch(user.id, { is_banned: !user.is_banned })
                           }

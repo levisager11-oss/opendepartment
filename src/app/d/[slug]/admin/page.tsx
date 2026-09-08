@@ -35,16 +35,7 @@ export default async function AdminPage({
   const member = await requireDeptAdmin(slug);
   const supabase = await createTenantClient(member.dept);
 
-  const [
-    { data: files },
-    { data: reports },
-    { data: members },
-    { data: invites },
-    { data: subjects },
-    { data: fileSubjects },
-    { data: settings },
-    { data: audit },
-  ] = await Promise.all([
+  const results = await Promise.all([
     supabase
       .from("files")
       .select(
@@ -55,6 +46,13 @@ export default async function AdminPage({
     supabase
       .from("reports")
       .select("id, file_id, reporter_id, reason, details, status, created_at")
+      .eq("status", "open")
+      .order("created_at", { ascending: true })
+      .limit(200),
+    supabase
+      .from("reports")
+      .select("id, file_id, reporter_id, reason, details, status, created_at")
+      .neq("status", "open")
       .order("created_at", { ascending: false })
       .limit(200),
     supabase.rpc("admin_list_members"),
@@ -80,6 +78,14 @@ export default async function AdminPage({
       .order("created_at", { ascending: false })
       .limit(100),
   ]);
+  // Failed reads must reach the retryable error boundary, never "all clear".
+  if (results.some((result) => result.error)) throw new Error("Could not load administration data.");
+  const [
+    { data: files }, { data: openReports }, { data: closedReports },
+    { data: members }, { data: invites }, { data: subjects },
+    { data: fileSubjects }, { data: settings }, { data: audit },
+  ] = results;
+  const reports = [...(openReports ?? []), ...(closedReports ?? [])];
 
   type MemberRow = {
     id: string;

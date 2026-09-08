@@ -2,6 +2,8 @@
 
 import { createBrowserClient } from "@supabase/ssr";
 
+let client: ReturnType<typeof createBrowserClient> | undefined;
+
 /**
  * Browser client for OpenDepartment's own project.
  *
@@ -10,10 +12,14 @@ import { createBrowserClient } from "@supabase/ssr";
  * able to overwrite one another.
  */
 export function createControlBrowserClient() {
-  return createBrowserClient(
+  if (typeof window !== "undefined" && client) return client;
+  const created = createBrowserClient(
     process.env.NEXT_PUBLIC_CONTROL_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_CONTROL_SUPABASE_ANON_KEY!
+    process.env.NEXT_PUBLIC_CONTROL_SUPABASE_ANON_KEY!,
+    { isSingleton: false }
   );
+  if (typeof window !== "undefined") client = created;
+  return created;
 }
 
 /**

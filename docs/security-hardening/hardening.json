@@ -1,0 +1,390 @@
+{
+  "documentType": "codex-security.hardening-analysis",
+  "schemaVersion": "1.0",
+  "analysisId": "hardening_final",
+  "sourceScan": {
+    "scanId": "360e089f-a106-44df-b1f1-f6a370934968",
+    "targetRevision": "ebe4fabb10b4ab8eb5dcc6eed4ede372f76a0c80",
+    "sourceDrift": "present",
+    "artifactState": "unsealed_running",
+    "observedManifestSha256": "df6bcd46a4a24999d89446c16b821856ae3fab9d501209fce40efaef8dc658e9",
+    "observedFindingsSha256": "9a71580b6de5b2741d1dc5b482a2c31a384d586bd3777bdede6b3548a9e2df93",
+    "observedCoverageSha256": "a3a4797477e491de1d9d8a2efd39ac55730e86678fb858664d2b62ec5b9ce6df",
+    "driftSummary": "Original canonical excerpts and baseline review describe target revision; current worktree adds authentication, bootstrap, insert fences, upload recovery and cleanup grace/recheck. Aggregate Storage admission remains absent."
+  },
+  "assessment": {
+    "outcome": "opportunities_identified",
+    "summary": "One structural opportunity remains: validate tenant-owned bounded upload admission and a durable object lifecycle to enforce finite per-member quotas; no architectural fix is implemented."
+  },
+  "constraints": {
+    "profile": "balanced",
+    "changeHorizons": [
+      "incremental",
+      "medium_term"
+    ],
+    "nonNegotiables": [
+      "Keep storage and gateway authority in the tenant, not the OpenDepartment host.",
+      "Keep private read/authentication and column fences.",
+      "Do not apply an untested trigger to Supabase-managed Storage tables.",
+      "No hosted project actions or architecture implementation in this analysis."
+    ],
+    "assumptions": [
+      "No latency, memory or operating budget supplied.",
+      "Finite cap should constrain hostile admitted members if presented as a strict guarantee.",
+      "Unlimited quota remains an intentional operator setting."
+    ]
+  },
+  "opportunities": [
+    {
+      "opportunityId": "storage-admission-lifecycle",
+      "title": "Own storage admission and object lifetime together",
+      "summary": "Authorize bounded bytes before allocation and own completion/cleanup as a durable lifecycle.",
+      "diagnosis": "Storage admits member bytes while aggregate accounting depends on an optional later client metadata write; cleanup infers abandonment outside that lifetime.",
+      "evidence": [
+        {
+          "claimType": "observed",
+          "sourceKind": "finding",
+          "findingId": "storage-quota-bypass",
+          "title": "Members can bypass the configured storage quota through direct uploads",
+          "path": "db/tenant-schema.sql",
+          "startLine": 553,
+          "endLine": 576,
+          "sourceRevision": "ebe4fabb10b4ab8eb5dcc6eed4ede372f76a0c80",
+          "claim": "Metadata trigger sums client sizes; Storage insertion independently admits own-folder member objects."
+        },
+        {
+          "claimType": "observed",
+          "sourceKind": "source",
+          "evidenceId": "SQL-CURRENT",
+          "title": "Current quota and Storage policies",
+          "path": "db/tenant-schema.sql",
+          "startLine": 609,
+          "endLine": 632,
+          "sha256": "b8549837a19e341c41aa3f89813ac3552b08b78f2536584c6e3bbd5eff7deb64",
+          "claim": "Finite quota still checks public.files rather than Storage allocation."
+        },
+        {
+          "claimType": "observed",
+          "sourceKind": "source",
+          "evidenceId": "UPLOAD-CURRENT",
+          "title": "Separate upload and metadata retry path",
+          "path": "src/components/dept/UploadForm.tsx",
+          "startLine": 159,
+          "endLine": 230,
+          "sha256": "5dd57d2b2a4004d1b1e0789e149e9bd57df3999cf7b4f91f68002b1b6f7645e3",
+          "claim": "Bytes precede metadata; stable-path retry now preserves uncertain writes."
+        },
+        {
+          "claimType": "observed",
+          "sourceKind": "source",
+          "evidenceId": "CLEANUP-CURRENT",
+          "title": "Orphan grace and purge recheck",
+          "path": "src/components/admin/AdminStorage.tsx",
+          "startLine": 77,
+          "endLine": 99,
+          "sha256": "d3e2ab4f4b7017b2fd1bafd2b2e36e69919fd257439ebb3f3c76ca3674baba0c",
+          "claim": "Age filtering and requery narrow stale cleanup, but list and delete remain separate."
+        },
+        {
+          "claimType": "observed",
+          "sourceKind": "experiment",
+          "evidenceId": "CLEANUP-TEST",
+          "title": "Cleanup age and reference regression",
+          "path": "db/test/04-tenant-security-regressions.sql",
+          "sha256": "e57dfd91772ab064f83308632285b79282c28f09e71739b6baba7f786d970d7d",
+          "claim": "Recent-orphan test failed before SQL grace; after change all148 tenant and52 control assertions passed. This is SQL-shim evidence only."
+        },
+        {
+          "claimType": "inferred",
+          "sourceKind": "source",
+          "evidenceId": "LIFECYCLE-INFERENCE",
+          "title": "Separated allocation and lifecycle ownership",
+          "path": "db/tenant-schema.sql",
+          "claim": "The quota and cleanup weaknesses share absent ownership of admission, completion and deletion states."
+        }
+      ],
+      "desiredInvariants": [
+        "Confirmed bytes plus reserved capacity stay within finite cap at admission, including concurrent requests.",
+        "Every stored object has one member/path reservation and no alternate unaccounted write route.",
+        "Trusted byte consumer enforces reservation bound independently of client claims.",
+        "Completion is idempotent and creates trusted size metadata.",
+        "Deleting objects cannot complete; capacity releases only after confirmed removal/absence.",
+        "Pending/deleting states remain charged, visible and retryable."
+      ],
+      "proposalPath": "proposals/storage-admission-lifecycle.md",
+      "options": [
+        {
+          "optionId": "metadata-recovery",
+          "title": "Metadata accounting with stronger recovery",
+          "kind": "baseline",
+          "summary": "Preserve direct browser uploads, stable-path retries and one-hour orphan grace with a purge recheck.",
+          "diagramPaths": {
+            "before": "diagrams/storage-admission-lifecycle-before.mmd",
+            "after": "diagrams/storage-admission-lifecycle-metadata-recovery-after.mmd"
+          },
+          "findingCoverage": [
+            {
+              "findingId": "storage-quota-bypass",
+              "title": "Members can bypass the configured storage quota through direct uploads",
+              "effect": "unaffected",
+              "tacticalFixRequired": true,
+              "rationale": "Direct uploads and client size claims remain outside metadata accounting."
+            }
+          ],
+          "evidenceCoverage": [
+            {
+              "evidenceId": "UPLOAD-CURRENT",
+              "title": "Separate upload and metadata retry path",
+              "effect": "mitigates",
+              "tacticalFixRequired": true,
+              "rationale": "Stable-path recovery and grace/recheck narrow accidental loss; final cross-service race remains."
+            },
+            {
+              "evidenceId": "CLEANUP-CURRENT",
+              "title": "Orphan grace and purge recheck",
+              "effect": "mitigates",
+              "tacticalFixRequired": true,
+              "rationale": "Stable-path recovery and grace/recheck narrow accidental loss; final cross-service race remains."
+            }
+          ],
+          "tradeoffs": [
+            {
+              "dimension": "security",
+              "direction": "improves",
+              "confidence": "high",
+              "basis": "source-derived",
+              "assessment": "Improves accidental-loss containment only; canonical malicious-member quota bypass remains.",
+              "validationPlan": "Run direct-upload/false-size scenarios and current retry/grace regressions; do not expect quota bypass to close."
+            },
+            {
+              "dimension": "performance",
+              "direction": "neutral",
+              "confidence": "medium",
+              "basis": "source-derived",
+              "assessment": "Successful byte path remains direct; extra queries occur on retry or cleanup.",
+              "validationPlan": "Compare direct upload p50/p95 and recovery query count at small and maximum file size."
+            },
+            {
+              "dimension": "memory",
+              "direction": "neutral",
+              "confidence": "medium",
+              "basis": "source-derived",
+              "assessment": "No new runtime or server-side streaming buffers; existing browser File handling remains.",
+              "validationPlan": "Measure browser heap during file selection and retry; check no retained file growth across repeated selections."
+            },
+            {
+              "dimension": "reliability",
+              "direction": "improves",
+              "confidence": "medium",
+              "basis": "source-derived",
+              "assessment": "Retry reconciliation reduces duplicate/missing metadata, but list/delete remains separate.",
+              "validationPlan": "Inject lost metadata replies and delayed metadata completion during cleanup."
+            },
+            {
+              "dimension": "operability",
+              "direction": "neutral",
+              "confidence": "medium",
+              "basis": "source-derived",
+              "assessment": "Existing app and schema release; operators need visible cleanup failures.",
+              "validationPlan": "Exercise failed Storage listing/delete and verify actionable retry feedback."
+            },
+            {
+              "dimension": "migration",
+              "direction": "neutral",
+              "confidence": "high",
+              "basis": "source-derived",
+              "assessment": "Current RPC shape remains compatible; reapply tenant SQL and deploy client.",
+              "validationPlan": "Run old/new clients against reapplied schema and preserve RPC shape."
+            },
+            {
+              "dimension": "ergonomics",
+              "direction": "neutral",
+              "confidence": "high",
+              "basis": "source-derived",
+              "assessment": "Existing split APIs stay familiar but future callers can omit recovery.",
+              "validationPlan": "Review a new upload caller for duplicated metadata cleanup logic."
+            },
+            {
+              "dimension": "rollback",
+              "direction": "neutral",
+              "confidence": "high",
+              "basis": "source-derived",
+              "assessment": "Independent UI changes are reversible; keep grace/recovery protections.",
+              "validationPlan": "Rehearse client downgrade while keeping schema safety guards."
+            }
+          ],
+          "residualRisks": [
+            "Malicious admitted member can bypass finite cap with direct upload or false size.",
+            "Grace and recheck do not make list/delete atomic."
+          ],
+          "implementationReadiness": {
+            "affectedComponents": [
+              "db/tenant-schema.sql",
+              "src/components/dept/UploadForm.tsx",
+              "src/components/admin/AdminStorage.tsx"
+            ],
+            "workPackages": [
+              "Retain retry, age-grace and purge recheck fixes; document soft quota."
+            ],
+            "acceptanceCriteria": [
+              "Recovery and grace regressions pass.",
+              "UI does not promise strict aggregate enforcement."
+            ],
+            "migrationNotes": [
+              "Keep current authentication and column-privilege fixes independently.",
+              "No architecture implementation selected or performed."
+            ],
+            "rollback": "Retain safety guards while reverting independent UI presentation if needed."
+          }
+        },
+        {
+          "optionId": "tenant-admission",
+          "title": "Tenant-owned admission, reservations and bounded upload gateway",
+          "kind": "structural",
+          "summary": "Tenant-local gateway reserves capacity under member lock, independently limits streamed bytes, denies direct Storage writes and owns durable completion/deletion states.",
+          "diagramPaths": {
+            "before": "diagrams/storage-admission-lifecycle-before.mmd",
+            "after": "diagrams/storage-admission-lifecycle-tenant-admission-after.mmd"
+          },
+          "findingCoverage": [
+            {
+              "findingId": "storage-quota-bypass",
+              "title": "Members can bypass the configured storage quota through direct uploads",
+              "effect": "addresses",
+              "tacticalFixRequired": true,
+              "rationale": "Conditional on implementing bounded admission and denying all direct writes; proposal alone does not close finding."
+            }
+          ],
+          "evidenceCoverage": [
+            {
+              "evidenceId": "UPLOAD-CURRENT",
+              "title": "Separate upload and metadata retry path",
+              "effect": "addresses",
+              "tacticalFixRequired": true,
+              "rationale": "Durable idempotent completion and deleting states own metadata/object lifetime; keep current guards while legacy paths drain."
+            },
+            {
+              "evidenceId": "CLEANUP-CURRENT",
+              "title": "Orphan grace and purge recheck",
+              "effect": "addresses",
+              "tacticalFixRequired": true,
+              "rationale": "Durable idempotent completion and deleting states own metadata/object lifetime; keep current guards while legacy paths drain."
+            }
+          ],
+          "tradeoffs": [
+            {
+              "dimension": "security",
+              "direction": "improves",
+              "confidence": "medium",
+              "basis": "hypothetical",
+              "assessment": "Moves finite-cap admission before consumption and lifecycle under one owner; privileged gateway introduces new attack surface.",
+              "validationPlan": "In hosted synthetic tenant, test all direct write routes, false lengths, over-bound streams, replay, cross-member paths and old signed capabilities."
+            },
+            {
+              "dimension": "performance",
+              "direction": "regresses",
+              "confidence": "medium",
+              "basis": "hypothetical",
+              "assessment": "Adds admission and streaming hops plus same-member lock contention.",
+              "validationPlan": "Benchmark current/candidate uploads with one/many members, small/max files and slow clients; agree p95/throughput/lock-wait budgets before rollout."
+            },
+            {
+              "dimension": "memory",
+              "direction": "regresses",
+              "confidence": "medium",
+              "basis": "hypothetical",
+              "assessment": "Adds bounded stream buffers, reservation rows/indexes and charged pending objects.",
+              "validationPlan": "Measure gateway peak memory/backpressure, pending row growth and stored bytes under abort storms; reject unbounded growth."
+            },
+            {
+              "dimension": "reliability",
+              "direction": "improves",
+              "confidence": "medium",
+              "basis": "hypothetical",
+              "assessment": "Durable idempotent recovery prevents premature release; gateway or worker failure delays admissions/reclamation.",
+              "validationPlan": "Crash at each reserve/upload/finalize/delete/release boundary and check invariants with concurrent native sessions."
+            },
+            {
+              "dimension": "operability",
+              "direction": "regresses",
+              "confidence": "medium",
+              "basis": "hypothetical",
+              "assessment": "Requires per-tenant deployment, credentials, worker health and stuck-state repair.",
+              "validationPlan": "Practice worker outage/restart, credential rotation and stuck-reservation recovery without logging tokens/content."
+            },
+            {
+              "dimension": "migration",
+              "direction": "regresses",
+              "confidence": "medium",
+              "basis": "hypothetical",
+              "assessment": "Requires trusted object inventory, old-client coordination, policy cutover and write pause.",
+              "validationPlan": "Dry-run inventory and cutover on referenced/orphan/missing-object fixtures; verify direct writes denied before reopening."
+            },
+            {
+              "dimension": "ergonomics",
+              "direction": "improves",
+              "confidence": "medium",
+              "basis": "hypothetical",
+              "assessment": "One lifecycle API reduces caller drift, with more state-machine complexity.",
+              "validationPlan": "Implement a test upload caller through the API; ensure it cannot mutate accounting or lifecycle out of order."
+            },
+            {
+              "dimension": "rollback",
+              "direction": "regresses",
+              "confidence": "medium",
+              "basis": "hypothetical",
+              "assessment": "Rollback requires pausing uploads and resolving charged states; unrestricted policy restores only soft quota.",
+              "validationPlan": "Rehearse pause/drain/reconcile/revert without completed-object loss or silently retaining a strict quota claim."
+            }
+          ],
+          "residualRisks": [
+            "Gateway credential compromise has tenant-wide potential impact where only broad service keys exist.",
+            "Provider upload/delete semantics, bounded streaming feasibility and old signed capabilities need hosted validation.",
+            "Remote Storage and SQL commits remain separate; durable charged pending state is required."
+          ],
+          "implementationReadiness": {
+            "affectedComponents": [
+              "db/tenant-schema.sql",
+              "src/components/dept/UploadForm.tsx",
+              "src/components/admin/AdminStorage.tsx",
+              "Proposed tenant-owned gateway and cleanup worker"
+            ],
+            "workPackages": [
+              "Define lifecycle contract and role grants.",
+              "Prototype hosted bounded streaming and deny direct writes.",
+              "Implement locked reservations and idempotent completion/deletion.",
+              "Inventory objects, rehearse migration and pilot opt-in tenant."
+            ],
+            "acceptanceCriteria": [
+              "Concurrent finite-cap admission never exceeds charged capacity.",
+              "Direct unreserved writes and false-size streams are rejected.",
+              "Completed objects survive retries; deleting reservations cannot finalize.",
+              "Budget is released only after confirmed deletion/absence."
+            ],
+            "migrationNotes": [
+              "Keep current authentication and column-privilege fixes independently.",
+              "No architecture implementation selected or performed."
+            ],
+            "rollback": "Pause admissions, drain or clean pending states, reconcile stored bytes; restore old API only with explicit soft-quota contract."
+          }
+        }
+      ],
+      "recommendedOptionId": "tenant-admission",
+      "recommendation": "Validate tenant-owned admission if finite quotas must resist malicious members; retain metadata recovery as immediate baseline or final soft-quota option when operational simplicity dominates."
+    }
+  ],
+  "openQuestions": [
+    "Tenant streaming/worker runtime and operating budget?",
+    "Narrower gateway authority than a broad tenant service key?",
+    "Hosted deletion/partial-upload acknowledgment and old signed-capability semantics?",
+    "Reservation lifetime and stuck-state recovery policy?",
+    "Strict finite-cap guarantee or explicitly cooperative usage allowance?"
+  ],
+  "validationLimitations": [
+    "No hosted Supabase service was contacted.",
+    "PGlite does not reproduce the hosted upload/delete protocol or multi-session concurrency.",
+    "Canonical draft hashes identify inspected inputs, not sealed integrity.",
+    "Proposal requires option selection, source refresh and hosted validation before implementation."
+  ]
+}
+

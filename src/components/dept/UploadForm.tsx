@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Spinner } from "@/components/Spinner";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n/provider";
@@ -54,12 +55,30 @@ export function UploadForm({
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [preparing, setPreparing] = useState(false);
+  const selectionRequest = useRef(0);
+  const [pendingFile, setPendingFile] = useState<{
+    path: string;
+    record: Record<string, string | number | null>;
+    subjectIds: string[];
+  } | null>(null);
+  const [pendingUpload, setPendingUpload] = useState<{
+    id: string;
+    subjectIds: string[];
+  } | null>(null);
   /** What happened to the picture's metadata, so the form can say. */
   const [scrubNote, setScrubNote] = useState<"stripped" | "unsupported" | null>(
     null
   );
 
+  useEffect(() => () => {
+    if (preview) URL.revokeObjectURL(preview);
+  }, [preview]);
+
   async function chooseFile(next: File | null) {
+    if (busy || pendingUpload || pendingFile) return;
+    const ticket = ++selectionRequest.current;
+    setPreparing(false);
     setError(null);
     setScrubNote(null);
     if (!next) return;
@@ -78,7 +97,19 @@ export function UploadForm({
     // before the bytes leave the browser -- afterwards they are in the
     // department owner's bucket and it is too late. Losslessly: the segments
     // are removed from the container, the pixels are not touched.
-    const scrubbed = await scrubImage(next);
+    setPreparing(true);
+    let scrubbed;
+    try {
+      scrubbed = await scrubImage(next);
+    } catch {
+      if (ticket === selectionRequest.current) {
+        setError(t("upload.errorGeneric"));
+        setPreparing(false);
+      }
+      return;
+    }
+    if (ticket !== selectionRequest.current) return;
+    setPreparing(false);
     const chosen = scrubbed.file;
     if (scrubbed.scrubbed) setScrubNote("stripped");
     else if (scrubbed.unsupported) setScrubNote("unsupported");
@@ -86,7 +117,6 @@ export function UploadForm({
     setFile(chosen);
     if (!title) setTitle(chosen.name.replace(/\.[^.]+$/, ""));
 
-    if (preview) URL.revokeObjectURL(preview);
     setPreview(
       chosen.type.startsWith("image/") ? URL.createObjectURL(chosen) : null
     );
@@ -98,8 +128,9 @@ export function UploadForm({
    * change event at all, and the dropzone just sits there looking broken.
    */
   function clearFile() {
+    selectionRequest.current += 1;
+    setPreparing(false);
     setFile(null);
-    if (preview) URL.revokeObjectURL(preview);
     setPreview(null);
     setError(null);
     setScrubNote(null);
@@ -117,6 +148,7 @@ export function UploadForm({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (busy || preparing) return;
     if (!file) return setError(t("upload.errorNoFile"));
     if (!title.trim()) return setError(t("upload.errorTitle"));
     if (!accepted) return;
@@ -126,64 +158,85 @@ export function UploadForm({
 
     // Path is namespaced by user id: the storage policy only lets you write
     // into your own folder, so the path itself is part of the access check.
-    const path = `${userId}/${crypto.randomUUID()}-${sanitiseName(file.name)}`;
-
+    let saved = pendingUpload;
+    let write = pendingFile;
     try {
-      const { error: uploadError } = await supabase.storage
-        .from(STORAGE_BUCKET)
-        .upload(path, file, {
-          contentType: file.type,
-          upsert: false,
-        });
-      if (uploadError) throw uploadError;
+      if (!saved) {
+        if (!write) {
+          const path = `${userId}/${crypto.randomUUID()}-${sanitiseName(file.name)}`;
+          const { error: uploadError } = await supabase.storage
+            .from(STORAGE_BUCKET)
+            .upload(path, file, { contentType: file.type, upsert: false });
+          if (uploadError) throw uploadError;
+          write = { path, subjectIds: Array.from(picked), record: {
+            owner_id: userId,
+            title: title.trim().slice(0, 200),
+            description: description.trim().slice(0, 2000) || null,
+            category,
+            storage_path: path,
+            original_name: file.name.slice(0, 200),
+            mime_type: file.type,
+            size_bytes: file.size,
+            kind: kindFromMime(file.type),
+          } };
+          setPendingFile(write);
+        } else {
+          // An earlier response was lost. Check for its committed row before
+          // retrying the same unique storage path, without uploading again.
+          const { data: existing, error: readError } = await supabase.from("files")
+            .select("id").eq("storage_path", write.path).maybeSingle();
+          if (readError) throw readError;
+          if (existing) saved = { id: existing.id, subjectIds: write.subjectIds };
+        }
 
-      const { data: row, error: insertError } = await supabase
-        .from("files")
-        .insert({
-          owner_id: userId,
-          title: title.trim().slice(0, 200),
-          description: description.trim().slice(0, 2000) || null,
-          category,
-          storage_path: path,
-          original_name: file.name.slice(0, 200),
-          mime_type: file.type,
-          size_bytes: file.size,
-          kind: kindFromMime(file.type),
-        })
-        .select("id")
-        .single();
-
-      if (insertError) {
-        // Do not leave an orphaned object behind if the row could not be made.
-        // This covers the storage quota too: the cap is a trigger on this
-        // INSERT, so a refusal arrives here with the object already uploaded,
-        // and without this the upload would spend the allowance it was
-        // refused for.
-        await supabase.storage.from(STORAGE_BUCKET).remove([path]);
-        throw insertError;
+        if (!saved) {
+          const { data: row, error: insertError } = await supabase.from("files")
+            .insert(write.record).select("id").single();
+          if (insertError || !row) {
+            const { data: existing, error: readError } = await supabase.from("files")
+              .select("id").eq("storage_path", write.path).maybeSingle();
+            if (existing && !readError) {
+              saved = { id: existing.id, subjectIds: write.subjectIds };
+            } else {
+              // A transport failure is not proof the INSERT failed. Preserve
+              // bytes on an uncertain read; a later retry uses this same path.
+              if (!readError && /^[0-9A-Z]{5}$/.test(insertError?.code ?? "")) {
+                await supabase.storage.from(STORAGE_BUCKET).remove([write.path]);
+                setPendingFile(null);
+                write = null;
+              }
+              throw insertError ?? readError ?? new Error("Upload status unknown");
+            }
+          } else saved = { id: row.id, subjectIds: write.subjectIds };
+        }
+        setPendingUpload(saved);
+        setPendingFile(null);
+        write = null;
       }
 
-      if (picked.size) {
-        // Checked, unlike before. A refusal here left the document filed under
-        // nothing at all while the form reported success, so the subjects the
-        // person picked quietly did not happen and only they would notice.
+      if (saved.subjectIds.length) {
+        const fileId = saved.id;
+        // Keep the uploaded record across retries. An uncertain response may
+        // have committed these links, so retrying them must be idempotent too.
         const { error: subjectError } = await supabase
           .from("file_subjects")
-          .insert(
-            Array.from(picked).map((subject_id) => ({
-              file_id: row.id,
+          .upsert(
+            saved.subjectIds.map((subject_id) => ({
+              file_id: fileId,
               subject_id,
-            }))
+            })),
+            { onConflict: "file_id,subject_id", ignoreDuplicates: true }
           );
         if (subjectError) throw subjectError;
       }
 
-      router.push(href(`file/${row.id}`));
+      router.push(href(`file/${saved.id}`));
       router.refresh();
     } catch (err) {
-      const message = err instanceof Error ? err.message : "";
+      const message = typeof err === "object" && err !== null && "message" in err
+        ? String(err.message) : "";
       setError(
-        message.includes("QUOTA_EXCEEDED")
+        saved ? t("upload.savedNeedsSubjects") : write ? t("upload.confirmSave") : message.includes("QUOTA_EXCEEDED")
           ? t("upload.errorQuota")
           : t("upload.errorGeneric")
       );
@@ -191,222 +244,224 @@ export function UploadForm({
     }
   }
 
-  const ready = Boolean(file && title.trim() && accepted && !busy);
+  const ready = Boolean(file && title.trim() && accepted && !busy && !preparing);
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-6">
-      {/* dropzone */}
-      <div
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragging(true);
-        }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragging(false);
-          chooseFile(e.dataTransfer.files?.[0] ?? null);
-        }}
-        onClick={() => inputRef.current?.click()}
-        className={`dropzone px-6 py-10 text-center ${
-          dragging ? "dropzone-active" : ""
-        }`}
-      >
-        <input
-          ref={inputRef}
-          id="upload-file"
-          type="file"
-          // sr-only, not hidden: display:none takes the input out of the tab
-          // order, which left the dropzone unreachable by keyboard entirely.
-          // The zone shows the focus ring for it via :focus-within.
-          className="sr-only"
-          accept={Object.keys(ACCEPTED_MIME).join(",")}
-          onChange={(e) => chooseFile(e.target.files?.[0] ?? null)}
-        />
-
-        {file ? (
-          <div className="flex items-center justify-center gap-4">
-            {preview ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={preview}
-                alt=""
-                width={96}
-                height={96}
-                decoding="async"
-                className="h-24 w-24 rounded-card border border-paper-400 object-cover"
-              />
-            ) : (
-              <div className="flex h-24 w-24 items-center justify-center rounded-card border border-paper-400 bg-paper-200 text-ink-500">
-                <KindIcon kind={kindFromMime(file.type)} size={34} />
-              </div>
-            )}
-            <div className="text-left">
-              <p className="typewriter text-sm break-all text-ink-900">
-                {file.name}
-              </p>
-              <p className="docket mt-1 text-2xs text-ink-500">
-                {formatBytes(file.size)} · {file.type}
-              </p>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  clearFile();
-                }}
-                className="mt-2 cursor-pointer text-xs text-stamp-red underline"
-              >
-                {t("common.cancel")}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <>
-            <svg
-              className="mx-auto mb-3 text-ink-400"
-              width="34"
-              height="34"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-            >
-              <path d="M12 16V4M8 8l4-4 4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" />
-            </svg>
-            <label
-              htmlFor="upload-file"
-              className="cursor-pointer font-semibold text-ink-700"
-            >
-              {t("upload.dropzone")}
-            </label>
-            <p className="docket mt-1 text-2xs text-ink-500">
-              {t("upload.dropzoneHint", { mb: maxUploadMb })}
-            </p>
-          </>
-        )}
-      </div>
-
-      {scrubNote && (
-        <p
-          role="status"
-          className={`notice text-xs ${
-            scrubNote === "stripped" ? "notice-ok" : "notice-error"
+      <fieldset disabled={busy || Boolean(pendingUpload) || Boolean(pendingFile)} className="contents">
+        {/* dropzone */}
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragging(false);
+            chooseFile(e.dataTransfer.files?.[0] ?? null);
+          }}
+          onClick={() => inputRef.current?.click()}
+          className={`dropzone px-6 py-10 text-center ${
+            dragging ? "dropzone-active" : ""
           }`}
         >
-          {t(
-            scrubNote === "stripped"
-              ? "upload.metadataStripped"
-              : "upload.metadataUnsupported"
-          )}
-        </p>
-      )}
+          <input
+            ref={inputRef}
+            id="upload-file"
+            type="file"
+            // sr-only, not hidden: display:none takes the input out of the tab
+            // order, which left the dropzone unreachable by keyboard entirely.
+            // The zone shows the focus ring for it via :focus-within.
+            className="sr-only"
+            accept={Object.keys(ACCEPTED_MIME).join(",")}
+            onChange={(e) => chooseFile(e.target.files?.[0] ?? null)}
+          />
 
-      {/* metadata */}
-      <div className="paper p-5">
-        <div className="flex flex-col gap-4">
-          <div>
-            <label className="label" htmlFor="title">
-              {t("upload.fileTitle")}
-            </label>
-            <input
-              id="title"
-              className="field"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder={t("upload.fileTitlePlaceholder")}
-              maxLength={200}
-              required
-            />
-          </div>
-
-          <div>
-            <label className="label" htmlFor="description">
-              {t("upload.description")}
-            </label>
-            <textarea
-              id="description"
-              className="field min-h-24 resize-y"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder={t("upload.descriptionPlaceholder")}
-              maxLength={2000}
-            />
-          </div>
-
-          <div>
-            <label className="label" htmlFor="category">
-              {t("upload.category")}
-            </label>
-            <select
-              id="category"
-              className="field"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-            >
-              {categories.map((c: string) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <span className="label">{t("upload.subjects")}</span>
-            {subjects.length === 0 ? (
-              <p className="text-sm text-ink-400">{t("upload.noSubjects")}</p>
-            ) : (
-              <>
-                <div className="flex flex-wrap gap-2">
-                  {subjects.map((s) => {
-                    const on = picked.has(s.id);
-                    return (
-                      <button
-                        key={s.id}
-                        type="button"
-                        onClick={() => toggleSubject(s.id)}
-                        aria-pressed={on}
-                        title={s.description ?? undefined}
-                        className={`typewriter cursor-pointer rounded-card border px-2.5 py-1 text-xs transition-colors ${
-                          on
-                            ? "border-gov-800 bg-gov-800 text-white"
-                            : "border-paper-400 bg-paper-100 text-ink-700 hover:border-gov-600"
-                        }`}
-                      >
-                        {on && <span aria-hidden>✓ </span>}
-                        {s.name}
-                      </button>
-                    );
-                  })}
+          {file ? (
+            <div className="flex items-center justify-center gap-4">
+              {preview ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={preview}
+                  alt=""
+                  width={96}
+                  height={96}
+                  decoding="async"
+                  className="h-24 w-24 rounded-card border border-paper-400 object-cover"
+                />
+              ) : (
+                <div className="flex h-24 w-24 items-center justify-center rounded-card border border-paper-400 bg-paper-200 text-ink-500">
+                  <KindIcon kind={kindFromMime(file.type)} size={34} />
                 </div>
-                <p className="mt-2 text-xs text-ink-400">
-                  {t("upload.subjectsHint")}
+              )}
+              <div className="text-left">
+                <p className="typewriter text-sm break-all text-ink-900">
+                  {file.name}
                 </p>
-              </>
+                <p className="docket mt-1 text-2xs text-ink-500">
+                  {formatBytes(file.size)} · {file.type}
+                </p>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    clearFile();
+                  }}
+                  className="mt-2 cursor-pointer text-xs text-stamp-red underline"
+                >
+                  {t("common.cancel")}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <svg
+                className="mx-auto mb-3 text-ink-400"
+                width="34"
+                height="34"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              >
+                <path d="M12 16V4M8 8l4-4 4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" />
+              </svg>
+              <label
+                htmlFor="upload-file"
+                className="cursor-pointer font-semibold text-ink-700"
+              >
+                {t("upload.dropzone")}
+              </label>
+              <p className="docket mt-1 text-2xs text-ink-500">
+                {t("upload.dropzoneHint", { mb: maxUploadMb })}
+              </p>
+            </>
+          )}
+        </div>
+
+        {scrubNote && (
+          <p
+            role="status"
+            className={`notice text-xs ${
+              scrubNote === "stripped" ? "notice-ok" : "notice-error"
+            }`}
+          >
+            {t(
+              scrubNote === "stripped"
+                ? "upload.metadataStripped"
+                : "upload.metadataUnsupported"
             )}
+          </p>
+        )}
+
+        {/* metadata */}
+        <div className="paper p-5">
+          <div className="flex flex-col gap-4">
+            <div>
+              <label className="label" htmlFor="title">
+                {t("upload.fileTitle")}
+              </label>
+              <input
+                id="title"
+                className="field"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder={t("upload.fileTitlePlaceholder")}
+                maxLength={200}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="label" htmlFor="description">
+                {t("upload.description")}
+              </label>
+              <textarea
+                id="description"
+                className="field min-h-24 resize-y"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder={t("upload.descriptionPlaceholder")}
+                maxLength={2000}
+              />
+            </div>
+
+            <div>
+              <label className="label" htmlFor="category">
+                {t("upload.category")}
+              </label>
+              <select
+                id="category"
+                className="field"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              >
+                {categories.map((c: string) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <span className="label">{t("upload.subjects")}</span>
+              {subjects.length === 0 ? (
+                <p className="text-sm text-ink-400">{t("upload.noSubjects")}</p>
+              ) : (
+                <>
+                  <div className="flex flex-wrap gap-2">
+                    {subjects.map((s) => {
+                      const on = picked.has(s.id);
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => toggleSubject(s.id)}
+                          aria-pressed={on}
+                          title={s.description ?? undefined}
+                          className={`typewriter cursor-pointer rounded-card border px-2.5 py-1 text-xs transition-colors ${
+                            on
+                              ? "border-gov-800 bg-gov-800 text-white"
+                              : "border-paper-400 bg-paper-100 text-ink-700 hover:border-gov-600"
+                          }`}
+                        >
+                          {on && <span aria-hidden>✓ </span>}
+                          {s.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-2 text-xs text-ink-400">
+                    {t("upload.subjectsHint")}
+                  </p>
+                </>
+              )}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* accountability */}
-      <div className="paper paper-flag-red p-5">
-        <p className="docket mb-2 text-stamp-red text-2xs">{t("notice.title")}</p>
-        <p className="text-sm leading-relaxed text-ink-700">
-          {t("notice.body")}
-        </p>
-        <label className="mt-4 flex cursor-pointer items-start gap-3 text-sm font-semibold text-ink-900">
-          <input
-            type="checkbox"
-            checked={accepted}
-            onChange={(e) => setAccepted(e.target.checked)}
-            className="mt-0.5 accent-stamp-red"
-            required
-          />
-          {t("notice.checkbox")}
-        </label>
-      </div>
+        {/* accountability */}
+        <div className="paper paper-flag-red p-5">
+          <p className="docket mb-2 text-stamp-red text-2xs">{t("notice.title")}</p>
+          <p className="text-sm leading-relaxed text-ink-700">
+            {t("notice.body")}
+          </p>
+          <label className="mt-4 flex cursor-pointer items-start gap-3 text-sm font-semibold text-ink-900">
+            <input
+              type="checkbox"
+              checked={accepted}
+              onChange={(e) => setAccepted(e.target.checked)}
+              className="mt-0.5 accent-stamp-red"
+              required
+            />
+            {t("notice.checkbox")}
+          </label>
+        </div>
 
+      </fieldset>
       {error && (
         <p
           role="alert"
@@ -414,6 +469,11 @@ export function UploadForm({
         >
           {error}
         </p>
+      )}
+      {pendingUpload && error && (
+        <Link href={href(`file/${pendingUpload.id}`)} className="text-sm text-gov-800 underline">
+          {t("upload.openSavedFile")}
+        </Link>
       )}
 
       <div className="flex items-center gap-4">
@@ -424,7 +484,7 @@ export function UploadForm({
           className="btn btn-lg btn-primary"
         >
           {busy && <Spinner />}
-          {busy ? t("upload.submitting") : t("upload.submit")}
+          {busy ? t("upload.submitting") : pendingUpload ? t("upload.retrySubjects") : pendingFile ? t("common.retry") : t("upload.submit")}
         </button>
 
         {busy && (

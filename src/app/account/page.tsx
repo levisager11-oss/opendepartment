@@ -23,12 +23,13 @@ export default async function AccountPage() {
   // department's own project knows the current one. Both values are public by
   // design -- they are already handed to every visitor of /d/<slug> -- and
   // departments_read_own means an operator only ever sees their own.
-  const { data: departments } = await supabase
+  const { data: departments, error } = await supabase
     .from("departments")
     .select(
       "slug, display_name, tagline, visibility, status, created_at, supabase_url, anon_key"
     )
     .order("created_at", { ascending: false });
+  if (error) throw new Error("Could not load departments.");
 
   return (
     <MarketingShell wide>

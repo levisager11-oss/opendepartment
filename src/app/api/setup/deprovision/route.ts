@@ -1,11 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createControlClient, CONTROL_CONFIGURED } from "@/lib/control/client";
 import { clientKey, rateLimit } from "@/lib/rate-limit";
+import { readJsonObject, sameOrigin, stringFields } from "@/lib/setup/request";
 import {
   COOKIE_BASE,
   TOKEN_COOKIE,
   oauthConfigured,
-  unseal,
+  managementToken,
 } from "@/lib/setup/oauth-session";
 import { deleteProject, getProject } from "@/lib/setup/supabase-management";
 
@@ -47,6 +48,7 @@ const WINDOW_MS = 10 * 60_000;
 const PROJECT_URL = /^https:\/\/([a-z0-9-]+)\.supabase\.(co|in)$/;
 
 export async function POST(request: NextRequest) {
+  if (!sameOrigin(request)) return NextResponse.json({ error: "BAD_ORIGIN" }, { status: 403 });
   if (!CONTROL_CONFIGURED || !oauthConfigured()) {
     return NextResponse.json({ error: "NOT_AVAILABLE" }, { status: 503 });
   }
@@ -69,12 +71,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 });
   }
 
-  let body: { slug?: string };
-  try {
-    body = await request.json();
-  } catch {
+  const parsed = await readJsonObject(request);
+  if (!parsed.ok) return parsed.response;
+  if (!stringFields(parsed.value, ["slug"])) {
     return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
   }
+  const body = parsed.value as { slug?: string };
 
   const slug = (body.slug ?? "").trim().toLowerCase();
   if (!/^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])$/.test(slug)) {
@@ -104,7 +106,7 @@ export async function POST(request: NextRequest) {
 
   const dashboard = `https://supabase.com/dashboard/project/${ref}`;
 
-  const token = unseal(request.cookies.get(TOKEN_COOKIE)?.value);
+  const token = managementToken(request.cookies.get(TOKEN_COOKIE)?.value, user.id);
   if (!token) {
     // Recoverable, and the only exit the caller should offer a retry for:
     // connect, then press the button again.

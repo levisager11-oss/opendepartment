@@ -24,6 +24,7 @@ export function CommentSection({
   const [comments, setComments] = useState(initialComments);
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
+  const [removing, setRemoving] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
   async function post(e: React.FormEvent) {
@@ -38,32 +39,42 @@ export function CommentSection({
     setBusy(true);
     setError(null);
 
-    const { data, error: insertError } = await supabase
-      .from("comments")
-      .insert({ file_id: fileId, author_id: currentUserId, body: text })
-      .select("id, file_id, author_id, body, created_at")
-      .single();
-
-    if (insertError || !data) {
-      setError(t("common.error"));
+    try {
+      const { data, error: insertError } = await supabase
+        .from("comments")
+        .insert({ file_id: fileId, author_id: currentUserId, body: text })
+        .select("id, file_id, author_id, body, created_at")
+        .single();
+      if (insertError || !data) throw insertError ?? new Error("Comment not saved");
+      setComments((prev) => [...prev, { ...data, author_username: currentUsername }]);
+      setBody("");
+    } catch {
+      setError(t("common.actionFailed"));
+    } finally {
       setBusy(false);
-      return;
     }
-
-    setComments((prev) => [
-      ...prev,
-      { ...data, author_username: currentUsername },
-    ]);
-    setBody("");
-    setBusy(false);
   }
 
   async function remove(id: string) {
-    const previous = comments;
-    setComments((prev) => prev.filter((c) => c.id !== id));
-
-    const { error } = await supabase.from("comments").delete().eq("id", id);
-    if (error) setComments(previous);
+    if (removing.has(id)) return;
+    setRemoving((prev) => new Set(prev).add(id));
+    setError(null);
+    try {
+      const { data, error: deleteError } = await supabase.from("comments")
+        .delete().eq("id", id).select("id");
+      if (deleteError || !data?.length) throw deleteError ?? new Error("Deletion refused");
+      // Remove only the confirmed row. A failed parallel request must never
+      // restore a snapshot containing another successfully deleted comment.
+      setComments((prev) => prev.filter((comment) => comment.id !== id));
+    } catch {
+      setError(t("common.actionFailed"));
+    } finally {
+      setRemoving((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
   }
 
   return (
@@ -99,6 +110,8 @@ export function CommentSection({
                     {(mine || isAdmin) && (
                       <button
                         type="button"
+                        disabled={removing.has(comment.id)}
+                        aria-busy={removing.has(comment.id)}
                         onClick={() => {
                           if (confirm(t("comments.deleteConfirm"))) {
                             remove(comment.id);
@@ -123,6 +136,8 @@ export function CommentSection({
           <textarea
             className="field min-h-20 resize-y"
             placeholder={t("comments.placeholder")}
+            aria-label={t("comments.placeholder")}
+            disabled={busy}
             value={body}
             onChange={(e) => setBody(e.target.value)}
             maxLength={2000}

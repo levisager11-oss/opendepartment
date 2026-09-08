@@ -8,8 +8,12 @@
  * callback inside a department.
  */
 export function requestOrigin(headers: Headers): string {
-  const host = headers.get("x-forwarded-host") ?? headers.get("host") ?? "localhost:3000";
-  const proto =
-    headers.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  // Deployment proxies must sanitize these headers. Validate their grammar
+  // here so a malformed forwarded value cannot become a redirect URL.
+  const validHost = (value: string | null) => value && /^[a-z0-9.-]+(?::\d{1,5})?$/i.test(value) ? value : null;
+  const host = validHost(headers.get("x-forwarded-host")) ?? validHost(headers.get("host")) ?? "localhost:3000";
+  const forwarded = headers.get("x-forwarded-proto");
+  const proto = forwarded === "http" || forwarded === "https" ? forwarded :
+    /^(localhost|127\.0\.0\.1)(:|$)/.test(host) ? "http" : "https";
   return `${proto}://${host}`;
 }

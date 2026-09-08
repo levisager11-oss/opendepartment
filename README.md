@@ -5,6 +5,11 @@ Run your own parody document archive. A generalisation of
 department, name it after anything, invite their own people, and keep every
 byte of it in a Supabase project they own.
 
+The [September 2026 audit](AUDIT.md) records the current security fixes,
+verification, remaining limitations and rollout steps. New installations use
+a private founder link; existing deployments must apply the updated SQL in
+both the control plane and every tenant project.
+
 ---
 
 ## The shape of it
@@ -64,9 +69,11 @@ the tenant's own database, each re-checking `is_admin()` itself:
 | `admin` deleting a department's tables | `purge_department(confirm)` |
 
 What OpenDepartment holds **at rest** is a URL and an anon key — both public by
-design and useless without an account the tenant's own RLS admits. **We cannot
-read any department's contents**, which is a feature, not a limitation: it is
-also the honest answer when someone asks who can see their files.
+design and restricted by the tenant's own RLS. During a member's request, the
+server receives that member's session, reads authorized metadata and creates
+temporary signed file URLs. This architecture avoids a permanent tenant
+administrator key; it does not make the hosting server unable to read data
+that the current visitor is authorized to access.
 
 One caveat, and it is a real one. If the deployment enables the optional
 [one-click setup](#one-click-setup-optional), OpenDepartment **does** handle a
@@ -75,8 +82,8 @@ minutes it takes to create their project and install the schema. That token is
 never written to any database; it lives encrypted in an httpOnly cookie in
 their own browser and is deleted when provisioning finishes. But the server
 decrypts it on each request, which it must in order to use it. So the accurate
-claim is *never stored, never persistent, and scoped to setup* — not *never
-seen*. A deployment that does not want that property simply leaves the two
+claim is *not written to a database, short-lived, account-bound and scoped to
+setup*. A deployment that does not want that property simply leaves the two
 environment variables unset, and the feature does not exist.
 
 The setup endpoint decodes the pasted key and **refuses a `service_role` JWT**
@@ -303,8 +310,11 @@ and back, and coming back to an empty form *after* running the SQL against a
 real project was the worst moment in the flow: the project is claimed by then,
 so starting over does not work either.
 
-**The first account to sign up becomes the administrator.** There is no seed
-file to edit and no support ticket to file.
+**Only the holder of the wizard's private founder link can create the first
+administrator.** The browser generates a single-use secret and puts only its
+SHA-256 digest in the SQL. Keep the founder link until signup succeeds. See
+[founder setup and recovery](docs/AUDIT-BOOTSTRAP.md), including the extra step
+for a fresh pinned department installed without the wizard.
 
 ### Getting in
 
@@ -459,8 +469,9 @@ the create-a-department flow run end to end on the live deployment).
   with no violations. `style-src` keeps `'unsafe-inline'` and says why — the
   accent reaches the page as a style *attribute*, which no nonce can cover,
   and that value is fenced by a CHECK constraint instead
-- **A SQL security suite** (`npm run test:rls`), 127 assertions over both
-  schemas. See below
+- **A SQL security suite** (`npm run test:rls`) for both schemas and a Vitest
+  suite for session isolation, setup, navigation and UI failure/retry behavior.
+  CI runs both suites, TypeScript and a production build.
 
 Not built yet:
 
@@ -469,35 +480,40 @@ Not built yet:
 
 ## Testing the part that actually enforces things
 
-Every authorisation decision in OpenDepartment is made in SQL — an RLS policy,
-a column privilege, or an `is_admin()` check inside a `security definer`
-function. None of it is reachable from the TypeScript, which means none of it
-was covered by anything.
+Tenant authorization is enforced by SQL policies, column privileges and
+checked functions. The test runner exercises those controls as `anon` and
+`authenticated`, alongside application regression tests.
 
 ```bash
-npm run test:rls
+npm ci
+npm run typecheck
+npm test
+npm run build
 ```
 
-Builds a throwaway PostgreSQL cluster, shims the parts of Supabase the schemas
-depend on, applies both `db/*.sql` files twice, and checks that a member cannot
-promote themselves, that an administrator cannot un-claim their own department
-or put arbitrary text where CSS is rendered, that a banned member cannot write,
-that a banned *administrator* is no longer an administrator, that a
-`service_role` key cannot be registered or swapped in later,
-that a signed-out visitor reaches only the two functions the front door needs,
-that the invite door admits and refuses the right people, that erasing a
-department is something only an unbanned administrator who names it can do, and
-that a suspended department cannot delist its way out of a suspension. 144
-assertions — 98 against the tenant schema, 46 against the control plane. No
-Supabase project, no network, no credentials — just a `postgres` binary.
+`npm run test:unit` runs Vitest. `npm run test:rls` uses disposable in-memory
+PostgreSQL instances through PGlite, with local stand-ins for Supabase Auth and
+Storage. It works on Windows and Linux with Node 22 and needs no project or
+credentials. Both schemas are applied twice before their tests run. The suite
+checks founder authorization, member/admin boundaries, column privileges,
+banned accounts, suspension, report validity, quota accounting and cleanup.
+
+`npm run test:rls:native` runs the SQL suites against a temporary native
+PostgreSQL cluster instead; it requires Bash and PostgreSQL binaries. Neither
+local runner exercises hosted Auth, Storage byte transfers, OAuth or
+multi-session locking. Those need a disposable Supabase integration project.
+
+For local production HTTP checks, start an unconfigured build with
+`npm run start -- --hostname 127.0.0.1`, then run `npm run test:smoke` in another
+terminal. This checks public pages, CSP/nonces, 404 responses and cross-origin
+setup refusal; it only accepts a loopback target.
 
 Applying each schema twice is the point of a separate step: re-running these
 files is the documented upgrade path below, so idempotency fails the suite
 rather than somebody's SQL editor.
 
-The suite was written against the *unfixed* schema first and reports failures
-there -- 12 for the round that added the column fences, and another 16 for the
-round that added the banned-administrator and secret-key assertions. A test that cannot fail is not evidence.
+Security regressions were exercised against the original schemas before the
+fixes and then rerun against the corrected schemas.
 [db/test/README.md](db/test/README.md) has the rest.
 
 ## Upgrading a deployment that already exists
@@ -539,11 +555,13 @@ CHECK constraint on the column, catching both key generations. It is added
 alter table public.departments validate constraint departments_key_not_secret;
 ```
 
-This round also adds a **per-member storage cap**
+This earlier round added **per-member document-size accounting**
 (`settings.max_member_storage_mb`, null for none), an **orphan sweep** on the
 administration screen for objects whose document row is gone, **one view per
 person per hour** instead of one per reload, and a fence tying
 `files.storage_path` to the folder its owner may actually write to.
+The accounting limit does not enforce actual Storage usage or billing: direct
+uploads and caller-supplied sizes bypass it. Monitor the project's usage.
 
 The current round of fixes also adds, to the tenant schema: `is_active_member()`
 on `claim_username()`, a shape constraint on invite codes (a code may carry
@@ -561,7 +579,9 @@ front door could drive unbounded writes), a constraint tying `mime_type` to
 constraints on existing rows are added `NOT VALID`, so re-running the file does
 not ask anybody to delete documents their members filed under the old rules.
 
-Nothing here needs the app to be redeployed first; the two are independent.
+The historical fixes above do not require the app to be redeployed first.
+For the current founder-verification change, follow the coordinated rollout
+in [AUDIT.md](AUDIT.md) and [founder setup](docs/AUDIT-BOOTSTRAP.md).
 The app also refuses a non-hex `accent` on the way out, so a department that
 has not re-run the file yet still cannot have CSS injected through it.
 

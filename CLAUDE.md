@@ -23,17 +23,16 @@ npm run test:rls      # the SQL security suite (see below)
 No lint script is configured, and `next.config.ts` sets
 `eslint.ignoreDuringBuilds`.
 
-The only tests are SQL. `npm run test:rls` builds a throwaway PostgreSQL
-cluster, applies a Supabase shim, applies both `db/*.sql` files **twice**
-(re-running them is the documented upgrade path, so idempotency is a tested
-property), and asserts the policies actually hold — 98 assertions against the
-tenant schema, 46 against the control plane. It needs a `postgres` server
-binary and nothing else: no Supabase project, no network, no credentials. See
+`npm test` runs Vitest, the SQL security suites and a demo-seed smoke test.
+`npm run test:rls` uses disposable PGlite databases on Node 22, applies the
+Supabase shim and both schemas **twice**, and tests policies as `anon` and
+`authenticated`. `npm run test:rls:native` additionally supports a temporary
+native PostgreSQL cluster when Bash and server binaries are available. See
 [db/test/README.md](db/test/README.md) before adding a case; the two rules that
 matter are that a test must run as `anon`/`authenticated` rather than the table
 owner (the owner bypasses RLS), and that a blocked write has two distinct
-shapes worth asserting separately. There is no single-test runner; the suites
-are two `.sql` files.
+shapes worth asserting separately. Vitest supports focused runs such as
+`npx vitest run tests/browser-realms.test.ts`.
 
 **When you change a policy, a grant or a `security definer` function, add the
 assertion in the same commit** — and check it goes red against the old schema,

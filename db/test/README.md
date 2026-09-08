@@ -11,11 +11,14 @@ machine checks.
 npm run test:rls
 ```
 
-Needs a PostgreSQL 14+ server binary and nothing else — no Supabase project, no
-network, no credentials. It builds a throwaway cluster in a temporary
-directory, tears it down afterwards, and never touches a real database. Set
-`PGBIN` if the binaries are not on the path (on Debian/Ubuntu they live in
-`/usr/lib/postgresql/<version>/bin`).
+The default runner uses PGlite with its pgcrypto extension on Node 22, including
+Windows. Run `npm ci` first. It creates separate disposable in-memory databases
+for the tenant and control plane and does not access a Supabase project.
+
+For native PostgreSQL, run `npm run test:rls:native`. This requires Bash and
+PostgreSQL 14+ server binaries. Set `PGBIN` if the binaries are not on the path
+(on Debian/Ubuntu they live in `/usr/lib/postgresql/<version>/bin`). It creates
+and removes only its own temporary cluster.
 
 ## What is in here
 
@@ -25,12 +28,20 @@ directory, tears it down afterwards, and never touches a real database. Set
 | `01-helpers.sql` | Assertion helpers and role impersonation. |
 | `02-rls-tests.sql` | The tenant schema: 98 assertions. |
 | `03-control-plane-tests.sql` | The control plane: 46 assertions. |
-| `run.sh` | Builds the cluster, applies each schema **twice**, runs both suites. |
+| `04-tenant-security-regressions.sql` | Anonymous deletion, protected columns, reports, founder proof and orphan cleanup regressions. |
+| `05-control-security-regressions.sql` | Operator cascade and registration serialization regressions. |
+| `run.mjs` | Portable PGlite runner. |
+| `run.sh` | Native cluster runner. |
 
 Applying each schema twice is deliberate. Re-running the `.sql` files is the
 documented way a deployment picks up a change, so "is it still idempotent" is
 a property worth failing the build over rather than discovering in somebody's
-SQL editor.
+SQL editor. The runner prints current assertion totals rather than relying on
+the historical counts above.
+
+The shim validates PostgreSQL authorization behavior, not Supabase's hosted
+Auth or Storage services. Single-backend PGlite does not reproduce concurrent
+transactions. Exercise those integrations separately before production rollout.
 
 ## Two things worth knowing before adding a test
 
