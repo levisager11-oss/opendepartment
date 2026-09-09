@@ -16,6 +16,7 @@ import { CommentSection } from "@/components/dept/CommentSection";
 import { AdminDanger } from "@/components/admin/AdminDanger";
 import { AdminUsers } from "@/components/admin/AdminUsers";
 import { AdminPanel } from "@/components/admin/AdminPanel";
+import { AdminAudit } from "@/components/admin/AdminAudit";
 import { AdminFiles } from "@/components/admin/AdminFiles";
 import { DeptHeader } from "@/components/dept/DeptHeader";
 import { DeleteFileButton } from "@/components/dept/DeleteFileButton";
@@ -385,6 +386,49 @@ describe("authentication and previews", () => {
     expect(screen.getByRole("alert")).toBeTruthy();
     view.rerender(<FileViewer kind="image" url="https://storage.example/fresh" title="Exhibit" />);
     expect(screen.getByRole("img").getAttribute("src")).toBe("https://storage.example/fresh");
+  });
+  it("refuses a signup whose two passwords disagree, without a round trip", () => {
+    render(<DeptLoginForm initialMode="signup" />);
+    fireEvent.change(screen.getByLabelText(tr("auth.email")), { target: { value: "a@b.test" } });
+    fireEvent.change(screen.getByLabelText(tr("auth.password")), { target: { value: "example-password" } });
+    fireEvent.change(screen.getByLabelText(tr("auth.repeatPassword")), { target: { value: "example-passwrod" } });
+    fireEvent.click(screen.getByRole("button", { name: tr("auth.signup") }));
+    expect(screen.getByRole("alert").textContent).toBe(tr("auth.passwordMismatch"));
+    expect(runtime.client.auth.signUp).not.toHaveBeenCalled();
+  });
+  it("stops asking twice once the password is on screen", () => {
+    render(<DeptLoginForm initialMode="signup" />);
+    expect(screen.getByLabelText(tr("auth.repeatPassword"))).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: tr("auth.showPassword") }));
+    // Nothing to confirm against when you can read it.
+    expect((screen.getByLabelText(tr("auth.password")) as HTMLInputElement).type).toBe("text");
+    expect(screen.queryByLabelText(tr("auth.repeatPassword"))).toBeNull();
+  });
+  it("exports the audit log as CSV that a spreadsheet cannot misread", () => {
+    const created = vi.fn().mockReturnValue("blob:audit");
+    vi.stubGlobal("URL", { ...URL, createObjectURL: created, revokeObjectURL: vi.fn() });
+    let captured = "";
+    vi.stubGlobal("Blob", class {
+      constructor(parts: string[]) { captured = parts.join(""); }
+    });
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    render(<AdminAudit entries={[{
+      id: 1, actor_id: "a", action: "file.delete", target: "one,two\nthree",
+      detail: { reason: 'said "no"' }, created_at: "2026-01-01T00:00:00Z",
+      actor_username: "=cmd|calc",
+    }]} />);
+    fireEvent.click(screen.getByRole("button", { name: tr("admin.audit.export") }));
+    // The property that matters: a comma and a newline inside a field stay
+    // inside it. Unquoted, they would shift every later column of the one
+    // record of who deleted what -- wrong in the way that still looks right.
+    expect(captured.startsWith("\ufeff")).toBe(true);
+    expect(captured.split("\r\n")).toHaveLength(2);
+    // A username starting with = is a formula to Excel and Sheets on open.
+    expect(captured).toContain(`"\'=cmd|calc"`);
+    // Every field is quoted, including the ones that did not need it.
+    expect(captured.replace(/^\ufeff/, "").split("\r\n")[0]).toBe(
+      '"when","action","actor","target","detail"'
+    );
   });
   it("says when a tab is showing only part of what the department holds", () => {
     // A screen that quietly lists the first 500 of 900 documents is worse than

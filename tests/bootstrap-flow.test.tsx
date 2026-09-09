@@ -41,9 +41,13 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-function signUp() {
+function signUp(repeat = "example-password") {
   fireEvent.change(screen.getByLabelText(tr("auth.email")), { target: { value: "owner@example.com" } });
   fireEvent.change(screen.getByLabelText(tr("auth.password")), { target: { value: "example-password" } });
+  // Signing up asks twice: the founder is the person for whom a password typed
+  // wrong is most expensive, since the way back is a reset mail to a
+  // department they have not joined yet.
+  fireEvent.change(screen.getByLabelText(tr("auth.repeatPassword")), { target: { value: repeat } });
   fireEvent.click(screen.getByRole("button", { name: tr("auth.signup") }));
 }
 

@@ -39,6 +39,7 @@ export const dictionary = {
     "common.and": "and",
     "setup.tooMany":
       "You have reached the maximum of 3 departments for one account. Remove one under Your departments first.",
+    "admin.audit.export": "Export CSV",
     "admin.truncated":
       "Showing the most recent entries only. This department holds more than this screen lists -- read the rest in your project's Supabase dashboard.",
     "schema.badge": "UPDATE AVAILABLE",
@@ -539,6 +540,8 @@ export const dictionary = {
     "auth.updateBody":
       "You arrived here from a reset link, so you are signed in for the moment. Pick a new password before you go any further.",
     "auth.newPassword": "New password",
+    "auth.showPassword": "Show",
+    "auth.hidePassword": "Hide",
     "auth.repeatPassword": "Repeat it",
     "auth.passwordMismatch": "Those two do not match.",
     "auth.updateSubmit": "Set the password",
@@ -807,6 +810,7 @@ export const dictionary = {
     "common.and": "und",
     "setup.tooMany":
       "Sie haben das Maximum von 3 Departementen pro Konto erreicht. Entfernen Sie zuerst eines unter «Ihre Departemente».",
+    "admin.audit.export": "Export CSV",
     "admin.truncated":
       "Es werden nur die neuesten Einträge angezeigt. Dieses Departement enthält mehr, als diese Ansicht auflistet -- den Rest sehen Sie im Supabase-Dashboard Ihres Projekts.",
     "schema.badge": "AKTUALISIERUNG VERFÜGBAR",
@@ -1304,6 +1308,8 @@ export const dictionary = {
     "auth.updateBody":
       "Sie sind über einen Link zum Zurücksetzen hierhergekommen und deshalb vorläufig angemeldet. Wählen Sie zuerst ein neues Passwort.",
     "auth.newPassword": "Neues Passwort",
+    "auth.showPassword": "Anzeigen",
+    "auth.hidePassword": "Verbergen",
     "auth.repeatPassword": "Wiederholen",
     "auth.passwordMismatch": "Die beiden stimmen nicht überein.",
     "auth.updateSubmit": "Passwort setzen",

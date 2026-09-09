@@ -70,6 +70,8 @@ export function DeptLoginForm({
   const [mode, setMode] = useState<Mode>(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [repeat, setRepeat] = useState("");
+  const [reveal, setReveal] = useState(false);
   const [invite, setInvite] = useState(presetInvite ?? "");
   // Shown up front unless the department is public: there, it is one line of
   // reassurance for the person who does have a code, not a barrier.
@@ -132,6 +134,16 @@ export function DeptLoginForm({
       }
 
       if (mode === "signup") {
+        // The reset flow is the only way back from a password typed wrong
+        // once, and it costs an e-mail round trip to a department somebody has
+        // not joined yet. DeptPasswordForm has always asked twice; this is the
+        // screen where getting it wrong is most expensive.
+        if (password !== repeat) {
+          setError(t("auth.passwordMismatch"));
+          setBusy(false);
+          return;
+        }
+
         const { data, error } = await supabase.auth.signUp({
           email: email.trim().toLowerCase(),
           password,
@@ -201,12 +213,25 @@ export function DeptLoginForm({
 
         {mode !== "reset" && (
           <div>
-            <label className="label" htmlFor="password">
-              {t("auth.password")}
-            </label>
+            <div className="flex items-baseline justify-between gap-3">
+              <label className="label" htmlFor="password">
+                {t("auth.password")}
+              </label>
+              {/* A password nobody can read is a password typed wrong twice.
+                  Not a checkbox: this toggles what is on screen right now, so
+                  it says what it will do and reports what it did. */}
+              <button
+                type="button"
+                onClick={() => setReveal((v) => !v)}
+                aria-pressed={reveal}
+                className="cursor-pointer text-xs text-ink-500 underline underline-offset-2 hover:text-ink-700"
+              >
+                {t(reveal ? "auth.hidePassword" : "auth.showPassword")}
+              </button>
+            </div>
             <input
               id="password"
-              type="password"
+              type={reveal ? "text" : "password"}
               required
               minLength={mode === "signup" ? 8 : undefined}
               autoComplete={mode === "signup" ? "new-password" : "current-password"}
@@ -215,6 +240,23 @@ export function DeptLoginForm({
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
             />
+            {mode === "signup" && !reveal && (
+              <div className="mt-3">
+                <label className="label" htmlFor="password-repeat">
+                  {t("auth.repeatPassword")}
+                </label>
+                <input
+                  id="password-repeat"
+                  type="password"
+                  required
+                  autoComplete="new-password"
+                  className="field"
+                  value={repeat}
+                  onChange={(e) => setRepeat(e.target.value)}
+                  placeholder="••••••••"
+                />
+              </div>
+            )}
           </div>
         )}
 
