@@ -168,7 +168,7 @@ export const dictionary = {
       "Megabytes, up to {cap}. Your storage bucket is resized to match when you save.",
     "settings.operator": "Who runs this department",
     "settings.operatorHint":
-      "Shown in the footer. The person named here is the one answerable for what is in the archive, which is the point of naming them.",
+      "Shown in the footer and on this department's imprint, which anybody can read without an account -- an imprint only members can see is not an imprint. So treat the contact as public: it is reachable by anyone who knows the address, and can be collected automatically. A role address is usually the better answer to that than a private one.",
     "settings.operatorName": "Name",
     "settings.operatorContact": "Contact",
     "settings.nameRequired": "A department needs a name.",
@@ -958,7 +958,7 @@ export const dictionary = {
       "Megabyte, höchstens {cap}. Ihr Storage-Bucket wird beim Speichern entsprechend angepasst.",
     "settings.operator": "Wer dieses Departement betreibt",
     "settings.operatorHint":
-      "Erscheint im Fussbereich. Die hier genannte Person verantwortet den Inhalt des Archivs -- genau darum wird sie genannt.",
+      "Erscheint im Fussbereich und im Impressum dieses Departements, das ohne Konto lesbar ist -- ein Impressum, das nur Mitglieder sehen, ist keines. Behandeln Sie den Kontakt daher als öffentlich: Er ist für alle erreichbar, die die Adresse kennen, und lässt sich automatisiert sammeln. Eine Funktionsadresse ist dafür meist die bessere Antwort als eine private.",
     "settings.operatorName": "Name",
     "settings.operatorContact": "Kontakt",
     "settings.nameRequired": "Ein Departement braucht einen Namen.",
