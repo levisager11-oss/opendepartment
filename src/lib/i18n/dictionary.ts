@@ -39,6 +39,24 @@ export const dictionary = {
     "common.and": "and",
     "setup.tooMany":
       "You have reached the maximum of 3 departments for one account. Remove one under Your departments first.",
+    "schema.badge": "UPDATE AVAILABLE",
+    "schema.notice":
+      "This department runs schema version {current}. Version {expected} is available.",
+    "schema.noticeUnknown":
+      "This department runs a schema older than version {expected}, from before departments recorded their version.",
+    "schema.title": "DATABASE SCHEMA OUT OF DATE",
+    "schema.body":
+      "This department is on schema version {current}; the current one is {expected}. New features and security fixes reach a department only when its own Supabase project runs the current file -- OpenDepartment holds no key to do it for you.",
+    "schema.bodyUnknown":
+      "This department is on a schema from before departments recorded their version; the current one is {expected}. New features and security fixes reach a department only when its own Supabase project runs the current file -- OpenDepartment holds no key to do it for you.",
+    "schema.step1": "Copy the SQL below.",
+    "schema.step2":
+      "Open your project's Supabase dashboard, then SQL Editor, then New query.",
+    "schema.step3": "Paste it, run it, and reload this page.",
+    "schema.safe":
+      "Safe to run on a live department: it keeps your settings, members, documents and invite codes, and does not reopen a claimed department to a new founder.",
+    "schema.howTo": "How to update",
+    "account.schemaOutdated": "Schema update available",
     "setup.projectTaken":
       "That Supabase project already backs a department on this platform. One project holds one archive -- check Your departments, or create a second Supabase project for this one.",
     "setup.next1":
@@ -787,6 +805,24 @@ export const dictionary = {
     "common.and": "und",
     "setup.tooMany":
       "Sie haben das Maximum von 3 Departementen pro Konto erreicht. Entfernen Sie zuerst eines unter «Ihre Departemente».",
+    "schema.badge": "AKTUALISIERUNG VERFÜGBAR",
+    "schema.notice":
+      "Dieses Departement läuft mit Schema-Version {current}. Version {expected} ist verfügbar.",
+    "schema.noticeUnknown":
+      "Dieses Departement läuft mit einem Schema älter als Version {expected}, aus der Zeit vor der Versionserfassung.",
+    "schema.title": "DATENBANKSCHEMA VERALTET",
+    "schema.body":
+      "Dieses Departement hat Schema-Version {current}; aktuell ist {expected}. Neue Funktionen und Sicherheitskorrekturen erreichen ein Departement erst, wenn sein eigenes Supabase-Projekt die aktuelle Datei ausführt -- OpenDepartment besitzt keinen Schlüssel, um das für Sie zu tun.",
+    "schema.bodyUnknown":
+      "Dieses Departement hat ein Schema aus der Zeit vor der Versionserfassung; aktuell ist {expected}. Neue Funktionen und Sicherheitskorrekturen erreichen ein Departement erst, wenn sein eigenes Supabase-Projekt die aktuelle Datei ausführt -- OpenDepartment besitzt keinen Schlüssel, um das für Sie zu tun.",
+    "schema.step1": "Kopieren Sie das SQL unten.",
+    "schema.step2":
+      "Öffnen Sie das Supabase-Dashboard Ihres Projekts, dann «SQL Editor», dann «New query».",
+    "schema.step3": "Einfügen, ausführen und diese Seite neu laden.",
+    "schema.safe":
+      "Für ein laufendes Departement unbedenklich: Einstellungen, Mitglieder, Dokumente und Einladungscodes bleiben erhalten, und ein bereits beanspruchtes Departement wird nicht für eine neue Gründung geöffnet.",
+    "schema.howTo": "Anleitung",
+    "account.schemaOutdated": "Schema-Aktualisierung verfügbar",
     "setup.projectTaken":
       "Dieses Supabase-Projekt gehört bereits zu einem Departement auf dieser Plattform. Ein Projekt trägt ein Archiv -- prüfen Sie «Ihre Departemente» oder legen Sie für dieses ein zweites Supabase-Projekt an.",
     "setup.next1":

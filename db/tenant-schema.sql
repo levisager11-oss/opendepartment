@@ -63,6 +63,43 @@ create table if not exists public.department_bootstrap (
 alter table public.department_bootstrap enable row level security;
 revoke all on public.department_bootstrap from anon, authenticated;
 
+-- ---------------------------------------------------------------------------
+-- Which version of this file has actually been run here.
+--
+-- Re-running this file is the documented way a department picks up a change,
+-- and until now nothing anywhere could tell whether one had. The app found out
+-- the way its users did: by calling something and getting back
+-- `function public.leave_department(unknown) does not exist`, one feature at a
+-- time, with a string in the interface apologising for it. Meanwhile a fix to
+-- a policy -- the kind of change that is the whole reason this file is
+-- versioned at all -- produces no symptom to notice, because nothing calls it.
+--
+-- So the file records what it is, and the app compares. One row, like
+-- `settings`: this is a fact about the installation, not a history of it, and
+-- a department that has re-run the file eleven times does not need eleven rows
+-- saying so. `applied_at` is the last time it was run.
+--
+-- WRITTEN AT THE END OF THIS FILE, not here. A paste into the SQL editor that
+-- fails halfway -- a permissions error, a closed browser, a statement a
+-- restricted session refuses -- must not leave behind a row claiming the whole
+-- file ran. Declaring the table early and stamping it last means the version
+-- is only ever recorded by a run that reached the bottom.
+--
+-- Deny-all, like `department_bootstrap` and `file_views`: RLS on with no
+-- policy and no grants. Nothing reads this over the API directly --
+-- department_identity() hands it out as `security definer`, which is also what
+-- lets the front door read it without a session -- and nothing but this file
+-- should ever write it. A version somebody can set by hand is a version that
+-- says whatever they wanted to be true.
+-- ---------------------------------------------------------------------------
+create table if not exists public.schema_version (
+  id         boolean primary key default true check (id),
+  version    integer not null,
+  applied_at timestamptz not null default now()
+);
+alter table public.schema_version enable row level security;
+revoke all on public.schema_version from anon, authenticated;
+
 -- A department created before open_join existed has a settings table without
 -- it, and the `if not exists` above leaves such a table alone. Re-running this
 -- file is the supported way to pick up a schema change, so add the column
@@ -1172,18 +1209,28 @@ $fn$;
 -- own imprint has to render for somebody who is not a member -- that is the
 -- whole point of an imprint. They are the address the department already
 -- publishes in its footer, not a member's.
+--
+-- schema_version rides along for the same reason the drop above exists: the
+-- app has to be able to ask an installation what it is running, and the two
+-- callers that need the answer -- a department page and the operator's account
+-- screen -- have no session in that project. A department still on an older
+-- schema has an older version of this function, which simply returns no such
+-- column; the app reads that absence as "older than the first version that
+-- could say", which is exactly what it is.
 drop function if exists public.department_identity();
 create or replace function public.department_identity()
 returns table (department_name text, tagline text, subject_label text,
                docket_prefix text, seal_top text, seal_bottom text,
                accent text, categories text[],
                max_upload_mb integer, claimed boolean, open_join boolean,
-               operator_name text, operator_contact text)
+               operator_name text, operator_contact text,
+               schema_version integer)
 language sql security definer set search_path = public as $fn$
   select s.department_name, s.tagline, s.subject_label, s.docket_prefix,
          s.seal_top, s.seal_bottom, s.accent, s.categories,
          s.max_upload_mb, s.claimed, s.open_join,
-         s.operator_name, s.operator_contact
+         s.operator_name, s.operator_contact,
+         (select v.version from public.schema_version v where v.id)
     from public.settings s where s.id;
 $fn$;
 
@@ -1477,6 +1524,24 @@ create policy "dept delete own or admin" on storage.objects
     bucket_id = 'department-files'
     and ((storage.foldername(name))[1] = auth.uid()::text or public.is_admin())
   );
+
+-- ===========================================================================
+--  VERSION STAMP -- deliberately the last statement in this file.
+--
+--  Everything above has run by the time this does, which is the whole point:
+--  the row means "this file, all of it, was applied here", and a paste that
+--  died in the middle leaves the old version in place to say so.
+--
+--  WHEN YOU CHANGE THIS FILE, RAISE THIS NUMBER. It is what tells every
+--  department's administrator that there is something to re-run -- a new
+--  function they will otherwise only discover by its absence, and a corrected
+--  policy they would otherwise never discover at all. scripts/build-schema.mjs
+--  reads the number out of the statement below and refuses to build without
+--  it, so the app and this file cannot drift apart.
+-- ===========================================================================
+insert into public.schema_version (id, version) values (true, 1)
+on conflict (id) do update
+  set version = excluded.version, applied_at = now();
 
 -- ===========================================================================
 --  DONE. Go back to OpenDepartment and finish connecting your project.

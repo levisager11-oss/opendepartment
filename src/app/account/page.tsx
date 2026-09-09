@@ -6,6 +6,7 @@ import { Seal } from "@/components/Seal";
 import { T } from "@/components/T";
 import { DepartmentRow } from "@/components/account/DepartmentRow";
 import { AccountSignOut } from "@/components/account/AccountSignOut";
+import { TENANT_SCHEMA_VERSION } from "@/lib/tenant/schema-sql.generated";
 import { privatePage } from "@/lib/seo";
 
 export const metadata = privatePage("Your departments", { path: "/account" });
@@ -65,7 +66,11 @@ export default async function AccountPage() {
       ) : (
         <ul className="space-y-3">
           {departments.map((dept) => (
-            <DepartmentRow key={dept.slug} dept={dept} />
+            <DepartmentRow
+              key={dept.slug}
+              dept={dept}
+              schemaVersion={TENANT_SCHEMA_VERSION}
+            />
           ))}
         </ul>
       )}

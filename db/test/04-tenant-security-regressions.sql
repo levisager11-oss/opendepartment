@@ -263,6 +263,37 @@ select odtest.as_owner();
 select odtest.equals('the demotion landed',
   $$select is_admin::text from public.profiles where id='a1000000-0000-0000-0000-000000000001'$$,'false');
 
+-- The version stamp. It is what tells an administrator there is something to
+-- re-run, so it has to be present, correct, readable through the front door's
+-- own function, and not something a member can rewrite to silence the notice.
+select odtest.as_owner();
+select odtest.equals('applying the schema records exactly one version row',
+  $$select count(*)::text from public.schema_version$$,'1');
+select odtest.equals('the recorded version matches the stamp at the end of the file',
+  $$select version::text from public.schema_version where id$$,'1');
+select odtest.equals('re-running the file does not accumulate version rows',
+  $$select count(*)::text from public.schema_version$$,'1');
+
+select odtest.as_anon();
+select odtest.denied('a signed-out caller cannot read the version table directly',
+  $$select * from public.schema_version$$);
+select odtest.equals('the front door still reports the version without a session',
+  $$select schema_version::text from public.department_identity()$$,'1');
+
+select odtest.as_user('a1000000-0000-0000-0000-000000000002');
+select odtest.denied('a member cannot read the version table directly',
+  $$select * from public.schema_version$$);
+select odtest.denied('a member cannot forge a version to silence the update notice',
+  $$update public.schema_version set version = 999 where id$$);
+select odtest.as_user('a1000000-0000-0000-0000-000000000012');
+select odtest.denied('an administrator cannot forge a version either',
+  $$update public.schema_version set version = 999 where id$$);
+select odtest.denied('an administrator cannot delete the version row',
+  $$delete from public.schema_version where id$$);
+select odtest.as_owner();
+select odtest.equals('the version survives every attempt to rewrite it',
+  $$select version::text from public.schema_version where id$$,'1');
+
 select odtest.as_owner();
 \o
 select * from odtest.report() where outcome='FAIL';

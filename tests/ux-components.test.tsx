@@ -30,6 +30,8 @@ const runtime = vi.hoisted(() => ({
     storage: { from: vi.fn() },
   },
   storage: { upload: vi.fn(), remove: vi.fn(), createSignedUrls: vi.fn() },
+  /** An anonymous read of somebody else's department_identity(). */
+  tenantRpc: vi.fn(),
   tenant: {
     slug: "demo", supabaseUrl: "https://demo.supabase.co",
     branding: { subjectLabel: "Case", categories: ["EXHIBIT", "MEMO"], maxUploadMb: 25, openJoin: false },
@@ -52,6 +54,7 @@ vi.mock("@/lib/i18n/provider", async () => {
 });
 vi.mock("@/lib/tenant/context", () => ({ useTenant: () => runtime.tenant, useTenantClient: () => runtime.client }));
 vi.mock("@/lib/control/browser", () => ({ CONTROL_READY: true, createControlBrowserClient: () => runtime.client }));
+vi.mock("@supabase/supabase-js", () => ({ createClient: () => ({ rpc: runtime.tenantRpc }) }));
 vi.mock("@/components/dept/FileCard", () => ({ FileCard: ({ file }: { file: { title: string } }) => <article>{file.title}</article> }));
 vi.mock("@/lib/tenant/scrub", () => ({ scrubImage: async (file: File) => ({ file, scrubbed: false, unsupported: false }) }));
 
@@ -87,6 +90,8 @@ beforeEach(() => {
   runtime.storage.remove.mockResolvedValue({ error: null });
   runtime.storage.createSignedUrls.mockResolvedValue({ data: [] });
   runtime.client.auth.getUser.mockResolvedValue({ data: { user: { id: "member" } } });
+  // Current by default, so no schema badge unless a test asks for one.
+  runtime.tenantRpc.mockResolvedValue({ data: [{ schema_version: 1 }], error: null });
   vi.spyOn(window, "confirm").mockReturnValue(true);
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
@@ -297,7 +302,7 @@ describe("action refusal feedback", () => {
   });
   it("preserves the actual listing visibility when a zero-row update is refused", async () => {
     runtime.client.from.mockReturnValue(query({ data: [], error: null }));
-    render(<DepartmentRow dept={dept} />);
+    render(<DepartmentRow dept={dept} schemaVersion={1} />);
     fireEvent.click(screen.getByRole("button", { name: tr("setup.unlisted") }));
     expect((await screen.findByRole("alert")).textContent).toBe(tr("common.actionFailed"));
     expect(screen.queryByRole("button", { name: tr("setup.public") })).toBeNull();
@@ -306,7 +311,7 @@ describe("action refusal feedback", () => {
   it("lets an owner dismiss a failed deletion and try again", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ json: async () => ({ available: false, connected: false }) }));
     runtime.client.from.mockReturnValue(query({ data: [], error: null }));
-    render(<DepartmentRow dept={dept} />);
+    render(<DepartmentRow dept={dept} schemaVersion={1} />);
     fireEvent.click(screen.getByRole("button", { name: tr("delete.open") }));
     await screen.findByText(tr("delete.noOauth"));
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "demo" } });
@@ -341,6 +346,30 @@ describe("authentication and previews", () => {
     expect(screen.getByRole("alert")).toBeTruthy();
     view.rerender(<FileViewer kind="image" url="https://storage.example/fresh" title="Exhibit" />);
     expect(screen.getByRole("img").getAttribute("src")).toBe("https://storage.example/fresh");
+  });
+  it("flags a department whose project reports an older schema", async () => {
+    runtime.tenantRpc.mockResolvedValue({ data: [{ schema_version: 0 }], error: null });
+    render(<DepartmentRow dept={dept} schemaVersion={1} />);
+    const badge = await screen.findByRole("link", { name: tr("account.schemaOutdated") });
+    expect(badge.getAttribute("href")).toBe("/d/demo/admin");
+  });
+  it("flags a department too old to report a schema version at all", async () => {
+    runtime.tenantRpc.mockResolvedValue({ data: [{ department_name: "Demo" }], error: null });
+    render(<DepartmentRow dept={dept} schemaVersion={1} />);
+    expect(await screen.findByRole("link", { name: tr("account.schemaOutdated") })).toBeTruthy();
+  });
+  it("leaves the badge off a current department", async () => {
+    render(<DepartmentRow dept={dept} schemaVersion={1} />);
+    await waitFor(() => expect(runtime.tenantRpc).toHaveBeenCalled());
+    expect(screen.queryByRole("link", { name: tr("account.schemaOutdated") })).toBeNull();
+  });
+  it("does not call an unreachable project out of date", async () => {
+    // "Cannot tell" is not "behind": a paused or deleted project would send
+    // the operator to their dashboard for entirely the wrong reason.
+    runtime.tenantRpc.mockRejectedValue(new Error("offline"));
+    render(<DepartmentRow dept={dept} schemaVersion={1} />);
+    await waitFor(() => expect(runtime.tenantRpc).toHaveBeenCalled());
+    expect(screen.queryByRole("link", { name: tr("account.schemaOutdated") })).toBeNull();
   });
   it("ends the OpenDepartment account session and leaves the account screen", async () => {
     runtime.client.auth.signOut.mockResolvedValue({ error: null });

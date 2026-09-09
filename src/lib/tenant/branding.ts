@@ -32,6 +32,18 @@ export type Branding = {
    */
   operatorName: string | null;
   operatorContact: string | null;
+  /**
+   * Which version of db/tenant-schema.sql this department has actually run.
+   *
+   * Null means the question could not be answered: either the project did not
+   * respond, or it is running a schema old enough that department_identity()
+   * has no such column -- which is itself the answer "older than the first
+   * version that could say". Callers must not read a null as up to date, and
+   * must not show an administrator a re-run notice on the strength of one
+   * alone: reach it only from a path that has already established the project
+   * responds, such as a member session that resolved.
+   */
+  schemaVersion: number | null;
 };
 
 export const FALLBACK_BRANDING: Branding = {
@@ -48,6 +60,7 @@ export const FALLBACK_BRANDING: Branding = {
   openJoin: false,
   operatorName: null,
   operatorContact: null,
+  schemaVersion: null,
 };
 
 /**
@@ -117,6 +130,10 @@ export const getBranding = cache(
       // inventing a name.
       operatorName: row.operator_name ?? null,
       operatorContact: row.operator_contact ?? null,
+      // Absent on any schema older than the one that started recording it, and
+      // absent is the signal rather than a gap -- see the field's own note.
+      schemaVersion:
+        typeof row.schema_version === "number" ? row.schema_version : null,
     };
   }
 );

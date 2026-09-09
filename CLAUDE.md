@@ -141,6 +141,26 @@ with no platform around it. Resolved by
 
 ### Schema codegen — edit the `.sql`, never the `.ts`
 
+**Every change to `db/tenant-schema.sql` must raise the version stamp at the
+bottom of that file.** Departments run the schema in their own Supabase
+projects, so a change here reaches nobody until each administrator re-runs the
+file — and the stamp is the only thing that tells them to. It records one row
+in `public.schema_version` (deny-all; `department_identity()` hands the number
+out as `security definer`), and the app compares it against
+`TENANT_SCHEMA_VERSION`, which
+[scripts/build-schema.mjs](scripts/build-schema.mjs) reads back out of the
+statement so the two cannot drift. Forget the bump and the change ships
+silently to nobody; the codegen refuses to build if the statement is missing
+altogether. The stamp is deliberately the **last** statement in the file, so a
+paste that dies halfway does not leave a row claiming the whole file ran.
+
+The notice reaches an administrator as a strip under the department header on
+every page (`SchemaNotice`), the SQL to fix it on the administration screen
+(`AdminSchema`, sent only when there is something to run — it is 73 kB), and a
+badge per row on the operator's `/account` screen. Import
+`TENANT_SCHEMA_VERSION` from server code only and pass it down as a prop: the
+constant sits in the same generated module as the whole schema text.
+
 [db/tenant-schema.sql](db/tenant-schema.sql) is the SQL the setup wizard
 shows a new department owner to paste into their own project. Vercel only
 ships traced files, so the raw `.sql` can't be read at request time in
