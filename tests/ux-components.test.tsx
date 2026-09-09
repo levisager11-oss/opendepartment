@@ -18,6 +18,8 @@ import { AdminUsers } from "@/components/admin/AdminUsers";
 import { AdminFiles } from "@/components/admin/AdminFiles";
 import { DeptHeader } from "@/components/dept/DeptHeader";
 import { DeleteFileButton } from "@/components/dept/DeleteFileButton";
+import { AccountSignOut } from "@/components/account/AccountSignOut";
+import { DeptLeaveForm } from "@/components/dept/DeptLeaveForm";
 
 const runtime = vi.hoisted(() => ({
   query: "",
@@ -330,15 +332,98 @@ describe("authentication and previews", () => {
     expect(screen.getByRole("alert").textContent).toBe(tr("auth.linkInvalid"));
   });
   it("provides an explicit preview retry and recovers when a fresh URL arrives", () => {
-    const view = render(<FileViewer kind="image" url={null} mimeType="image/png" title="Exhibit" />);
+    const view = render(<FileViewer kind="image" url={null} title="Exhibit" />);
     expect(screen.getByRole("alert").textContent).toBe(tr("file.previewFailed"));
     fireEvent.click(screen.getByRole("button", { name: tr("common.retry") }));
     expect(runtime.router.refresh).toHaveBeenCalledTimes(1);
-    view.rerender(<FileViewer kind="image" url="https://storage.example/old" mimeType="image/png" title="Exhibit" />);
+    view.rerender(<FileViewer kind="image" url="https://storage.example/old" title="Exhibit" />);
     fireEvent.error(screen.getByRole("img"));
     expect(screen.getByRole("alert")).toBeTruthy();
-    view.rerender(<FileViewer kind="image" url="https://storage.example/fresh" mimeType="image/png" title="Exhibit" />);
+    view.rerender(<FileViewer kind="image" url="https://storage.example/fresh" title="Exhibit" />);
     expect(screen.getByRole("img").getAttribute("src")).toBe("https://storage.example/fresh");
+  });
+  it("ends the OpenDepartment account session and leaves the account screen", async () => {
+    runtime.client.auth.signOut.mockResolvedValue({ error: null });
+    render(<AccountSignOut />);
+    fireEvent.click(screen.getByRole("button", { name: tr("nav.signout") }));
+    await waitFor(() => expect(runtime.client.auth.signOut).toHaveBeenCalledTimes(1));
+    // Anywhere but /account: the middleware would bounce that to the login
+    // screen, which is a confusing answer to having just signed out.
+    expect(runtime.router.push).toHaveBeenCalledWith("/");
+  });
+  it("says so rather than pretending when signing out of the account fails", async () => {
+    runtime.client.auth.signOut.mockResolvedValue({ error: { message: "offline" } });
+    render(<AccountSignOut />);
+    fireEvent.click(screen.getByRole("button", { name: tr("nav.signout") }));
+    expect((await screen.findByRole("alert")).textContent).toBe(tr("common.actionFailed"));
+    expect(runtime.router.push).not.toHaveBeenCalled();
+  });
+  it("refuses to erase a membership until the confirmation matches", () => {
+    render(<DeptLeaveForm username="auditmember" />);
+    fireEvent.click(screen.getByRole("button", { name: tr("leave.start") }));
+    const submit = screen.getByRole("button", { name: tr("leave.submit") }) as HTMLButtonElement;
+    expect(submit.disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText(translate("en", "leave.confirmLabel", { name: "auditmember" })),
+      { target: { value: "auditmember" } });
+    expect((screen.getByRole("button", { name: tr("leave.submit") }) as HTMLButtonElement).disabled).toBe(false);
+    expect(runtime.client.rpc).not.toHaveBeenCalled();
+  });
+  it("explains that the last administrator cannot leave, without signing them out", async () => {
+    runtime.client.rpc.mockResolvedValue({ data: null, error: { message: "LAST_ADMIN" } });
+    render(<DeptLeaveForm username="auditadmin" />);
+    fireEvent.click(screen.getByRole("button", { name: tr("leave.start") }));
+    fireEvent.change(screen.getByLabelText(translate("en", "leave.confirmLabel", { name: "auditadmin" })),
+      { target: { value: "auditadmin" } });
+    fireEvent.click(screen.getByRole("button", { name: tr("leave.submit") }));
+    expect((await screen.findByRole("alert")).textContent).toBe(tr("leave.lastAdmin"));
+    expect(runtime.client.auth.signOut).not.toHaveBeenCalled();
+  });
+  it("removes the objects a departure hands back before the session ends", async () => {
+    runtime.client.rpc.mockResolvedValue({
+      data: { files: 1, account: "deleted", storage_paths: ["me/one.png"] }, error: null,
+    });
+    runtime.storage.remove.mockResolvedValue({ error: null });
+    runtime.client.auth.signOut.mockResolvedValue({ error: null });
+    render(<DeptLeaveForm username="auditleaver" />);
+    fireEvent.click(screen.getByRole("button", { name: tr("leave.start") }));
+    fireEvent.change(screen.getByLabelText(translate("en", "leave.confirmLabel", { name: "auditleaver" })),
+      { target: { value: "auditleaver" } });
+    fireEvent.click(screen.getByRole("button", { name: tr("leave.submit") }));
+    // The member's own session is the only thing allowed to delete their
+    // folder, so the objects have to go before it ends.
+    await waitFor(() => expect(runtime.storage.remove).toHaveBeenCalledWith(["me/one.png"]));
+    await waitFor(() => expect(runtime.client.auth.signOut).toHaveBeenCalledTimes(1));
+  });
+  it("keeps a departure whose objects survived visible to the member", async () => {
+    runtime.client.rpc.mockResolvedValue({
+      data: { files: 1, account: "deleted", storage_paths: ["me/one.png"] }, error: null,
+    });
+    runtime.storage.remove.mockResolvedValue({ error: { message: "denied" } });
+    render(<DeptLeaveForm username="auditleaver" />);
+    fireEvent.click(screen.getByRole("button", { name: tr("leave.start") }));
+    fireEvent.change(screen.getByLabelText(translate("en", "leave.confirmLabel", { name: "auditleaver" })),
+      { target: { value: "auditleaver" } });
+    fireEvent.click(screen.getByRole("button", { name: tr("leave.submit") }));
+    expect((await screen.findByRole("status")).textContent).toBe(tr("leave.doneObjectsLeft"));
+    // Not signed out behind their back: the notice is for an administrator and
+    // they have to be able to read it.
+    expect(runtime.client.auth.signOut).not.toHaveBeenCalled();
+  });
+  it("renders a document in a frame that cannot run what it is served", () => {
+    // Storage returns the Content-Type the uploader supplied, so an exhibit
+    // filed as a PDF can arrive as text/html. The sandbox is what makes that
+    // inert: no allow-scripts, and no allow-same-origin to escape through.
+    const { container } = render(
+      <FileViewer kind="pdf" url="https://storage.example/exhibit.pdf" title="Exhibit" />
+    );
+    const frame = container.querySelector("iframe");
+    expect(frame).toBeTruthy();
+    const sandbox = frame!.getAttribute("sandbox") ?? "";
+    expect(sandbox.split(/\s+/)).not.toContain("allow-scripts");
+    expect(sandbox.split(/\s+/)).not.toContain("allow-same-origin");
+    // An <object> honours the response type over its own attribute, which is
+    // the element this replaced.
+    expect(container.querySelector("object")).toBeNull();
   });
   it("labels account inputs and recovers from an unexpected auth failure", async () => {
     runtime.client.auth.signInWithPassword.mockRejectedValue(new Error("offline"));

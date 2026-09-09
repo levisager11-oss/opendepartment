@@ -1,96 +1,46 @@
-"use client";
-
-import { useEffect, useRef, useState } from "react";
-
 const KOFI_ID = "A7J825QGLG";
 const KOFI_COLOR = "#72a4f2";
-const KOFI_SCRIPT = "https://storage.ko-fi.com/cdn/widget/Widget_2.js";
-
-declare global {
-  interface Window {
-    kofiwidget2?: {
-      init: (text: string, color: string, id: string) => void;
-      getHTML?: () => string;
-      draw?: () => void;
-    };
-  }
-}
 
 /**
- * Ko-fi support button.
+ * Ko-fi support link.
  *
- * Two details make this less trivial than pasting the snippet:
+ * This used to load Ko-fi's widget script and replace the link below with
+ * whatever `kofiwidget2.getHTML()` returned. Three things were wrong with that
+ * and only one of them was Ko-fi's fault:
  *
- *  1. The official snippet ends in `kofiwidget2.draw()`, which calls
- *     document.write. That works in a blocking <script> during parse and
- *     blanks the entire page when called after load, which is the only time it
- *     can run in a React app. So we call getHTML() and inject instead.
+ *   IT CONTRADICTED THE COOKIE NOTICE, which tells every reader there is no
+ *   third-party tag on these pages -- while a third-party script loaded on
+ *   every marketing page before anybody had agreed to anything. Under the
+ *   ePrivacy rules the notice exists to satisfy, the strictly-necessary
+ *   exemption it relies on does not cover a script somebody else controls.
  *
- *  2. Ko-fi's domain is blocked by most ad blockers. Rather than leaving a
- *     hole where the button was, we render our own styled link first and only
- *     replace it if the widget actually loads.
+ *   IT WAS AN INJECTION POINT. `getHTML()`'s result went into innerHTML.
+ *   'strict-dynamic' in the policy means markup inserted that way cannot bring
+ *   scripts with it, so this was never an XSS -- but a bad response from that
+ *   CDN still put arbitrary markup on our own origin, on the pages a stranger
+ *   sees first, and a convincing form is not made of scripts.
+ *
+ *   IT MOSTLY DID NOT RENDER ANYWAY. Ko-fi's domain is blocked by most content
+ *   blockers, which is why the fallback link below was written in the first
+ *   place. It is the thing the majority of readers already saw.
+ *
+ * So the fallback is the whole component now: a plain anchor, styled the same,
+ * doing the same job with no third party, no consent question and nothing to
+ * fail. A server component, because there is no longer any client behaviour
+ * here to hydrate.
  */
 export function KofiButton({ className = "" }: { className?: string }) {
-  const host = useRef<HTMLDivElement>(null);
-  const [widgetLoaded, setWidgetLoaded] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    function render() {
-      const w = window.kofiwidget2;
-      if (cancelled || !w || !host.current) return;
-      try {
-        w.init("Support me on Ko-fi", KOFI_COLOR, KOFI_ID);
-        // Deliberately not draw(): see note 1 above.
-        const html = w.getHTML?.();
-        if (html) {
-          host.current.innerHTML = html;
-          setWidgetLoaded(true);
-        }
-      } catch {
-        // Leave the fallback link in place.
-      }
-    }
-
-    if (window.kofiwidget2) {
-      render();
-      return;
-    }
-
-    const existing = document.querySelector<HTMLScriptElement>(
-      `script[src="${KOFI_SCRIPT}"]`
-    );
-    if (existing) {
-      existing.addEventListener("load", render);
-      return () => existing.removeEventListener("load", render);
-    }
-
-    const script = document.createElement("script");
-    script.src = KOFI_SCRIPT;
-    script.async = true;
-    script.onload = render;
-    document.body.appendChild(script);
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   return (
     <div className={className}>
-      <div ref={host} />
-      {!widgetLoaded && (
-        <a
-          href={`https://ko-fi.com/${KOFI_ID}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-block px-4 py-2 text-sm font-bold text-gov-950 transition-opacity hover:opacity-90"
-          style={{ backgroundColor: KOFI_COLOR }}
-        >
-          ☕ Support me on Ko-fi
-        </a>
-      )}
+      <a
+        href={`https://ko-fi.com/${KOFI_ID}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-block px-4 py-2 text-sm font-bold text-gov-950 transition-opacity hover:opacity-90"
+        style={{ backgroundColor: KOFI_COLOR }}
+      >
+        ☕ Support me on Ko-fi
+      </a>
     </div>
   );
 }

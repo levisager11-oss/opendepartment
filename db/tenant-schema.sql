@@ -785,11 +785,43 @@ end; $fn$;
 revoke execute on function public.delete_file(uuid, text) from anon, public;
 grant execute on function public.delete_file(uuid, text) to authenticated;
 
+-- ---------------------------------------------------------------------------
+-- The two flags an administrator may change on somebody else, and the one
+-- outcome they may not arrive at.
+--
+-- Sequentially, a department cannot be left without an administrator here:
+-- is_admin() already refused a caller who is banned or demoted, and
+-- CANNOT_CHANGE_SELF means the caller is never the target -- so whoever
+-- succeeds in changing a flag is themselves an administrator who is still
+-- standing when the statement returns.
+--
+-- CONCURRENTLY it can. Two administrators who ban each other in the same
+-- instant both pass is_admin() against a snapshot taken before the other's
+-- write, and both commit. The department ends with an archive, a membership,
+-- and nobody who can moderate any of it -- a state that is not recoverable
+-- from inside the app at all. `profiles.is_admin` is outside the authenticated
+-- UPDATE grant, this function refuses a caller who is not an administrator,
+-- and there is deliberately no service_role key anywhere in this design to
+-- climb back in with. It takes the project owner opening their own SQL editor,
+-- which is a reasonable thing to document and an unreasonable thing to leave
+-- one lost race away.
+--
+-- So: the same settings-row lock the signup trigger uses, for the same reason.
+-- It orders the two transactions, which makes the loser's check read the
+-- winner's committed result instead of a snapshot that predates it. The check
+-- itself is on the OUTCOME rather than on the action -- one query instead of a
+-- case analysis over which flag, which direction and how many administrators
+-- are left -- and the raise rolls the losing ban back.
+-- ---------------------------------------------------------------------------
 create or replace function public.admin_set_flag(target uuid, flag text, value boolean)
 returns void language plpgsql security definer set search_path = public as $fn$
 begin
   if not public.is_admin() then raise exception 'NOT_ADMIN'; end if;
   if target = auth.uid() then raise exception 'CANNOT_CHANGE_SELF'; end if;
+
+  -- Ordering, not reading. Every path that can remove an administrator takes
+  -- this lock, so only one of them is ever in flight at a time.
+  perform 1 from public.settings s where s.id for update;
 
   if flag = 'is_admin' then
     update public.profiles set is_admin = value where id = target;
@@ -797,6 +829,13 @@ begin
     update public.profiles set is_banned = value where id = target;
   else
     raise exception 'UNKNOWN_FLAG';
+  end if;
+
+  if not exists (
+    select 1 from public.profiles p where p.is_admin and not p.is_banned
+  ) then
+    raise exception 'LAST_ADMIN'
+      using hint = 'A department must keep at least one administrator who is not banned.';
   end if;
 
   insert into public.audit_log (actor_id, action, target, detail)
@@ -991,6 +1030,127 @@ end; $fn$;
 -- at all.
 revoke execute on function public.purge_department(text) from anon, public;
 grant  execute on function public.purge_department(text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Leave, and take your things with you.
+--
+-- Everything else in this schema is written from the department's side: what
+-- an administrator may do to a member, what a member may do to a document.
+-- There was no answer at all to the member who simply wants out. Signing out
+-- ends a session; the profile, the e-mail address, the documents, the comments
+-- and the votes all stay, and the only person who could remove any of it was
+-- an administrator the member has no claim on. For an archive whose subject is
+-- frequently a real person that is the wrong default, and it is the one
+-- deletion the department's own privacy notice implies exists.
+--
+-- The shape is purge_department()'s, deliberately, because the problem is the
+-- same one at a smaller scale:
+--
+--   THE BYTES ARE NOT ITS JOB. The storage paths come back for the caller to
+--   remove through the storage API, which their own session is already allowed
+--   to do for their own folder. Deleting the rows out of storage.objects here
+--   would drop the metadata and leave the objects where they are.
+--
+--   THE ACCOUNT GOES TOO, when it can. A member's e-mail address should not
+--   outlive the membership it was given to. Wrapped for the same reason
+--   purge_department() wraps it: auth.users belongs to supabase_auth_admin,
+--   and on a project where this function's owner cannot delete from it the
+--   erasure should still erase everything else. The profile is gone either
+--   way, so what is left behind is a login to a department that no longer
+--   knows who they are.
+--
+--   THE LAST ADMINISTRATOR MAY NOT LEAVE. This is the check that actually
+--   bites -- unlike the one in admin_set_flag() above, which the
+--   CANNOT_CHANGE_SELF rule already makes unreachable sequentially. A sole
+--   administrator pressing this button would leave a live archive with a
+--   membership and nobody who can moderate it, and no way back in short of
+--   the project owner's SQL editor. They are told to hand the department over
+--   or erase it instead, both of which they can do from the administration
+--   screen. Same settings lock as admin_set_flag(), so two administrators
+--   leaving at once cannot both read "there is another one".
+--
+-- What it deliberately does NOT do is anonymise in place. A comment whose
+-- author row is gone is a comment attributed to nobody, and the archive is
+-- more honest with the thread missing than with a ghost in it -- so comments
+-- and votes go with the profile, by cascade.
+-- ---------------------------------------------------------------------------
+create or replace function public.leave_department(confirm text)
+returns jsonb language plpgsql security definer set search_path = public as $fn$
+declare
+  me         uuid := auth.uid();
+  handle     text;
+  paths      text[];
+  file_count bigint;
+  account    text := 'deleted';
+begin
+  if not public.is_active_member() then raise exception 'NOT_A_MEMBER'; end if;
+
+  -- Ordered against admin_set_flag() and against another member leaving.
+  perform 1 from public.settings s where s.id for update;
+
+  select p.username into handle from public.profiles p where p.id = me;
+
+  -- Typed confirmation for the same reason purge_department() asks for one:
+  -- this is irreversible, and an RPC named like this one that takes no
+  -- argument that has to match is a single mis-click from being called. A
+  -- member who never chose a username confirms with the word instead, because
+  -- there is nothing else of theirs to type.
+  if lower(trim(coalesce(confirm, ''))) is distinct from
+     lower(trim(coalesce(handle, 'leave'))) then
+    raise exception 'CONFIRMATION_MISMATCH';
+  end if;
+
+  if public.is_admin() and not exists (
+    select 1 from public.profiles p
+     where p.is_admin and not p.is_banned and p.id <> me
+  ) then
+    raise exception 'LAST_ADMIN'
+      using hint = 'Promote another administrator, or erase the department instead.';
+  end if;
+
+  select coalesce(array_agg(f.storage_path order by f.created_at), '{}'), count(*)
+    into paths, file_count
+    from public.files f where f.owner_id = me;
+
+  -- Named rather than left to the cascade, for the same reason
+  -- purge_department() names its tables: a table added later with no cascade
+  -- to profiles would otherwise survive this silently. reports filed BY this
+  -- member go; reports filed ABOUT their documents go with the documents.
+  delete from public.reports    where reporter_id = me;
+  delete from public.comments   where author_id = me;
+  delete from public.votes      where user_id = me;
+  delete from public.file_views where user_id = me;
+  delete from public.files      where owner_id = me;
+  delete from public.user_emails where user_id = me;
+
+  -- The log outlives the member on purpose, and says so: an audit trail that
+  -- can be emptied by the person it is about is not one. actor_id is
+  -- `on delete set null`, so what remains is the action and its date.
+  insert into public.audit_log (actor_id, action, target, detail)
+  values (me, 'member.leave', me::text,
+          jsonb_build_object('files', file_count, 'username', handle));
+
+  delete from public.profiles where id = me;
+
+  begin
+    delete from auth.users u where u.id = me;
+  exception when others then
+    account := 'kept';
+    raise warning 'could not delete auth.users: %', sqlerrm;
+  end;
+
+  return jsonb_build_object(
+    'files', file_count,
+    'account', account,
+    'storage_paths', to_jsonb(paths)
+  );
+end; $fn$;
+
+-- Same reasoning as purge_department(): a function that erases things does not
+-- get to be reachable by the signed-out role, even though its first line would
+-- refuse them.
+revoke execute on function public.leave_department(text) from anon, public;
+grant  execute on function public.leave_department(text) to authenticated;
 
 -- Counters for the department's front door. Returns only totals -- never
 -- titles, never names.

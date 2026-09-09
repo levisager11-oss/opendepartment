@@ -149,6 +149,96 @@ alter table public.departments
   add constraint departments_key_not_secret
   check (not public.looks_like_secret_key(anon_key)) not valid;
 
+-- ---------------------------------------------------------------------------
+-- One Supabase project, one department.
+--
+-- A department's `supabase_url` and `anon_key` are served to every visitor of
+-- its front door -- that is the whole design, and both values are public. What
+-- followed from it was not: anybody holding those two public strings could
+-- register a SECOND slug pointing at the same project. Not a copy of the
+-- archive, the archive itself, under an address somebody else chose and with a
+-- directory entry somebody else wrote.
+--
+-- Three things that costs, worst first:
+--
+--   SUSPENSION STOPS WORKING. It is the platform's only lever, and it is a
+--   flag on one row. Suspend /d/real and /d/mirror goes on resolving to the
+--   same project, so the takedown is undone by one registration. This is the
+--   reason the fix is a constraint on the DIRECTORY rather than a check in the
+--   wizard: the mirror is not a bug in setup, it is a second legitimate-looking
+--   row.
+--
+--   UNLISTED STOPS MEANING ANYTHING. An archive whose owner deliberately kept
+--   it out of /directory could be put there by a stranger, because visibility
+--   lives on the listing and the listing was not the owner's to control.
+--
+--   THE NAME IN THE DIRECTORY IS NOT THE DEPARTMENT'S. display_name and
+--   tagline are the registrant's to set. A mirror gets to caption somebody
+--   else's documents.
+--
+-- A trigger rather than a bare unique index, for the same reason so many
+-- constraints in this file are NOT VALID: a control plane re-running this file
+-- may already hold a duplicate pair, and an index that refuses to build would
+-- fail the whole migration over history rather than over new writes. The
+-- trigger only ever looks at the row being written. The index below is
+-- attempted afterwards as a backstop and skipped, loudly, when it cannot be
+-- built -- at which point the trigger is still doing the work.
+--
+-- Covers both doors. register_department() is `security definer` and owns the
+-- table, so a policy could not see it; `supabase_url` is also in the operator's
+-- own UPDATE grant, so a registered department could otherwise be repointed at
+-- a project already spoken for. A trigger fires for both.
+--
+-- What this deliberately does NOT do is prove that the registrant controls the
+-- project. It cannot: this function has no way to reach out to it, and the
+-- coordinates it is handed are public by design. It makes the binding
+-- exclusive and first-come, which is what suspension needs in order to hold.
+-- The first signup is protected separately, by the founder capability in
+-- db/tenant-schema.sql -- registering a slug for somebody else's project still
+-- does not get you an account inside it.
+-- ---------------------------------------------------------------------------
+create or replace function public.departments_one_project()
+returns trigger language plpgsql security definer set search_path = public as $fn$
+begin
+  if tg_op = 'UPDATE' and new.supabase_url is not distinct from old.supabase_url then
+    return new;
+  end if;
+
+  if exists (
+    select 1 from public.departments d
+     where d.supabase_url = new.supabase_url
+       and d.slug <> new.slug
+  ) then
+    raise exception 'PROJECT_ALREADY_REGISTERED'
+      using hint = 'That Supabase project already backs a department on this platform.';
+  end if;
+
+  return new;
+end; $fn$;
+
+revoke execute on function public.departments_one_project() from anon, authenticated, public;
+
+drop trigger if exists departments_one_project on public.departments;
+create trigger departments_one_project
+  before insert or update of supabase_url on public.departments
+  for each row execute function public.departments_one_project();
+
+-- The backstop. Two registrations in the same instant both pass the trigger's
+-- lookup and both reach the insert; the index is what refuses the loser. It is
+-- attempted rather than declared because a directory that already holds a
+-- duplicate should be told about it, not blocked from applying the trigger
+-- that stops the next one.
+do $idx$ begin
+  create unique index if not exists departments_one_project_idx
+    on public.departments (supabase_url);
+exception when unique_violation then
+  raise warning 'departments.supabase_url already holds duplicates; the exclusive index was not built. Resolve them, then re-run this file. Duplicated projects: %',
+    (select string_agg(distinct supabase_url, ', ')
+       from public.departments d
+      where exists (select 1 from public.departments o
+                     where o.supabase_url = d.supabase_url and o.slug <> d.slug));
+end $idx$;
+
 -- Slugs that must never be handed out, because they collide with app routes
 -- or invite impersonation.
 -- RLS on with no policy is deliberate here: deny-all. Nothing reads this over
@@ -386,6 +476,7 @@ language plpgsql security definer set search_path = public as $fn$
 declare
   clean text := lower(trim(want_slug));
   owned integer;
+  failed text;
 begin
   if auth.uid() is null then raise exception 'NOT_SIGNED_IN'; end if;
 
@@ -421,7 +512,18 @@ exception
   -- and both reach the INSERT. `slug` is the primary key, so the loser gets a
   -- unique violation -- translated here into the same error the pre-check
   -- raises, so the caller has one case to handle rather than two.
+  --
+  -- Two different races land here now, though, and they are not the same
+  -- refusal: the exclusive project index can be the one that fires, and
+  -- telling somebody their slug is taken when the truth is that their PROJECT
+  -- is already registered sends them off to think of another name that will
+  -- fail in exactly the same way. The constraint name is the only thing that
+  -- distinguishes them at this point.
   when unique_violation then
+    get stacked diagnostics failed = constraint_name;
+    if failed = 'departments_one_project_idx' then
+      raise exception 'PROJECT_ALREADY_REGISTERED';
+    end if;
     raise exception 'SLUG_UNAVAILABLE';
 end; $fn$;
 

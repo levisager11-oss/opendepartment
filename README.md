@@ -67,6 +67,7 @@ the tenant's own database, each re-checking `is_admin()` itself:
 | `admin.from("user_emails")` for one file | `admin_file_owner_email(id)` |
 | `admin` counts for the landing page | `department_stats()` |
 | `admin` deleting a department's tables | `purge_department(confirm)` |
+| nothing — a member could not leave at all | `leave_department(confirm)` |
 
 What OpenDepartment holds **at rest** is a URL and an anon key — both public by
 design and restricted by the tenant's own RLS. During a member's request, the
@@ -395,14 +396,23 @@ claimed.
   in and the cap is not something a hand-rolled API call can step around.
 - **30 reserved slugs**, covering app routes and names worth impersonating.
 - **Unlisted by default.** A department appears in `/directory` only if its
-  owner opts in.
+  owner opts in. Unlisted means not indexed and not listed, not secret:
+  `slug_available()` has to answer before anybody has an account, so a
+  determined wordlist can still discover that a slug is taken.
+- **One project, one department.** A department's URL and anon key are served
+  to every visitor of its front door, so without this anybody holding those two
+  public strings could register a second slug against the same project — a live
+  mirror with a directory entry of their own choosing, and a way straight past
+  the suspension below. A trigger on `departments` refuses it on INSERT and on
+  UPDATE, since `supabase_url` is in the operator's own grant too.
 - **Terms accepted at signup**, with the responsibility spelled out rather
   than buried: the person who creates an archive answers for what is in it.
 - **Suspension** — setting a department's `status` to `suspended` stops its
   slug resolving, without touching a byte of the owner's own data. `status` is
   not in the operator's UPDATE grant and a suspended row cannot be deleted, so
   a suspension is not something its subject can lift or delist their way out
-  of.
+  of — and because the project stays bound to that row, not something they can
+  re-register their way out of either.
 
 ## Status
 

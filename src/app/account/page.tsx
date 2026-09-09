@@ -5,6 +5,7 @@ import { MarketingShell } from "@/components/MarketingShell";
 import { Seal } from "@/components/Seal";
 import { T } from "@/components/T";
 import { DepartmentRow } from "@/components/account/DepartmentRow";
+import { AccountSignOut } from "@/components/account/AccountSignOut";
 import { privatePage } from "@/lib/seo";
 
 export const metadata = privatePage("Your departments", { path: "/account" });
@@ -33,7 +34,7 @@ export default async function AccountPage() {
 
   return (
     <MarketingShell wide>
-      <div className="mb-8 flex flex-wrap items-center gap-4">
+      <div className="mb-2 flex flex-wrap items-center gap-4">
         <h1 className="font-serif text-2xl font-black break-words text-ink-900 sm:text-3xl">
           <T k="account.title" />
         </h1>
@@ -43,6 +44,15 @@ export default async function AccountPage() {
         >
           <T k="od.create" />
         </Link>
+      </div>
+
+      {/* Under the heading rather than in the shell's navigation: this is the
+          only screen the control-plane session is used from, and a sign-out in
+          the marketing header would offer itself to every reader who has no
+          account at all. */}
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-2">
+        <p className="typewriter text-xs break-all text-ink-500">{user.email}</p>
+        <AccountSignOut />
       </div>
 
       {!departments || departments.length === 0 ? (

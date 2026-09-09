@@ -6,6 +6,7 @@ import { useI18n } from "@/lib/i18n/provider";
 import { useTenant, useTenantClient } from "@/lib/tenant/context";
 import { FileCard } from "./FileCard";
 import {
+  SIGNED_URL_TTL,
   STORAGE_BUCKET,
   type CaseFile,
   type FileKind,
@@ -184,7 +185,7 @@ export function VaultBrowser({
         if (imagePaths.length) {
           const { data: signed } = await supabase.storage
             .from(STORAGE_BUCKET)
-            .createSignedUrls(imagePaths, 3600);
+            .createSignedUrls(imagePaths, SIGNED_URL_TTL);
           if (signed && !stale()) {
             setThumbs((prev) => {
               const next = { ...prev };

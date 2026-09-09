@@ -170,6 +170,99 @@ select odtest.equals('orphan cleanup protects a recent upload awaiting metadata'
   $$select count(*)::text from public.admin_orphaned_objects() where path like '%/new-upload.png'$$,'0');
 select odtest.equals('orphan cleanup protects old referenced objects',
   $$select count(*)::text from public.admin_orphaned_objects() where path like '%/ordinary.png'$$,'0');
+-- Leaving: a member erases their own membership, and the last administrator
+-- may not erase the one account that can still moderate the archive.
+select odtest.as_owner();
+alter table auth.users disable trigger on_auth_user_created;
+insert into auth.users (id,email) values
+  ('a1000000-0000-0000-0000-000000000010','audit-leaver@example.test'),
+  ('a1000000-0000-0000-0000-000000000011','audit-second-admin@example.test');
+insert into public.profiles (id,username,is_admin,is_banned) values
+  ('a1000000-0000-0000-0000-000000000010','auditleaver',false,false),
+  ('a1000000-0000-0000-0000-000000000011','auditsecond',true,false);
+alter table auth.users enable trigger on_auth_user_created;
+insert into public.files
+  (id,owner_id,title,storage_path,original_name,mime_type,size_bytes,kind)
+values ('f1000000-0000-0000-0000-000000000010','a1000000-0000-0000-0000-000000000010',
+  'Leaver exhibit','a1000000-0000-0000-0000-000000000010/leaving.png','leaving.png','image/png',10,'image');
+insert into public.comments (file_id,author_id,body) values
+  ('f1000000-0000-0000-0000-000000000003','a1000000-0000-0000-0000-000000000010','A parting word');
+
+select odtest.as_anon();
+select odtest.denied('a signed-out caller cannot reach leave_department',
+  $$select public.leave_department('auditleaver')$$);
+
+select odtest.as_user('a1000000-0000-0000-0000-000000000003');
+select odtest.denied('a banned member cannot use leaving to erase their trail',
+  $$select public.leave_department('auditbanned')$$);
+
+select odtest.as_user('a1000000-0000-0000-0000-000000000010');
+select odtest.denied('leaving refuses a confirmation that is not the caller name',
+  $$select public.leave_department('auditadmin')$$);
+select odtest.equals('a refused confirmation leaves the membership intact',
+  $$select count(*)::text from public.profiles where id='a1000000-0000-0000-0000-000000000010'$$,'1');
+select odtest.equals('leaving hands back the storage paths it did not delete',
+  $$select public.leave_department('auditleaver') -> 'storage_paths' ->> 0$$,
+  'a1000000-0000-0000-0000-000000000010/leaving.png');
+
+select odtest.as_owner();
+select odtest.equals('leaving removes the profile',
+  $$select count(*)::text from public.profiles where id='a1000000-0000-0000-0000-000000000010'$$,'0');
+select odtest.equals('leaving removes the private e-mail row',
+  $$select count(*)::text from public.user_emails where user_id='a1000000-0000-0000-0000-000000000010'$$,'0');
+select odtest.equals('leaving removes the documents that were filed',
+  $$select count(*)::text from public.files where owner_id='a1000000-0000-0000-0000-000000000010'$$,'0');
+select odtest.equals('leaving removes the comments that were written',
+  $$select count(*)::text from public.comments where author_id='a1000000-0000-0000-0000-000000000010'$$,'0');
+select odtest.equals('leaving removes the account itself',
+  $$select count(*)::text from auth.users where id='a1000000-0000-0000-0000-000000000010'$$,'0');
+select odtest.equals('the audit trail outlives the member who left',
+  $$select count(*)::text from public.audit_log where action='member.leave'$$,'1');
+
+-- An administrator may leave while another one remains. Earlier sections of
+-- the suite share this database and left administrators of their own behind,
+-- so the count is what makes this assertion mean something rather than the
+-- two accounts named here.
+select odtest.as_user('a1000000-0000-0000-0000-000000000011');
+select odtest.allowed('an administrator may leave while another one remains',
+  $$select public.leave_department('auditsecond')$$);
+
+-- The floor itself needs a department with exactly one administrator left, and
+-- this one has several. Demoting the others as the owner is fixture work, not
+-- the property under test -- admin_set_flag() is exercised for that on its own
+-- below.
+select odtest.as_owner();
+update public.profiles set is_admin = false
+ where is_admin and id <> 'a1000000-0000-0000-0000-000000000001';
+select odtest.equals('the fixture leaves exactly one administrator standing',
+  $$select count(*)::text from public.profiles where is_admin and not is_banned$$,'1');
+select odtest.as_user('a1000000-0000-0000-0000-000000000001');
+select odtest.denied('the last administrator may not leave the department unmoderated',
+  $$select public.leave_department('auditadmin')$$);
+select odtest.as_owner();
+select odtest.equals('the refused departure leaves the last administrator in place',
+  $$select count(*)::text from public.profiles where id='a1000000-0000-0000-0000-000000000001' and is_admin$$,'1');
+select odtest.equals('the refused departure leaves their documents in place',
+  $$select count(*)::text from public.files where owner_id='a1000000-0000-0000-0000-000000000001'$$,'1');
+
+-- Demotion still works when somebody is left to do the moderating, which is
+-- the half of admin_set_flag() the new outcome check must not have broken.
+select odtest.as_owner();
+alter table auth.users disable trigger on_auth_user_created;
+insert into auth.users (id,email) values
+  ('a1000000-0000-0000-0000-000000000012','audit-third-admin@example.test');
+insert into public.profiles (id,username,is_admin,is_banned) values
+  ('a1000000-0000-0000-0000-000000000012','auditthird',true,false);
+alter table auth.users enable trigger on_auth_user_created;
+select odtest.as_user('a1000000-0000-0000-0000-000000000012');
+select odtest.allowed('an administrator may still demote a colleague',
+  $$select public.admin_set_flag('a1000000-0000-0000-0000-000000000001','is_admin',false)$$);
+select odtest.allowed('an administrator may still ban a colleague',
+  $$select public.admin_set_flag('a1000000-0000-0000-0000-000000000002','is_banned',true)$$);
+select odtest.as_owner();
+select odtest.equals('the demotion landed',
+  $$select is_admin::text from public.profiles where id='a1000000-0000-0000-0000-000000000001'$$,'false');
+
 select odtest.as_owner();
 \o
 select * from odtest.report() where outcome='FAIL';

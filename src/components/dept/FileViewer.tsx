@@ -47,12 +47,10 @@ function MediaFrame({
 export function FileViewer({
   kind,
   url,
-  mimeType,
   title,
 }: {
   kind: FileKind;
   url: string | null;
-  mimeType: string;
   title: string;
 }) {
   const { t } = useI18n();
@@ -134,21 +132,41 @@ export function FileViewer({
     );
   }
 
-  // PDF. <object> degrades to the fallback on browsers that refuse to inline it.
+  /**
+   * PDF, in a sandboxed frame rather than an <object>.
+   *
+   * What decides how the bytes are rendered is the response's Content-Type,
+   * never a `type` attribute the markup asserts -- and that value is whatever
+   * the uploading browser said it was. Storage takes it from the client, and
+   * the storage INSERT policy checks the folder and the membership, not the
+   * media type. The CHECK constraint in db/tenant-schema.sql fences
+   * `files.mime_type` and `kind` -- the ROW -- and cannot reach the object
+   * those columns describe.
+   *
+   * So a member could file a row as application/pdf over an object stored as
+   * text/html, and an <object> would render it: a document with scripts, in a
+   * nested browsing context, on the department's own supabase.co origin, which
+   * the policy has to allow because that is where every exhibit lives. Not
+   * cross-site scripting against this app -- the session cookie is on this
+   * origin, not that one -- but active content inside a page a member trusts,
+   * which is enough for a convincing overlay, a top-level navigation attempt
+   * and a beacon carrying whoever opened the exhibit.
+   *
+   * The sandbox is what makes the media type stop mattering. With neither
+   * allow-scripts nor allow-same-origin, a smuggled HTML document is inert
+   * markup in an opaque origin, while the browser's own PDF viewer -- which is
+   * not page script -- goes on rendering an actual PDF. allow-downloads keeps
+   * that viewer's save button working; the download link beside it is the
+   * fallback either way.
+   */
   return (
-    <object
-      data={url}
-      type={mimeType}
+    <iframe
+      src={url}
+      title={title}
+      sandbox="allow-downloads"
+      referrerPolicy="no-referrer"
       className="h-viewer w-full rounded-card border border-paper-400 bg-white shadow-md"
-      aria-label={title}
-    >
-      <Placeholder>
-        <KindIcon kind="pdf" size={40} className="text-ink-400" />
-        <p className="mt-3 max-w-sm text-sm text-ink-500">
-          {t("file.unsupported")}
-        </p>
-      </Placeholder>
-    </object>
+    />
   );
 }
 

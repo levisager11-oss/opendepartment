@@ -63,6 +63,16 @@ column privilege in [db/tenant-schema.sql](db/tenant-schema.sql) as well —
 (`background: var(--accent)`) and a value carrying a semicolon reparses into
 extra declarations.
 
+**A member can erase their own membership.** `leave_department(confirm)` is the
+counterpart to `purge_department()` at one person's scale: it removes their
+files, comments, votes, reports, profile, e-mail row and auth user, hands the
+storage paths back for the caller to remove (same division of labour as
+`delete_file()`), and refuses the last active administrator, who would otherwise
+leave a live archive nobody can moderate. It is reached from
+`/d/<slug>/account`, the member's own page. When adding anything that stores
+something about a member, add it to that function's delete list — the tables are
+named individually rather than left to the cascade for exactly this reason.
+
 **OpenDepartment never holds a `service_role` key for any tenant.** Every
 privileged tenant operation (member listing, file deletion, owner email
 lookup, stats) is a `security definer` Postgres function inside the
@@ -89,6 +99,11 @@ authorised for a whole organisation.
 
 Consequences that show up throughout the code:
 
+- **One Supabase project backs at most one department.** Enforced by the
+  `departments_one_project` trigger in the control plane, on INSERT and on
+  UPDATE. Both values needed to point a slug at a project are public — they are
+  served to every visitor of `/d/<slug>` — so without the constraint, suspension
+  (a flag on a single row) could be undone by registering a second slug.
 - **Two cookie realms.** The control-plane session uses the default
   Supabase cookie name. Each department gets its own cookie named
   `od-<slug>` scoped to path `/d/<slug>` (see

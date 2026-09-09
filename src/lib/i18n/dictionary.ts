@@ -39,6 +39,8 @@ export const dictionary = {
     "common.and": "and",
     "setup.tooMany":
       "You have reached the maximum of 3 departments for one account. Remove one under Your departments first.",
+    "setup.projectTaken":
+      "That Supabase project already backs a department on this platform. One project holds one archive -- check Your departments, or create a second Supabase project for this one.",
     "setup.next1":
       "Use the private founder link below to create your administrator account. Keep this link to yourself until signup is complete.",
     "setup.next2":
@@ -534,6 +536,29 @@ export const dictionary = {
     "onboarding.placeholder": "e.g. DEEP_THROAT",
     "onboarding.rules": "3-20 characters. Letters, digits, underscore and dash.",
     "onboarding.submit": "Confirm identity",
+
+    "member.title": "Your membership",
+    "member.body":
+      "What this department knows about you, and how to end it. This page covers this department only -- leaving here changes nothing about any other archive you belong to.",
+    "member.identity": "ON RECORD",
+    "member.username": "Filed as",
+    "member.email": "Address on file",
+    "member.emailNote":
+      "Your address is visible to this department's administrators and to nobody else. It is never shown beside your documents or comments.",
+    "member.changePassword": "Change password",
+    "leave.title": "LEAVE THIS DEPARTMENT",
+    "leave.body":
+      "Erases your membership and everything filed under it: your documents, your comments, your votes, your address and this account. It cannot be undone, and an administrator cannot restore it. The audit log keeps the date you left.",
+    "leave.start": "Leave this department",
+    "leave.confirmLabel": "Type {name} to confirm",
+    "leave.submit": "Erase my membership",
+    "leave.mismatch": "That does not match. Type it exactly as shown.",
+    "leave.lastAdmin":
+      "You are this department's only administrator. Promote somebody else first, or erase the whole department under Administration.",
+    "leave.unavailable":
+      "This department has not installed the schema update that makes leaving possible. Ask its administrator to re-run the setup SQL.",
+    "leave.doneObjectsLeft":
+      "Your membership is erased, but some of your uploaded files could not be removed from storage. Tell this department's administrator: they can clear them under Administration, Storage.",
     "onboarding.taken": "That name is already assigned to another operative.",
     "onboarding.invalid":
       "Invalid name. Use 3-20 letters, digits, underscores or dashes.",
@@ -762,6 +787,8 @@ export const dictionary = {
     "common.and": "und",
     "setup.tooMany":
       "Sie haben das Maximum von 3 Departementen pro Konto erreicht. Entfernen Sie zuerst eines unter «Ihre Departemente».",
+    "setup.projectTaken":
+      "Dieses Supabase-Projekt gehört bereits zu einem Departement auf dieser Plattform. Ein Projekt trägt ein Archiv -- prüfen Sie «Ihre Departemente» oder legen Sie für dieses ein zweites Supabase-Projekt an.",
     "setup.next1":
       "Erstellen Sie Ihr Administrationskonto über den privaten Gründerlink unten. Behalten Sie diesen Link bis zum Abschluss der Registrierung für sich.",
     "setup.next2":
@@ -1255,6 +1282,29 @@ export const dictionary = {
     "onboarding.rules":
       "3-20 Zeichen. Buchstaben, Ziffern, Unterstrich und Bindestrich.",
     "onboarding.submit": "Identität bestätigen",
+
+    "member.title": "Ihre Mitgliedschaft",
+    "member.body":
+      "Was dieses Departement über Sie weiss und wie Sie das beenden. Diese Seite betrifft nur dieses Departement -- ein Austritt hier ändert nichts an anderen Archiven, denen Sie angehören.",
+    "member.identity": "AKTENKUNDIG",
+    "member.username": "Geführt als",
+    "member.email": "Hinterlegte Adresse",
+    "member.emailNote":
+      "Ihre Adresse sehen nur die Administratoren dieses Departements und sonst niemand. Sie erscheint nie neben Ihren Dokumenten oder Kommentaren.",
+    "member.changePassword": "Passwort ändern",
+    "leave.title": "DIESES DEPARTEMENT VERLASSEN",
+    "leave.body":
+      "Löscht Ihre Mitgliedschaft und alles, was darunter abgelegt ist: Ihre Dokumente, Ihre Kommentare, Ihre Stimmen, Ihre Adresse und dieses Konto. Das lässt sich nicht rückgängig machen, auch nicht durch die Administration. Im Protokoll bleibt das Datum Ihres Austritts.",
+    "leave.start": "Departement verlassen",
+    "leave.confirmLabel": "Tippen Sie zur Bestätigung {name}",
+    "leave.submit": "Mitgliedschaft löschen",
+    "leave.mismatch": "Das stimmt nicht überein. Tippen Sie es genau wie angegeben.",
+    "leave.lastAdmin":
+      "Sie sind die einzige Administration dieses Departements. Ernennen Sie zuerst jemanden anderen oder löschen Sie unter «Verwaltung» das ganze Departement.",
+    "leave.unavailable":
+      "Dieses Departement hat die Schema-Aktualisierung für den Austritt noch nicht eingespielt. Bitten Sie die Administration, das Einrichtungs-SQL erneut auszuführen.",
+    "leave.doneObjectsLeft":
+      "Ihre Mitgliedschaft ist gelöscht, einzelne hochgeladene Dateien konnten aber nicht aus dem Speicher entfernt werden. Melden Sie das der Administration dieses Departements: Sie kann sie unter «Verwaltung», «Speicher» bereinigen.",
     "onboarding.taken": "Dieser Name ist bereits vergeben.",
     "onboarding.invalid":
       "Ungültiger Name. Verwenden Sie 3-20 Buchstaben, Ziffern, Unterstriche oder Bindestriche.",

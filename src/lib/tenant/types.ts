@@ -78,6 +78,25 @@ export type SortKey = "top" | "new" | "worst" | "views" | "discussed";
 export const STORAGE_BUCKET = "department-files";
 
 /**
+ * How long a signed exhibit link stays good, in seconds.
+ *
+ * This number is how long deletion and banning take to actually bite. A signed
+ * Storage URL carries its own authorisation and cannot be revoked -- there is
+ * no list to remove it from -- so between the moment a document is deleted, or
+ * a member is banned, and the moment their outstanding links stop working,
+ * exactly this much time passes. At the hour it used to be, "delete" meant
+ * "delete, and it remains readable to anyone who had the page open until after
+ * lunch", which is not what the button says and not what somebody asking for a
+ * document about them to come down is being promised.
+ *
+ * Ten minutes is the trade. It is longer than reading a page and shorter than
+ * leaving one open, the file view already offers a retry that mints a fresh
+ * link when a stale one fails, and a vault thumbnail that expires behind an
+ * idle tab costs a reload. Shorter would start costing people mid-video.
+ */
+export const SIGNED_URL_TTL = 600;
+
+/**
  * Categories a department starts with. A department can replace this list
  * entirely from its settings, so nothing in the code may assume these values.
  */

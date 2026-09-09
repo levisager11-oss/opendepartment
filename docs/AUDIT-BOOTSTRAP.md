@@ -42,6 +42,52 @@ Neither the raw capability nor a service-role key belongs in the platform regist
 
 If an unfinished saved draft has lost its key, the wizard sends you back to the SQL step with a recovery notice. Copy and rerun that SQL before continuing: it installs a new digest, invalidating any earlier unused founder link. If the whole draft is gone, the manual procedure above can issue a replacement link for the existing unclaimed department without changing its registry entry.
 
+### The department was claimed by an address nobody controls
+
+This is the case the reissue SQL above cannot reach, and it is reachable by an
+ordinary typo. When e-mail confirmation is enabled, Supabase Auth inserts the
+row into `auth.users` **before** the address is confirmed, so `handle_new_user`
+runs immediately: the verifier is consumed, `settings.claimed` becomes true and
+an administrator profile is created, all attached to an account whose owner
+never receives the confirmation mail. The department is claimed, the founder
+link is spent, and the personalization SQL refuses to install a new verifier
+because it is guarded on `not claimed`.
+
+Nothing in the app can recover this, by design — there is no service_role key
+anywhere in it. Recover it from the project's own SQL editor, and read the
+`select` first: it should list exactly the account you mistyped, and nothing
+else.
+
+```sql
+-- 1. Look at what is actually there before deleting anything.
+select u.id, u.email, u.email_confirmed_at, p.is_admin, p.created_at
+  from auth.users u
+  left join public.profiles p on p.id = u.id
+ order by u.created_at;
+
+-- 2. Remove the unconfirmed founder. Replace the address with the one from the
+--    listing above; this is deliberately not written as "delete every
+--    unconfirmed account", because on a department that has been running for a
+--    while that is not the same set.
+begin;
+delete from auth.users where email = 'the-address-you-mistyped@example.test';
+
+-- 3. Reopen founding only if the deletion left nobody who can administer the
+--    department. The guard is the point: on a department that already has a
+--    working administrator this updates no rows, and you should stop here.
+update public.settings set claimed = false
+ where id and not exists (
+   select 1 from public.profiles p where p.is_admin and not p.is_banned
+ );
+commit;
+```
+
+Then issue a fresh founder link with the `bootstrap.mjs` procedure above — the
+personalization SQL will now install a verifier, because `claimed` is false
+again — and sign up with the address spelled correctly. Turning e-mail
+confirmation off for the founding signup avoids the whole situation, which is
+what the setup wizard's e-mail step recommends.
+
 Reapplying the current schema to an already claimed department preserves its administrator and membership behavior. The personalization and manual SQL above install a verifier only while `settings.claimed` is false. They do not reopen a claimed department or replace its administrator. A department claimed by the wrong person before this protection was installed requires a separate owner-led account/role recovery; installing this schema does not silently take it back.
 
 The regression suite checks fragment clearing, reload/reset recovery, hash-only personalized SQL, rejected founder signups, single-use verification, Auth metadata cleanup, ordinary membership after claiming and denial of direct verifier access. Local SQL tests run in isolated PostgreSQL instances with a Supabase role shim; they do not exercise Supabase's hosted mail delivery, external OAuth consent or a deployed browser/network flow. Test one fresh department on the target deployment before broadly rolling out a schema upgrade.
