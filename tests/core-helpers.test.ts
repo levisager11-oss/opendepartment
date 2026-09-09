@@ -3,6 +3,8 @@ import { scrubImage } from "@/lib/tenant/scrub";
 import { looksLikeSecretKey, parseSupabaseCredentials } from "@/lib/setup/credentials";
 import { rateLimit } from "@/lib/rate-limit";
 import { getLegalDoc } from "@/lib/legal";
+import { deletedObjectPaths } from "@/lib/tenant/types";
+import { makeThumbnail } from "@/lib/tenant/thumbnail";
 
 afterEach(() => vi.useRealTimers());
 const bytesOf = async (file: File) => [...new Uint8Array(await file.arrayBuffer())];
@@ -85,4 +87,59 @@ it("falls back to naming the missing configuration rather than a placeholder", (
   // Either real operator details, or an honest sentence about what is unset --
   // never "[Your name here]".
   expect(text).not.toMatch(/\[.*\]/);
+});
+
+// delete_file() has had two return shapes and both are live at once: the app
+// deploys before any administrator re-runs the schema, which is the whole
+// reason the version notice exists. Reading only the new one would silently
+// start leaving originals in the bucket of every department behind on it.
+it("removes the object a schema-2 department reports", () => {
+  expect(deletedObjectPaths("owner/one.png")).toEqual(["owner/one.png"]);
+});
+it("removes both objects a schema-3 department reports", () => {
+  expect(
+    deletedObjectPaths({
+      storage_path: "owner/one.png",
+      thumb_path: "owner/one-thumb.webp",
+      storage_paths: ["owner/one.png", "owner/one-thumb.webp"],
+    })
+  ).toEqual(["owner/one.png", "owner/one-thumb.webp"]);
+});
+it("leaves an unreadable answer to the orphan sweep rather than guessing", () => {
+  // Nothing to remove beats removing the wrong thing; the administration
+  // screen lists unreferenced objects for exactly this case.
+  expect(deletedObjectPaths(null)).toEqual([]);
+  expect(deletedObjectPaths("")).toEqual([]);
+  expect(deletedObjectPaths({ storage_paths: "not-a-list" })).toEqual([]);
+  expect(deletedObjectPaths({ storage_paths: [null, "", "ok"] })).toEqual(["ok"]);
+});
+
+// A thumbnail is an optimisation on how the vault grid loads. Every refusal
+// below has to end with "no thumbnail", never with a thrown upload: a member
+// whose browser cannot encode WebP still gets to file their document.
+it("declines to thumbnail anything that is not an image", async () => {
+  const pdf = new File([new Uint8Array([1, 2, 3])], "a.pdf", { type: "application/pdf" });
+  await expect(makeThumbnail(pdf)).resolves.toBeNull();
+});
+it("declines rather than throwing when the browser cannot decode images", async () => {
+  vi.stubGlobal("createImageBitmap", undefined);
+  const png = new File([new Uint8Array([1, 2, 3])], "a.png", { type: "image/png" });
+  await expect(makeThumbnail(png)).resolves.toBeNull();
+  vi.unstubAllGlobals();
+});
+it("declines rather than throwing when decoding fails", async () => {
+  vi.stubGlobal("createImageBitmap", vi.fn().mockRejectedValue(new Error("bad image")));
+  const png = new File([new Uint8Array([1, 2, 3])], "a.png", { type: "image/png" });
+  await expect(makeThumbnail(png)).resolves.toBeNull();
+  vi.unstubAllGlobals();
+});
+it("does not make a second copy of an image that is already small", async () => {
+  // A "thumbnail" the same size as the original is worse than none: it is a
+  // second object to store, sign and delete for no saving at all.
+  const close = vi.fn();
+  vi.stubGlobal("createImageBitmap", vi.fn().mockResolvedValue({ width: 120, height: 90, close }));
+  const png = new File([new Uint8Array([1, 2, 3])], "a.png", { type: "image/png" });
+  await expect(makeThumbnail(png)).resolves.toBeNull();
+  expect(close).toHaveBeenCalled();
+  vi.unstubAllGlobals();
 });

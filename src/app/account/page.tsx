@@ -7,6 +7,7 @@ import { T } from "@/components/T";
 import { DepartmentRow } from "@/components/account/DepartmentRow";
 import { AccountSignOut } from "@/components/account/AccountSignOut";
 import { TENANT_SCHEMA_VERSION } from "@/lib/tenant/schema-sql.generated";
+import { StaffReports } from "@/components/account/StaffReports";
 import { privatePage } from "@/lib/seo";
 
 export const metadata = privatePage("Your departments", { path: "/account" });
@@ -25,6 +26,12 @@ export default async function AccountPage() {
   // department's own project knows the current one. Both values are public by
   // design -- they are already handed to every visitor of /d/<slug> -- and
   // departments_read_own means an operator only ever sees their own.
+  // Whether this account moderates the platform. Asked here so the section
+  // below is not rendered at all for the people it would only ever show an
+  // error to -- the authority itself is is_staff() inside the database, which
+  // every one of that component's calls re-checks.
+  const { data: staff } = await supabase.rpc("is_staff");
+
   const { data: departments, error } = await supabase
     .from("departments")
     .select(
@@ -74,6 +81,8 @@ export default async function AccountPage() {
           ))}
         </ul>
       )}
+
+      {staff === true && <StaffReports />}
     </MarketingShell>
   );
 }

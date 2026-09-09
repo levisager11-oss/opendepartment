@@ -336,6 +336,44 @@ alter table public.files
   add constraint files_path_is_owners
   check (split_part(storage_path, '/', 1) = owner_id::text) not valid;
 
+-- ---------------------------------------------------------------------------
+-- The small copy of a picture.
+--
+-- A vault page shows twenty-four cards, and every one of them used to be the
+-- ORIGINAL: a signed URL to the full-resolution object, scaled down by the
+-- browser after it had all arrived. Twenty-four twenty-megabyte scans is
+-- roughly half a gigabyte of egress, per visitor, per page, out of the free
+-- tier the department's own owner is paying for -- and the owner is the person
+-- who finds out, by way of an archive that stops loading.
+--
+-- The thumbnail is made in the browser at upload time, next to the metadata
+-- scrubbing that is already there, so it costs the platform nothing and the
+-- bytes still go straight to the owner's bucket.
+--
+-- Nullable on purpose, and it stays nullable. Documents filed before this
+-- existed have none, a department that has not re-run this file has none, and
+-- the generator is allowed to fail -- a browser that cannot encode WebP, an
+-- image too large to decode, a refused second upload. Every one of those ends
+-- with a card that falls back to the original, which is exactly what it did
+-- before. A thumbnail is an optimisation, so it may never be a precondition.
+--
+-- Same folder rule as storage_path, for the same reason: the delete and purge
+-- paths hand this back to the caller to remove, and a row pointing at somebody
+-- else's object should not be able to nominate it for deletion.
+-- ---------------------------------------------------------------------------
+alter table public.files add column if not exists thumb_path text;
+
+alter table public.files drop constraint if exists files_thumb_is_owners;
+alter table public.files
+  add constraint files_thumb_is_owners check (
+    thumb_path is null
+    or (split_part(thumb_path, '/', 1) = owner_id::text
+        and thumb_path <> storage_path)
+  ) not valid;
+
+create index if not exists files_thumb_idx
+  on public.files (thumb_path) where thumb_path is not null;
+
 alter table public.files drop constraint if exists files_text_lengths;
 alter table public.files
   add constraint files_text_lengths check (
@@ -876,15 +914,27 @@ end; $fn$;
 
 -- Deletes the row and returns the storage path so the caller can remove the
 -- object too. Storage RLS already lets an admin delete, so no elevated key.
+-- Returns the objects the caller must now remove, not just the one. An exhibit
+-- can have a thumbnail beside it, and a delete that forgot it would leave
+-- behind a small picture of a document the archive says is gone -- readable by
+-- every member, since the storage read policy is bucket-wide.
+--
+-- Dropped first because the return type changed from `text` to `jsonb`;
+-- `create or replace` refuses that. Callers written against the old shape get
+-- a bare path and keep working, which is the transient state while a
+-- department has the new app and has not yet re-run this file.
+drop function if exists public.delete_file(uuid, text);
 create or replace function public.delete_file(target uuid, why text default null)
-returns text language plpgsql security definer set search_path = public as $fn$
-declare path text; owner uuid;
+returns jsonb language plpgsql security definer set search_path = public as $fn$
+declare path text; thumb text; owner uuid;
 begin
   -- An anonymous auth.uid() is NULL. SQL's three-valued equality must never
   -- turn a failed ownership comparison into a skipped rejection branch.
   if not public.is_active_member() then raise exception 'NOT_A_MEMBER'; end if;
 
-  select f.storage_path, f.owner_id into path, owner from public.files f where f.id = target;
+  select f.storage_path, f.thumb_path, f.owner_id
+    into path, thumb, owner
+    from public.files f where f.id = target;
   if path is null then raise exception 'NOT_FOUND'; end if;
 
   if owner is distinct from auth.uid() and not public.is_admin() then
@@ -893,10 +943,15 @@ begin
 
   insert into public.audit_log (actor_id, action, target, detail)
   values (auth.uid(), 'file.delete', target::text,
-          jsonb_build_object('storage_path', path, 'reason', why));
+          jsonb_build_object('storage_path', path, 'thumb_path', thumb,
+                             'reason', why));
 
   delete from public.files where id = target;
-  return path;
+  return jsonb_build_object(
+    'storage_path', path,
+    'thumb_path', thumb,
+    'storage_paths', to_jsonb(array_remove(array[path, thumb], null))
+  );
 end; $fn$;
 
 revoke execute on function public.delete_file(uuid, text) from anon, public;
@@ -993,8 +1048,12 @@ begin
          -- Uploading bytes and filing metadata are separate requests. Give a
          -- normal upload an hour to finish before offering the object to purge.
          and o.created_at < now() - interval '1 hour'
+         -- Either column: a thumbnail is a referenced object too, and a
+         -- sweep that offered every one of them for deletion would be a
+         -- button that empties the vault's grid.
          and not exists (
-           select 1 from public.files f where f.storage_path = o.name
+           select 1 from public.files f
+            where f.storage_path = o.name or f.thumb_path = o.name
          )
        order by o.created_at
        limit 500;
@@ -1085,10 +1144,14 @@ begin
     raise exception 'CONFIRMATION_MISMATCH';
   end if;
 
-  select coalesce(array_agg(f.storage_path order by f.created_at), '{}'),
-         count(*)
-    into paths, file_count
-    from public.files f;
+  -- Both objects per exhibit. A purge that returned only the originals would
+  -- report an erased archive while its thumbnails stayed in the bucket.
+  select coalesce(
+           array_agg(p order by p) filter (where p is not null), '{}')
+    into paths
+    from public.files f,
+         lateral unnest(array[f.storage_path, f.thumb_path]) as p;
+  select count(*) into file_count from public.files;
 
   select count(*) into members
     from public.profiles p where p.id <> auth.uid();
@@ -1225,9 +1288,16 @@ begin
       using hint = 'Promote another administrator, or erase the department instead.';
   end if;
 
-  select coalesce(array_agg(f.storage_path order by f.created_at), '{}'), count(*)
-    into paths, file_count
-    from public.files f where f.owner_id = me;
+  -- Both objects per exhibit, for the same reason purge_department() takes
+  -- both: a thumbnail left in the bucket outlives the membership it belonged
+  -- to, and every member can still read it.
+  select coalesce(
+           array_agg(p order by p) filter (where p is not null), '{}')
+    into paths
+    from public.files f,
+         lateral unnest(array[f.storage_path, f.thumb_path]) as p
+   where f.owner_id = me;
+  select count(*) into file_count from public.files where owner_id = me;
 
   -- Named rather than left to the cascade, for the same reason
   -- purge_department() names its tables: a table added later with no cascade
@@ -1447,7 +1517,7 @@ grant  update (title, description, category) on public.files to authenticated;
 -- forged scores, counters, case numbers or timestamps on a brand-new row.
 revoke insert on public.files from anon, authenticated;
 grant insert (owner_id, title, description, category, storage_path,
-              original_name, mime_type, size_bytes, kind)
+              original_name, mime_type, size_bytes, kind, thumb_path)
   on public.files to authenticated;
 
 -- FILE_SUBJECTS
@@ -1524,7 +1594,7 @@ create view public.files_public
 with (security_invoker = true) as
 select
   f.id, f.title, f.description, f.category, f.kind, f.mime_type,
-  f.size_bytes, f.original_name, f.storage_path,
+  f.size_bytes, f.original_name, f.storage_path, f.thumb_path,
   f.upvotes, f.downvotes, f.score, f.comment_count, f.view_count,
   f.case_number, f.created_at, f.owner_id,
   f.search,
@@ -1630,7 +1700,7 @@ create policy "dept delete own or admin" on storage.objects
 --  reads the number out of the statement below and refuses to build without
 --  it, so the app and this file cannot drift apart.
 -- ===========================================================================
-insert into public.schema_version (id, version) values (true, 2)
+insert into public.schema_version (id, version) values (true, 3)
 on conflict (id) do update
   set version = excluded.version, applied_at = now();
 

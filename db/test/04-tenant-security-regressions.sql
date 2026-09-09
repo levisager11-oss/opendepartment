@@ -44,7 +44,8 @@ select odtest.as_user('a1000000-0000-0000-0000-000000000002');
 select odtest.denied('member cannot delete another owners file through the RPC',
   $$select public.delete_file('f1000000-0000-0000-0000-000000000003')$$);
 select odtest.equals('owner deletion returns the path needed for storage cleanup',
-  $$select public.delete_file('f1000000-0000-0000-0000-000000000004', 'owner request')$$,
+  $$select public.delete_file('f1000000-0000-0000-0000-000000000004', 'owner request')
+      ->> 'storage_path'$$,
   'a1000000-0000-0000-0000-000000000002/cleanup.png');
 select odtest.allowed('owner can still remove the storage object after RPC deletion',
   $$delete from storage.objects where bucket_id='department-files'
@@ -115,7 +116,8 @@ select odtest.allowed('administrator can still resolve a report',
   $$update public.reports set status='resolved',resolved_by=auth.uid(),resolved_at=now()
     where file_id='f1000000-0000-0000-0000-000000000003'$$);
 select odtest.equals('administrator can delete another owners exhibit and clean storage',
-  $$select public.delete_file('f1000000-0000-0000-0000-000000000002', 'moderation')$$,
+  $$select public.delete_file('f1000000-0000-0000-0000-000000000002', 'moderation')
+      ->> 'storage_path'$$,
   'a1000000-0000-0000-0000-000000000003/banned.png');
 select odtest.as_owner();
 select odtest.equals('owner deletion is attributed in the audit log',
@@ -263,6 +265,70 @@ select odtest.as_owner();
 select odtest.equals('the demotion landed',
   $$select is_admin::text from public.profiles where id='a1000000-0000-0000-0000-000000000001'$$,'false');
 
+-- Thumbnails are objects too: every path that removes an exhibit has to hand
+-- back the small copy beside it, and the orphan sweep must not offer a live one
+-- for deletion. A thumbnail left behind is readable by every member, because
+-- the storage read policy is bucket-wide.
+select odtest.as_owner();
+alter table auth.users disable trigger on_auth_user_created;
+insert into auth.users (id,email) values
+  ('a1000000-0000-0000-0000-000000000020','audit-thumbs@example.test');
+insert into public.profiles (id,username,is_admin,is_banned) values
+  ('a1000000-0000-0000-0000-000000000020','auditthumbs',false,false);
+alter table auth.users enable trigger on_auth_user_created;
+insert into public.files
+  (id,owner_id,title,storage_path,thumb_path,original_name,mime_type,size_bytes,kind)
+values ('f1000000-0000-0000-0000-000000000030','a1000000-0000-0000-0000-000000000020',
+  'Illustrated exhibit',
+  'a1000000-0000-0000-0000-000000000020/full.png',
+  'a1000000-0000-0000-0000-000000000020/full-thumb.webp',
+  'full.png','image/png',10,'image');
+insert into storage.objects (bucket_id,name,created_at) values
+  ('department-files','a1000000-0000-0000-0000-000000000020/full.png',now()-interval '2 hours'),
+  ('department-files','a1000000-0000-0000-0000-000000000020/full-thumb.webp',now()-interval '2 hours');
+
+-- auditthird, not auditadmin: the section above demoted auditadmin, and
+-- admin_orphaned_objects() refuses a caller who is not an administrator.
+select odtest.as_user('a1000000-0000-0000-0000-000000000012');
+select odtest.equals('a live thumbnail is not offered to the orphan sweep',
+  $$select count(*)::text from public.admin_orphaned_objects()
+     where path like '%full-thumb.webp'$$,'0');
+
+select odtest.as_user('a1000000-0000-0000-0000-000000000020');
+select odtest.denied('a thumbnail cannot point into another member folder',
+  $$insert into public.files
+      (owner_id,title,storage_path,thumb_path,original_name,mime_type,size_bytes,kind)
+    values (auth.uid(),'Borrowed thumbnail',
+      auth.uid()::text||'/mine.png',
+      'a1000000-0000-0000-0000-000000000001/theirs.webp',
+      'mine.png','image/png',10,'image')$$);
+select odtest.equals('deleting an exhibit hands back both objects to remove',
+  $$select jsonb_array_length(
+      public.delete_file('f1000000-0000-0000-0000-000000000030') -> 'storage_paths')::text$$,
+  '2');
+select odtest.as_owner();
+select odtest.equals('the removed exhibit leaves its thumbnail to the caller, not the sweep',
+  $$select count(*)::text from public.files
+     where thumb_path='a1000000-0000-0000-0000-000000000020/full-thumb.webp'$$,'0');
+select odtest.as_user('a1000000-0000-0000-0000-000000000012');
+select odtest.equals('an unreferenced thumbnail becomes an orphan once its row is gone',
+  $$select count(*)::text from public.admin_orphaned_objects()
+     where path like '%full-thumb.webp'$$,'1');
+
+-- Leaving takes both objects too.
+select odtest.as_owner();
+insert into public.files
+  (id,owner_id,title,storage_path,thumb_path,original_name,mime_type,size_bytes,kind)
+values ('f1000000-0000-0000-0000-000000000031','a1000000-0000-0000-0000-000000000020',
+  'Second illustrated exhibit',
+  'a1000000-0000-0000-0000-000000000020/second.png',
+  'a1000000-0000-0000-0000-000000000020/second-thumb.webp',
+  'second.png','image/png',10,'image');
+select odtest.as_user('a1000000-0000-0000-0000-000000000020');
+select odtest.equals('leaving hands back a thumbnail as well as its original',
+  $$select jsonb_array_length(
+      public.leave_department('auditthumbs') -> 'storage_paths')::text$$,'2');
+
 -- A member's private address follows the one they actually confirmed. The
 -- fixtures above insert profiles directly with the signup trigger disabled, so
 -- the row handle_new_user() would have written has to be arranged here.
@@ -350,7 +416,7 @@ select odtest.as_owner();
 select odtest.equals('applying the schema records exactly one version row',
   $$select count(*)::text from public.schema_version$$,'1');
 select odtest.equals('the recorded version matches the stamp at the end of the file',
-  $$select version::text from public.schema_version where id$$,'2');
+  $$select version::text from public.schema_version where id$$,'3');
 select odtest.equals('re-running the file does not accumulate version rows',
   $$select count(*)::text from public.schema_version$$,'1');
 
@@ -358,7 +424,7 @@ select odtest.as_anon();
 select odtest.denied('a signed-out caller cannot read the version table directly',
   $$select * from public.schema_version$$);
 select odtest.equals('the front door still reports the version without a session',
-  $$select schema_version::text from public.department_identity()$$,'2');
+  $$select schema_version::text from public.department_identity()$$,'3');
 
 select odtest.as_user('a1000000-0000-0000-0000-000000000002');
 select odtest.denied('a member cannot read the version table directly',
@@ -372,7 +438,7 @@ select odtest.denied('an administrator cannot delete the version row',
   $$delete from public.schema_version where id$$);
 select odtest.as_owner();
 select odtest.equals('the version survives every attempt to rewrite it',
-  $$select version::text from public.schema_version where id$$,'2');
+  $$select version::text from public.schema_version where id$$,'3');
 
 select odtest.as_owner();
 \o

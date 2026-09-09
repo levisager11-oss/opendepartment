@@ -155,7 +155,7 @@ export function VaultBrowser({
         let query = supabase
           .from("files_public")
           .select(
-            "id, title, description, category, kind, mime_type, size_bytes, original_name, storage_path, upvotes, downvotes, score, comment_count, view_count, case_number, created_at, owner_id, owner_username, subjects",
+            "id, title, description, category, kind, mime_type, size_bytes, original_name, storage_path, thumb_path, upvotes, downvotes, score, comment_count, view_count, case_number, created_at, owner_id, owner_username, subjects",
             { count: "exact" }
           );
 
@@ -211,18 +211,30 @@ export function VaultBrowser({
         setPage(pageIndex);
 
         // One batched call for all image thumbnails on this page.
-        const imagePaths = rows
+        //
+        // The small copy when there is one, the original when there is not:
+        // an exhibit filed before thumbnails existed, or one whose thumbnail
+        // could not be made, still has to show a picture. The map is keyed by
+        // the card's storage_path either way, so FileCard does not have to
+        // know which of the two it got.
+        const wanted = rows
           .filter((r) => r.kind === "image")
-          .map((r) => r.storage_path);
-        if (imagePaths.length) {
+          .map((r) => ({ key: r.storage_path, path: r.thumb_path || r.storage_path }));
+        if (wanted.length) {
           const { data: signed } = await supabase.storage
             .from(STORAGE_BUCKET)
-            .createSignedUrls(imagePaths, SIGNED_URL_TTL);
+            .createSignedUrls(wanted.map((w) => w.path), SIGNED_URL_TTL);
           if (signed && !stale()) {
+            const byPath = new Map(
+              signed
+                .filter((entry) => entry.signedUrl && entry.path)
+                .map((entry) => [entry.path as string, entry.signedUrl as string])
+            );
             setThumbs((prev) => {
               const next = { ...prev };
-              signed.forEach((entry) => {
-                if (entry.signedUrl && entry.path) next[entry.path] = entry.signedUrl;
+              wanted.forEach(({ key, path }) => {
+                const url = byPath.get(path);
+                if (url) next[key] = url;
               });
               return next;
             });

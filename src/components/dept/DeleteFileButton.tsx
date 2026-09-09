@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n/provider";
 import { useTenant, useTenantClient } from "@/lib/tenant/context";
-import { STORAGE_BUCKET } from "@/lib/tenant/types";
+import { deletedObjectPaths, STORAGE_BUCKET } from "@/lib/tenant/types";
 
 export function DeleteFileButton({
   fileId,
@@ -21,7 +21,8 @@ export function DeleteFileButton({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   const [rowDeleted, setRowDeleted] = useState(false);
-  const [remainingPath, setRemainingPath] = useState<string | null>(null);
+  const [remainingPaths, setRemainingPaths] = useState<string[]>([]);
+
 
   /**
    * The single-tenant original posted to an API route that used the service
@@ -34,20 +35,22 @@ export function DeleteFileButton({
     setError(false);
 
     try {
-      let path = remainingPath;
+      let paths = remainingPaths;
       if (!rowDeleted) {
         const { data, error: rpcError } = await supabase.rpc("delete_file", {
           target: fileId, why: null,
         });
         if (rpcError) throw rpcError;
-        path = typeof data === "string" && data ? data : null;
+        paths = deletedObjectPaths(data);
         setRowDeleted(true);
-        setRemainingPath(path);
+        setRemainingPaths(paths);
       }
-      if (path) {
-        const { error: storageError } = await supabase.storage.from(STORAGE_BUCKET).remove([path]);
+      if (paths.length) {
+        const { error: storageError } = await supabase.storage
+          .from(STORAGE_BUCKET)
+          .remove(paths);
         if (storageError) throw storageError;
-        setRemainingPath(null);
+        setRemainingPaths([]);
       }
       router.push(href("vault"));
       router.refresh();

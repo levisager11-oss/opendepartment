@@ -291,6 +291,122 @@ alter table public.abuse_reports
     and char_length(coalesce(details, ''))  <= 4000
   );
 
+-- ---------------------------------------------------------------------------
+-- WHO ANSWERS AN ABUSE REPORT.
+--
+-- report_department() has been writing into abuse_reports since it was
+-- written, and nothing has ever read them back. The platform's takedown path
+-- was a table you had to remember to open in the Supabase dashboard -- so the
+-- 25-open-report cap, the deduplication and the careful "returns quietly"
+-- design were all in service of a queue with no reader.
+--
+-- Staff is a flag on the operator row rather than a list of addresses in an
+-- environment variable. An env var can gate a screen; it cannot gate
+-- PostgREST, and the reports are one table away from anybody with the anon
+-- key. The same rule the tenant schema states about itself applies here: a
+-- check the app performs is decoration unless the database performs it too.
+--
+-- Set by hand, once, in this project's own SQL editor:
+--
+--   update public.operators set is_staff = true
+--    where id = (select id from auth.users where email = 'you@example.test');
+--
+-- Deliberately not settable from the app at all. `operators` grants UPDATE on
+-- display_name and nothing else, so this column is outside every path a
+-- signed-in caller has -- which is what stops the platform's moderation
+-- authority being one PostgREST call away from whoever registers next.
+-- ---------------------------------------------------------------------------
+alter table public.operators
+  add column if not exists is_staff boolean not null default false;
+
+create or replace function public.is_staff()
+returns boolean language sql stable security definer set search_path = public as $fn$
+  select coalesce((select o.is_staff from public.operators o where o.id = auth.uid()), false);
+$fn$;
+
+/**
+ * The queue, for whoever has to read it.
+ *
+ * Returns the department's current status alongside each report, because the
+ * first question about a complaint is always whether anything was already done
+ * about this slug -- and the second is whether the department still exists,
+ * since a report outlives the row it names.
+ */
+create or replace function public.staff_list_reports(
+  want_status text default 'open', limit_to integer default 200
+)
+returns table (id uuid, slug text, reporter_email text, reason text,
+               details text, status text, created_at timestamptz,
+               department_status text)
+language plpgsql security definer set search_path = public as $fn$
+begin
+  if not public.is_staff() then raise exception 'NOT_STAFF'; end if;
+  return query
+    select r.id, r.slug, r.reporter_email, r.reason, r.details, r.status,
+           r.created_at, d.status
+      from public.abuse_reports r
+      left join public.departments d on d.slug = r.slug
+     where want_status is null or r.status = want_status
+     order by r.created_at
+     limit greatest(1, least(coalesce(limit_to, 200), 500));
+end; $fn$;
+
+/** Close one report. The rows are never deleted: this is the takedown trail. */
+create or replace function public.staff_resolve_report(target uuid, new_status text)
+returns void language plpgsql security definer set search_path = public as $fn$
+begin
+  if not public.is_staff() then raise exception 'NOT_STAFF'; end if;
+  if new_status not in ('open', 'resolved', 'dismissed') then
+    raise exception 'UNKNOWN_STATUS';
+  end if;
+  update public.abuse_reports set status = new_status where id = target;
+  if not found then raise exception 'NO_SUCH_REPORT'; end if;
+end; $fn$;
+
+/**
+ * The lever the reports exist to reach.
+ *
+ * Suspending a department was the platform's answer to abuse and there was no
+ * way to do it except by hand in the SQL editor -- which meant the answer to a
+ * complaint depended on somebody being at a computer with the right tab open.
+ * `status` stays outside the operator's own UPDATE grant; this is a staff
+ * function and re-checks that itself.
+ *
+ * Suspension does not touch a byte of the department's data. It stops the slug
+ * resolving here, which is the whole of what this platform controls -- the
+ * contents live in a database whose keys OpenDepartment does not hold.
+ */
+create or replace function public.staff_set_department_status(
+  want_slug text, new_status text, note text default null
+)
+returns void language plpgsql security definer set search_path = public as $fn$
+begin
+  if not public.is_staff() then raise exception 'NOT_STAFF'; end if;
+  if new_status not in ('active', 'suspended') then
+    raise exception 'UNKNOWN_STATUS';
+  end if;
+  update public.departments
+     set status = new_status,
+         suspended_note = case when new_status = 'suspended'
+                               then left(trim(coalesce(note, '')), 500)
+                               else null end
+   where slug = lower(trim(want_slug));
+  if not found then raise exception 'NO_SUCH_DEPARTMENT'; end if;
+end; $fn$;
+
+-- Internals, and one of them decides who may suspend a department. Postgres
+-- grants EXECUTE to PUBLIC by default, so each of these has to say otherwise.
+revoke execute on function public.is_staff() from anon, public;
+revoke execute on function public.staff_list_reports(text, integer) from anon, public;
+revoke execute on function public.staff_resolve_report(uuid, text) from anon, public;
+revoke execute on function public.staff_set_department_status(text, text, text)
+  from anon, public;
+grant execute on function public.is_staff() to authenticated;
+grant execute on function public.staff_list_reports(text, integer) to authenticated;
+grant execute on function public.staff_resolve_report(uuid, text) to authenticated;
+grant execute on function public.staff_set_department_status(text, text, text)
+  to authenticated;
+
 -- ===========================================================================
 --  RLS
 -- ===========================================================================

@@ -63,6 +63,27 @@ column privilege in [db/tenant-schema.sql](db/tenant-schema.sql) as well —
 (`background: var(--accent)`) and a value carrying a semicolon reparses into
 extra declarations.
 
+**An exhibit can be two objects, not one.** `files.thumb_path` holds a small
+WebP copy made in the browser at upload (`src/lib/tenant/thumbnail.ts`), so the
+vault grid stops downloading full-resolution originals out of the department
+owner's free tier. It is nullable and stays nullable — older rows, older
+schemas and every failure of the generator produce none, and a card without one
+falls back to the original. Anything that removes an exhibit has to remove
+both: `delete_file()`, `purge_department()` and `leave_department()` all return
+the full list of paths, and `admin_orphaned_objects()` excludes an object
+referenced by *either* column, or the sweep would offer every live thumbnail
+for deletion. `delete_file()` returns jsonb from schema 3 and a bare string
+before it; `deletedObjectPaths()` in `src/lib/tenant/types.ts` reads both,
+because the app always deploys before an administrator re-runs the file.
+
+**The platform's takedown queue is staff-gated in the database.**
+`staff_list_reports()`, `staff_resolve_report()` and
+`staff_set_department_status()` are `security definer` functions in the control
+plane, all re-checking `is_staff()`. The flag is `operators.is_staff`, outside
+every UPDATE grant a signed-in caller has, set by hand in the control plane's
+own SQL editor. Do not replace this with an environment variable: an env var
+can gate the screen, but `abuse_reports` is one PostgREST call away.
+
 **A member can erase their own membership.** `leave_department(confirm)` is the
 counterpart to `purge_department()` at one person's scale: it removes their
 files, comments, votes, reports, profile, e-mail row and auth user, hands the

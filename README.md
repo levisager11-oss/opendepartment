@@ -396,9 +396,11 @@ claimed.
   in and the cap is not something a hand-rolled API call can step around.
 - **30 reserved slugs**, covering app routes and names worth impersonating.
 - **Unlisted by default.** A department appears in `/directory` only if its
-  owner opts in. Unlisted means not indexed and not listed, not secret:
-  `slug_available()` has to answer before anybody has an account, so a
-  determined wordlist can still discover that a slug is taken.
+  owner opts in. Unlisted means not indexed and not listed — it does not mean
+  secret, and the wizard says so where somebody chooses it. `slug_available()`
+  has to answer before anybody has an account, so a determined wordlist can
+  discover that a slug is taken. What is behind the door is what the invite
+  code and the department's own RLS protect; the address never was the lock.
 - **One project, one department.** A department's URL and anon key are served
   to every visitor of its front door, so without this anybody holding those two
   public strings could register a second slug against the same project — a live
@@ -407,6 +409,13 @@ claimed.
   UPDATE, since `supabase_url` is in the operator's own grant too.
 - **Terms accepted at signup**, with the responsibility spelled out rather
   than buried: the person who creates an archive answers for what is in it.
+- **A staff queue.** `report_department()` had been filling `abuse_reports`
+  since it was written and nothing read them back. `staff_list_reports()`,
+  `staff_resolve_report()` and `staff_set_department_status()` are
+  `security definer` functions gated on `operators.is_staff` — a column
+  outside every UPDATE grant a signed-in caller has, set by hand once in the
+  control plane's own SQL editor. An environment variable could gate the
+  screen; it could not gate PostgREST.
 - **Suspension** — setting a department's `status` to `suspended` stops its
   slug resolving, without touching a byte of the owner's own data. `status` is
   not in the operator's UPDATE grant and a suspended row cannot be deleted, so

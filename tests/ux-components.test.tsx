@@ -17,6 +17,7 @@ import { AdminDanger } from "@/components/admin/AdminDanger";
 import { AdminUsers } from "@/components/admin/AdminUsers";
 import { AdminPanel } from "@/components/admin/AdminPanel";
 import { AdminAudit } from "@/components/admin/AdminAudit";
+import { StaffReports } from "@/components/account/StaffReports";
 import { AdminFiles } from "@/components/admin/AdminFiles";
 import { DeptHeader } from "@/components/dept/DeptHeader";
 import { DeleteFileButton } from "@/components/dept/DeleteFileButton";
@@ -174,6 +175,26 @@ describe("archive filters and pagination", () => {
     });
     expect((screen.getByRole("textbox", { name: tr("vault.search") }) as HTMLInputElement).value).toBe("restored");
     expect((screen.getByRole("combobox", { name: tr("vault.filter.kind") }) as HTMLSelectElement).value).toBe("audio");
+  });
+
+  it("signs the small copy when there is one and the original when there is not", async () => {
+    // The whole point of the column: a 24-card page used to download every
+    // full-resolution original out of the department owner's free tier.
+    runtime.client.from.mockReturnValue(query({
+      data: [
+        { id: "a", title: "With thumb", kind: "image", storage_path: "o/a.png", thumb_path: "o/a-thumb.webp" },
+        { id: "b", title: "Without", kind: "image", storage_path: "o/b.png", thumb_path: null },
+        { id: "c", title: "A document", kind: "pdf", storage_path: "o/c.pdf", thumb_path: null },
+      ],
+      count: 3,
+    }));
+    runtime.storage.createSignedUrls.mockResolvedValue({ data: [] });
+    render(<VaultBrowser subjects={[]} currentUserId="member" />);
+    await waitFor(() => expect(runtime.storage.createSignedUrls).toHaveBeenCalled());
+    const [paths] = runtime.storage.createSignedUrls.mock.calls[0];
+    expect(paths).toEqual(["o/a-thumb.webp", "o/b.png"]);
+    // A PDF card shows an icon, so it costs no signature at all.
+    expect(paths).not.toContain("o/c.pdf");
   });
 
   it("filters by subject in one request instead of fetching an id list", async () => {
@@ -387,6 +408,25 @@ describe("authentication and previews", () => {
     view.rerender(<FileViewer kind="image" url="https://storage.example/fresh" title="Exhibit" />);
     expect(screen.getByRole("img").getAttribute("src")).toBe("https://storage.example/fresh");
   });
+  it("says what was not cleaned, not only what was", async () => {
+    // Silence about a video read as reassurance: somebody who had seen
+    // "location and camera details were removed" on a photograph had every
+    // reason to assume the same happened here. It does not.
+    render(<UploadForm userId="member" subjects={[]} />);
+    const input = document.getElementById("upload-file") as HTMLInputElement;
+    const video = new File([new Uint8Array([1])], "clip.mp4", { type: "video/mp4" });
+    Object.defineProperty(input, "files", { value: [video], configurable: true });
+    fireEvent.change(input);
+    expect((await screen.findByRole("status")).textContent).toBe(tr("upload.metadataMedia"));
+  });
+  it("says the same for a document, whose author travels with it", async () => {
+    render(<UploadForm userId="member" subjects={[]} />);
+    const input = document.getElementById("upload-file") as HTMLInputElement;
+    const pdf = new File([new Uint8Array([1])], "memo.pdf", { type: "application/pdf" });
+    Object.defineProperty(input, "files", { value: [pdf], configurable: true });
+    fireEvent.change(input);
+    expect((await screen.findByRole("status")).textContent).toBe(tr("upload.metadataDocument"));
+  });
   it("refuses a signup whose two passwords disagree, without a round trip", () => {
     render(<DeptLoginForm initialMode="signup" />);
     fireEvent.change(screen.getByLabelText(tr("auth.email")), { target: { value: "a@b.test" } });
@@ -429,6 +469,41 @@ describe("authentication and previews", () => {
     expect(captured.replace(/^\ufeff/, "").split("\r\n")[0]).toBe(
       '"when","action","actor","target","detail"'
     );
+  });
+  it("offers suspension on an active department and lifting it on a suspended one", async () => {
+    runtime.client.rpc.mockResolvedValue({
+      data: [{
+        id: "r1", slug: "target", reporter_email: null, reason: "illegal",
+        details: "A complaint", status: "open", created_at: "2026-01-01",
+        department_status: "active",
+      }],
+      error: null,
+    });
+    render(<StaffReports />);
+    await screen.findByText("/d/target");
+    expect(screen.getByRole("button", { name: tr("staff.suspend") })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: tr("staff.unsuspend") })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: tr("staff.suspend") }));
+    await waitFor(() => expect(runtime.client.rpc).toHaveBeenCalledWith(
+      "staff_set_department_status",
+      { want_slug: "target", new_status: "suspended", note: "illegal" }
+    ));
+  });
+  it("says so rather than emptying the queue when an action is refused", async () => {
+    runtime.client.rpc.mockImplementation((fn: string) =>
+      fn === "staff_list_reports"
+        ? Promise.resolve({ data: [{
+            id: "r1", slug: "target", reporter_email: null, reason: "illegal",
+            details: null, status: "open", created_at: "2026-01-01",
+            department_status: "active",
+          }], error: null })
+        : Promise.resolve({ data: null, error: { message: "NOT_STAFF" } }));
+    render(<StaffReports />);
+    fireEvent.click(await screen.findByRole("button", { name: tr("staff.resolve") }));
+    expect((await screen.findByRole("alert")).textContent).toBe(tr("common.actionFailed"));
+    // The complaint is still on screen: a refused action must not look like
+    // one that worked.
+    expect(screen.getByText("/d/target")).toBeTruthy();
   });
   it("says when a tab is showing only part of what the department holds", () => {
     // A screen that quietly lists the first 500 of 900 documents is worse than

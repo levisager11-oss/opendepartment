@@ -16,6 +16,8 @@ export type CaseFile = {
   size_bytes: number;
   original_name: string;
   storage_path: string;
+  /** The small copy, when one was made. Null is normal -- see thumbnail.ts. */
+  thumb_path: string | null;
   upvotes: number;
   downvotes: number;
   score: number;
@@ -95,6 +97,31 @@ export const STORAGE_BUCKET = "department-files";
  * idle tab costs a reload. Shorter would start costing people mid-video.
  */
 export const SIGNED_URL_TTL = 600;
+
+/**
+ * The objects a delete_file() call left for the caller to remove.
+ *
+ * The function has had two return shapes and both are live at once. A
+ * department running schema 2 or older hands back the storage path as a bare
+ * string; from schema 3 it hands back an object carrying the thumbnail beside
+ * it. The app deploys before any administrator re-runs the file -- that is the
+ * whole reason the version notice exists -- so reading only the new shape
+ * would silently start leaving originals behind in every department that has
+ * not updated yet.
+ *
+ * Anything unrecognised yields nothing to remove, which leaves the objects for
+ * the administrator's orphan sweep rather than throwing away a deletion.
+ */
+export function deletedObjectPaths(data: unknown): string[] {
+  if (typeof data === "string") return data ? [data] : [];
+  if (data && typeof data === "object") {
+    const list = (data as { storage_paths?: unknown }).storage_paths;
+    if (Array.isArray(list)) {
+      return list.filter((p): p is string => typeof p === "string" && p !== "");
+    }
+  }
+  return [];
+}
 
 /**
  * Categories a department starts with. A department can replace this list

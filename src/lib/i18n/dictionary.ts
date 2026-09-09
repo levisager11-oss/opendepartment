@@ -59,6 +59,20 @@ export const dictionary = {
     "schema.safe":
       "Safe to run on a live department: it keeps your settings, members, documents and invite codes, and does not reopen a claimed department to a new founder.",
     "schema.howTo": "How to update",
+    "staff.title": "Abuse reports",
+    "staff.filter": "Show reports with status",
+    "staff.status.open": "Open",
+    "staff.status.resolved": "Resolved",
+    "staff.status.dismissed": "Dismissed",
+    "staff.none": "Nothing to answer.",
+    "staff.resolve": "Mark resolved",
+    "staff.dismiss": "Dismiss",
+    "staff.suspend": "Suspend department",
+    "staff.unsuspend": "Lift suspension",
+    "staff.suspended": "SUSPENDED",
+    "staff.gone": "no longer listed",
+    "staff.scope":
+      "Suspending stops the slug resolving here. It does not touch the department's own database -- OpenDepartment holds no key to it, so the contents remain entirely with whoever runs that department.",
     "account.schemaOutdated": "Schema update available",
     "setup.projectTaken":
       "That Supabase project already backs a department on this platform. One project holds one archive -- check Your departments, or create a second Supabase project for this one.",
@@ -264,7 +278,7 @@ export const dictionary = {
     "od.directory": "Public departments",
     "od.directoryEmpty": "No department has made itself public yet.",
     "od.directoryNote":
-      "These are archives whose owners chose to be listed. Most departments are unlisted and reachable only by invitation.",
+      "These are archives whose owners chose to be listed. Most departments are not here: they are unlisted, and joining one needs an invite code from whoever runs it.",
 
     // --- setup wizard ---------------------------------------------------
     // --- one-click setup (only when this deployment registered an OAuth app)
@@ -406,9 +420,9 @@ export const dictionary = {
     "setup.done": "Your department is live",
     "setup.openDept": "Open your department",
     "setup.visibility": "Listing",
-    "setup.unlisted": "Unlisted -- reachable only with the link",
+    "setup.unlisted": "Unlisted -- kept out of the directory",
     "setup.unlistedHelp":
-      "Nobody finds it by browsing, and nobody joins without an invite code you hand out.",
+      "Nobody finds it by browsing and nobody joins without an invite code you hand out. It is not a secret address, though: the name has to be checked against every other one before it can be given to you, so somebody guessing names can find out that yours is taken. What is behind the door is what the invite code protects.",
     "setup.public": "Public -- listed in the directory",
     "setup.publicHelp":
       "Listed in the directory, and anybody who opens it can create an account without a code.",
@@ -665,6 +679,10 @@ export const dictionary = {
     "upload.errorType": "That file type is not accepted.",
     "upload.errorQuota":
       "You have reached the storage limit for this department. Delete something you filed earlier, or ask an administrator to raise the limit.",
+    "upload.metadataDocument":
+      "PDFs are uploaded exactly as they are. This one may name whoever wrote it, the software that made it and when -- none of which is removed here. Check the document's own properties first if that matters.",
+    "upload.metadataMedia":
+      "Video and audio are uploaded exactly as they are. Recordings often carry the device and sometimes where they were made -- none of which is removed here. Strip it before uploading if that matters.",
     "upload.metadataStripped":
       "Location and camera details were removed from this image before upload.",
     "upload.metadataUnsupported":
@@ -830,6 +848,20 @@ export const dictionary = {
     "schema.safe":
       "Für ein laufendes Departement unbedenklich: Einstellungen, Mitglieder, Dokumente und Einladungscodes bleiben erhalten, und ein bereits beanspruchtes Departement wird nicht für eine neue Gründung geöffnet.",
     "schema.howTo": "Anleitung",
+    "staff.title": "Missbrauchsmeldungen",
+    "staff.filter": "Meldungen anzeigen mit Status",
+    "staff.status.open": "Offen",
+    "staff.status.resolved": "Erledigt",
+    "staff.status.dismissed": "Abgewiesen",
+    "staff.none": "Nichts zu bearbeiten.",
+    "staff.resolve": "Als erledigt markieren",
+    "staff.dismiss": "Abweisen",
+    "staff.suspend": "Departement sperren",
+    "staff.unsuspend": "Sperre aufheben",
+    "staff.suspended": "GESPERRT",
+    "staff.gone": "nicht mehr eingetragen",
+    "staff.scope":
+      "Eine Sperre verhindert, dass die Adresse hier noch auflöst. Sie berührt die Datenbank des Departements nicht -- OpenDepartment besitzt dafür keinen Schlüssel; die Inhalte bleiben vollständig bei der verantwortlichen Stelle.",
     "account.schemaOutdated": "Schema-Aktualisierung verfügbar",
     "setup.projectTaken":
       "Dieses Supabase-Projekt gehört bereits zu einem Departement auf dieser Plattform. Ein Projekt trägt ein Archiv -- prüfen Sie «Ihre Departemente» oder legen Sie für dieses ein zweites Supabase-Projekt an.",
@@ -1038,7 +1070,7 @@ export const dictionary = {
     "od.directory": "Öffentliche Departemente",
     "od.directoryEmpty": "Noch kein Departement hat sich öffentlich gelistet.",
     "od.directoryNote":
-      "Dies sind Archive, deren Administration eine Listung gewählt hat. Die meisten Departemente sind nicht gelistet und nur auf Einladung erreichbar.",
+      "Dies sind Archive, deren Administration eine Listung gewählt hat. Die meisten Departemente stehen nicht hier: Sie sind nicht gelistet, und für den Beitritt braucht es einen Einladungscode der verantwortlichen Stelle.",
 
     // --- setup wizard ---------------------------------------------------
     // --- Ein-Klick-Einrichtung (nur mit registrierter OAuth-App) ---------
@@ -1180,9 +1212,9 @@ export const dictionary = {
     "setup.done": "Ihr Departement ist online",
     "setup.openDept": "Departement öffnen",
     "setup.visibility": "Listung",
-    "setup.unlisted": "Nicht gelistet -- nur mit dem Link erreichbar",
+    "setup.unlisted": "Nicht gelistet -- nicht im Verzeichnis",
     "setup.unlistedHelp":
-      "Niemand findet es beim Stöbern, und niemand tritt ohne einen von Ihnen verteilten Einladungscode bei.",
+      "Niemand findet es beim Stöbern, und niemand tritt ohne einen von Ihnen verteilten Einladungscode bei. Die Adresse ist aber nicht geheim: Der Name muss gegen alle anderen geprüft werden, bevor er vergeben werden kann, also lässt sich durch Raten herausfinden, dass Ihrer belegt ist. Was hinter der Tür liegt, schützt der Einladungscode.",
     "setup.public": "Öffentlich -- im Verzeichnis gelistet",
     "setup.publicHelp":
       "Im Verzeichnis gelistet, und wer es öffnet, kann ohne Code ein Konto erstellen.",
@@ -1435,6 +1467,10 @@ export const dictionary = {
     "upload.errorType": "Dieser Dateityp wird nicht akzeptiert.",
     "upload.errorQuota":
       "Sie haben das Speicherlimit dieses Departements erreicht. Löschen Sie etwas Früheres oder bitten Sie eine Administratorin, das Limit zu erhöhen.",
+    "upload.metadataDocument":
+      "PDFs werden unverändert hochgeladen. Dieses kann festhalten, wer es verfasst hat, mit welcher Software und wann -- nichts davon wird hier entfernt. Prüfen Sie nötigenfalls zuerst die Dokumenteigenschaften.",
+    "upload.metadataMedia":
+      "Video und Audio werden unverändert hochgeladen. Aufnahmen enthalten oft das Gerät und teils den Aufnahmeort -- nichts davon wird hier entfernt. Entfernen Sie es nötigenfalls vor dem Hochladen.",
     "upload.metadataStripped":
       "Standort- und Kameradaten wurden vor dem Hochladen aus diesem Bild entfernt.",
     "upload.metadataUnsupported":
