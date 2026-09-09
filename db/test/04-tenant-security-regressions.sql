@@ -263,6 +263,86 @@ select odtest.as_owner();
 select odtest.equals('the demotion landed',
   $$select is_admin::text from public.profiles where id='a1000000-0000-0000-0000-000000000001'$$,'false');
 
+-- A member's private address follows the one they actually confirmed. The
+-- fixtures above insert profiles directly with the signup trigger disabled, so
+-- the row handle_new_user() would have written has to be arranged here.
+select odtest.as_owner();
+insert into public.user_emails (user_id, email) values
+  ('a1000000-0000-0000-0000-000000000002','audit-member@example.test')
+on conflict (user_id) do update set email = excluded.email;
+update auth.users set email='audit-member-new@example.test'
+ where id='a1000000-0000-0000-0000-000000000002';
+select odtest.equals('changing an address in Auth updates the private row',
+  $$select email from public.user_emails
+     where user_id='a1000000-0000-0000-0000-000000000002'$$,
+  'audit-member-new@example.test');
+select odtest.equals('the administration screen sees the new address, not the old one',
+  $$select count(*)::text from public.user_emails
+     where email='audit-member@example.test'$$,'0');
+-- Blocked by having no UPDATE policy rather than by a revoked privilege, so
+-- this is the silent shape: it succeeds and changes nothing.
+select odtest.as_user('a1000000-0000-0000-0000-000000000002');
+select odtest.touches_nothing('a member still cannot rewrite their own private address row',
+  $$update public.user_emails set email='forged@example.test' where user_id=auth.uid()$$);
+select odtest.as_owner();
+select odtest.equals('the private address survives the attempt',
+  $$select email from public.user_emails
+     where user_id='a1000000-0000-0000-0000-000000000002'$$,
+  'audit-member-new@example.test');
+
+-- Search and subject filtering. Both moved into the database so the browser
+-- stops building filter syntax out of a search term and stops fetching an id
+-- list that grows with the archive.
+select odtest.as_owner();
+insert into public.subjects (id, name) values
+  ('50000000-0000-0000-0000-000000000001','Audit subject');
+insert into public.files
+  (id, owner_id, title, description, storage_path, original_name, mime_type, size_bytes, kind)
+values ('f1000000-0000-0000-0000-000000000020','a1000000-0000-0000-0000-000000000001',
+  'Departmental budget', 'Quarterly figures, redacted',
+  'a1000000-0000-0000-0000-000000000001/budget.pdf','budget.pdf','application/pdf',10,'pdf');
+insert into public.file_subjects (file_id, subject_id) values
+  ('f1000000-0000-0000-0000-000000000020','50000000-0000-0000-0000-000000000001');
+
+select odtest.equals('the search vector is generated from title, description and filename',
+  $$select (search @@ websearch_to_tsquery('simple','budget')
+       and search @@ websearch_to_tsquery('simple','redacted')
+       and search @@ websearch_to_tsquery('simple','pdf'))::text
+      from public.files where id='f1000000-0000-0000-0000-000000000020'$$,'true');
+-- Whole words, not substrings: the old ilike matched 'art' inside 'Department'.
+select odtest.equals('search matches words rather than substrings',
+  $$select (search @@ websearch_to_tsquery('simple','artment'))::text
+      from public.files where id='f1000000-0000-0000-0000-000000000020'$$,'false');
+-- A term is a value now, so punctuation is data and not syntax.
+select odtest.equals('a term full of filter punctuation is a search, not an error',
+  $$select count(*)::text from public.files
+     where search @@ websearch_to_tsquery('simple','(budget), 50%')$$,'0');
+select odtest.equals('punctuation around a real term is stripped rather than breaking it',
+  $$select count(*)::text from public.files
+     where search @@ websearch_to_tsquery('simple','(budget)')$$,'1');
+-- The filename is split on its punctuation, so an extension is a word.
+select odtest.equals('a document is reachable by a word in its filename',
+  $$select (search @@ websearch_to_tsquery('simple','pdf'))::text
+      from public.files where id='f1000000-0000-0000-0000-000000000020'$$,'true');
+select odtest.equals('the generated column follows an edit',
+  $$update public.files set title='Renamed entirely'
+     where id='f1000000-0000-0000-0000-000000000020';
+    select (search @@ websearch_to_tsquery('simple','renamed'))::text
+      from public.files where id='f1000000-0000-0000-0000-000000000020'$$,'true');
+
+select odtest.as_user('a1000000-0000-0000-0000-000000000001');
+select odtest.equals('the vault view carries the subject ids the filter needs',
+  $$select subject_ids[1]::text from public.files_public
+     where id='f1000000-0000-0000-0000-000000000020'$$,
+  '50000000-0000-0000-0000-000000000001');
+select odtest.equals('filtering by subject finds the document without an id list',
+  $$select count(*)::text from public.files_public
+     where subject_ids @> array['50000000-0000-0000-0000-000000000001'::uuid]$$,'1');
+select odtest.as_user('a1000000-0000-0000-0000-000000000003');
+select odtest.equals('a banned member searches nothing, the view still being RLS-bound',
+  $$select count(*)::text from public.files_public
+     where search @@ websearch_to_tsquery('simple','renamed')$$,'0');
+
 -- The version stamp. It is what tells an administrator there is something to
 -- re-run, so it has to be present, correct, readable through the front door's
 -- own function, and not something a member can rewrite to silence the notice.
@@ -270,7 +350,7 @@ select odtest.as_owner();
 select odtest.equals('applying the schema records exactly one version row',
   $$select count(*)::text from public.schema_version$$,'1');
 select odtest.equals('the recorded version matches the stamp at the end of the file',
-  $$select version::text from public.schema_version where id$$,'1');
+  $$select version::text from public.schema_version where id$$,'2');
 select odtest.equals('re-running the file does not accumulate version rows',
   $$select count(*)::text from public.schema_version$$,'1');
 
@@ -278,7 +358,7 @@ select odtest.as_anon();
 select odtest.denied('a signed-out caller cannot read the version table directly',
   $$select * from public.schema_version$$);
 select odtest.equals('the front door still reports the version without a session',
-  $$select schema_version::text from public.department_identity()$$,'1');
+  $$select schema_version::text from public.department_identity()$$,'2');
 
 select odtest.as_user('a1000000-0000-0000-0000-000000000002');
 select odtest.denied('a member cannot read the version table directly',
@@ -292,7 +372,7 @@ select odtest.denied('an administrator cannot delete the version row',
   $$delete from public.schema_version where id$$);
 select odtest.as_owner();
 select odtest.equals('the version survives every attempt to rewrite it',
-  $$select version::text from public.schema_version where id$$,'1');
+  $$select version::text from public.schema_version where id$$,'2');
 
 select odtest.as_owner();
 \o

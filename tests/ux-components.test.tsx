@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { translate, type TranslationKey } from "@/lib/i18n/dictionary";
-import { VaultBrowser } from "@/components/dept/VaultBrowser";
+import { VaultBrowser, prefixSearchQuery } from "@/components/dept/VaultBrowser";
 import { UploadForm } from "@/components/dept/UploadForm";
 import { AdminReports } from "@/components/admin/AdminReports";
 import { AdminInvites } from "@/components/admin/AdminInvites";
@@ -15,6 +15,7 @@ import { AdminStorage } from "@/components/admin/AdminStorage";
 import { CommentSection } from "@/components/dept/CommentSection";
 import { AdminDanger } from "@/components/admin/AdminDanger";
 import { AdminUsers } from "@/components/admin/AdminUsers";
+import { AdminPanel } from "@/components/admin/AdminPanel";
 import { AdminFiles } from "@/components/admin/AdminFiles";
 import { DeptHeader } from "@/components/dept/DeptHeader";
 import { DeleteFileButton } from "@/components/dept/DeleteFileButton";
@@ -62,7 +63,8 @@ type Result = { data?: unknown; error?: unknown; count?: number };
 function query(result: Result | Promise<Result>) {
   const builder = {
     select: vi.fn(), eq: vi.fn(), in: vi.fn(), order: vi.fn(), range: vi.fn(),
-    or: vi.fn(), insert: vi.fn(), upsert: vi.fn(), update: vi.fn(), delete: vi.fn(),
+    or: vi.fn(), contains: vi.fn(), textSearch: vi.fn(),
+    insert: vi.fn(), upsert: vi.fn(), update: vi.fn(), delete: vi.fn(),
     single: vi.fn(), maybeSingle: vi.fn(),
     then: (resolve: (value: Result) => unknown, reject?: (reason: unknown) => unknown) => Promise.resolve(result).then(resolve, reject),
   };
@@ -95,6 +97,30 @@ beforeEach(() => {
   vi.spyOn(window, "confirm").mockReturnValue(true);
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
+describe("archive search terms", () => {
+  it("makes every token a prefix so a half-typed word still matches", () => {
+    expect(prefixSearchQuery("bud")).toBe("bud:*");
+    expect(prefixSearchQuery("dep bud")).toBe("dep:* & bud:*");
+  });
+  it("treats tsquery operators as separators rather than syntax", () => {
+    // The whole reason assembling a query here is acceptable: no token can
+    // carry an operator, because only letters, digits and _ survive.
+    expect(prefixSearchQuery("a & b | !c:*")).toBe("a:* & b:* & c:*");
+    expect(prefixSearchQuery("100% (budget)")).toBe("100:* & budget:*");
+    expect(prefixSearchQuery("O'Brien")).toBe("o:* & brien:*");
+  });
+  it("keeps letters outside ASCII, which are most of the archive's languages", () => {
+    expect(prefixSearchQuery("Grüsse Öffentlich")).toBe("grüsse:* & öffentlich:*");
+  });
+  it("is not a search at all when nothing survives tokenising", () => {
+    expect(prefixSearchQuery("%%% ,,, ()")).toBeNull();
+    expect(prefixSearchQuery("   ")).toBeNull();
+  });
+  it("stops at eight tokens", () => {
+    expect(prefixSearchQuery("a b c d e f g h i j")?.split(" & ")).toHaveLength(8);
+  });
+});
 
 describe("archive filters and pagination", () => {
   it("discards an older filter result whose vote lookup finishes last", async () => {
@@ -133,7 +159,7 @@ describe("archive filters and pagination", () => {
 
   it("restores shared filters, clears all of them, and follows browser history", async () => {
     window.history.replaceState({}, "", "/d/demo/vault?q=letter&sort=new&subject=case-a&category=MEMO&kind=pdf&mine=1");
-    runtime.client.from.mockImplementation((table: string) => query(table === "file_subjects" ? { data: [{ file_id: "file-1" }] } : { data: [], count: 0 }));
+    runtime.client.from.mockImplementation(() => query({ data: [], count: 0 }));
     render(<VaultBrowser subjects={[{ id: "case-a", name: "Case A" }]} currentUserId="member" />);
     expect((screen.getByRole("textbox", { name: tr("vault.search") }) as HTMLInputElement).value).toBe("letter");
     expect((screen.getByRole("combobox", { name: tr("vault.sort") }) as HTMLSelectElement).value).toBe("new");
@@ -147,6 +173,19 @@ describe("archive filters and pagination", () => {
     });
     expect((screen.getByRole("textbox", { name: tr("vault.search") }) as HTMLInputElement).value).toBe("restored");
     expect((screen.getByRole("combobox", { name: tr("vault.filter.kind") }) as HTMLSelectElement).value).toBe("audio");
+  });
+
+  it("filters by subject in one request instead of fetching an id list", async () => {
+    // The id list grew with the archive and would eventually overflow the
+    // request URL. The subject is a `contains` on the view's own array now.
+    window.history.replaceState({}, "", "/d/demo/vault?subject=case-a&q=budget");
+    const builder = query({ data: [], count: 0 });
+    runtime.client.from.mockReturnValue(builder);
+    render(<VaultBrowser subjects={[{ id: "case-a", name: "Case A" }]} currentUserId="member" />);
+    await waitFor(() => expect(builder.contains).toHaveBeenCalledWith("subject_ids", ["case-a"]));
+    expect(builder.textSearch).toHaveBeenCalledWith("search", "budget:*", { config: "simple" });
+    // Every table read went to the view; nothing asked file_subjects.
+    expect(runtime.client.from.mock.calls.map((c) => c[0])).not.toContain("file_subjects");
   });
 
   it("shows a failed subject lookup as an error instead of an empty archive", async () => {
@@ -346,6 +385,30 @@ describe("authentication and previews", () => {
     expect(screen.getByRole("alert")).toBeTruthy();
     view.rerender(<FileViewer kind="image" url="https://storage.example/fresh" title="Exhibit" />);
     expect(screen.getByRole("img").getAttribute("src")).toBe("https://storage.example/fresh");
+  });
+  it("says when a tab is showing only part of what the department holds", () => {
+    // A screen that quietly lists the first 500 of 900 documents is worse than
+    // one that lists 500 and says so.
+    render(
+      <AdminPanel
+        truncated={{ files: true, reports: false, audit: false }}
+        currentUserId="admin" files={[]} reports={[]} users={[]} invites={[]}
+        subjects={[]} settings={null} audit={[]} totalBytes={0}
+      />
+    );
+    expect(screen.getByText(tr("admin.truncated"))).toBeTruthy();
+  });
+  it("does not claim a complete tab is truncated", () => {
+    render(
+      <AdminPanel
+        truncated={{ files: false, reports: false, audit: true }}
+        currentUserId="admin" files={[]} reports={[]} users={[]} invites={[]}
+        subjects={[]} settings={null} audit={[]} totalBytes={0}
+      />
+    );
+    // Opens on files, which is complete; the audit log's notice belongs to the
+    // audit tab and must not leak onto this one.
+    expect(screen.queryByText(tr("admin.truncated"))).toBeNull();
   });
   it("flags a department whose project reports an older schema", async () => {
     runtime.tenantRpc.mockResolvedValue({ data: [{ schema_version: 0 }], error: null });

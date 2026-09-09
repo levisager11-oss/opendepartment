@@ -345,6 +345,54 @@ alter table public.files
     and char_length(category) <= 60
   ) not valid;
 
+-- ---------------------------------------------------------------------------
+-- What the archive is searched by.
+--
+-- The vault used to search with `ilike '%term%'` across three columns, OR'd
+-- together in a PostgREST filter string. Three things wrong with that, and
+-- they are the same three thing:
+--
+--   NO INDEX CAN SERVE IT. A leading wildcard means a sequential scan of every
+--   row, on every keystroke after the debounce, alongside an exact `count`.
+--   Fine at a hundred documents and the reason the archive stops being usable
+--   at ten thousand -- on hardware the department's owner is paying for.
+--
+--   THE TERM WAS INTERPOLATED INTO A GRAMMAR. `or=(title.ilike.%x%,...)` is a
+--   syntax with `,` `(` `)` as separators, and the app stripped exactly those
+--   from the term before splicing it in. No escape was found, but a denylist
+--   against a grammar is a standing invitation, and it silently mangled any
+--   search containing a percent sign.
+--
+--   IT MATCHED SUBSTRINGS, NOT WORDS. Searching `art` hit every `Department`.
+--
+-- A generated tsvector fixes all three at once. `to_tsvector('simple', ...)`
+-- takes the regconfig explicitly because that is the immutable form -- the
+-- one-argument version depends on default_text_search_config and Postgres
+-- refuses it in a generated column. `simple` rather than `english`: a
+-- department names its documents in whatever language it likes, and English
+-- stemming applied to German is worse than no stemming at all.
+--
+-- The callers pass the term to websearch_to_tsquery as a VALUE rather than
+-- building syntax, so quoting and OR and negation all work and none of it is
+-- interpolation any more.
+-- ---------------------------------------------------------------------------
+--
+-- The filename is broken on its punctuation first. Postgres's parser
+-- recognises `budget.pdf` as a single `file` token, so it is not reachable by
+-- searching either `budget` or `pdf` -- and a phone camera's `IMG_2043.jpg`
+-- would be reachable only by typing it back exactly, which is not a search.
+-- Splitting on `.`, `_` and `-` turns a filename into the words it is made of.
+alter table public.files
+  add column if not exists search tsvector
+  generated always as (
+    to_tsvector('simple',
+      coalesce(title, '') || ' ' ||
+      coalesce(description, '') || ' ' ||
+      translate(coalesce(original_name, ''), '._-', '   '))
+  ) stored;
+
+create index if not exists files_search_idx on public.files using gin (search);
+
 create table if not exists public.file_subjects (
   file_id     uuid not null references public.files(id) on delete cascade,
   subject_id  uuid not null references public.subjects(id) on delete cascade,
@@ -580,6 +628,38 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
+
+-- ---------------------------------------------------------------------------
+-- Keep the private address current.
+--
+-- user_emails was written once, at signup, and never again -- so a member who
+-- changed their address in Supabase Auth left the administration screen
+-- showing the old one indefinitely. That is the address an administrator uses
+-- to contact somebody about a document, and the one this table exists to hold
+-- privately; a stale copy of it is worse than none, because nothing on the
+-- screen suggests it might be wrong.
+--
+-- Confirmed addresses only. Supabase writes the requested new address into
+-- `email_change` and moves it into `email` once the person clicks the link, so
+-- following `email` means the table only ever learns an address its owner has
+-- proved they can read.
+-- ---------------------------------------------------------------------------
+create or replace function public.sync_user_email()
+returns trigger language plpgsql security definer set search_path = public as $fn$
+begin
+  update public.user_emails
+     set email = lower(trim(new.email))
+   where user_id = new.id;
+  return null;
+end; $fn$;
+
+revoke execute on function public.sync_user_email() from anon, authenticated, public;
+
+drop trigger if exists on_auth_email_changed on auth.users;
+create trigger on_auth_email_changed
+  after update of email on auth.users
+  for each row when (new.email is distinct from old.email)
+  execute function public.sync_user_email();
 
 -- ---------------------------------------------------------------------------
 -- Counter triggers
@@ -1447,6 +1527,7 @@ select
   f.size_bytes, f.original_name, f.storage_path,
   f.upvotes, f.downvotes, f.score, f.comment_count, f.view_count,
   f.case_number, f.created_at, f.owner_id,
+  f.search,
   p.username as owner_username,
   coalesce(
     (select json_agg(json_build_object('id', s.id, 'name', s.name) order by s.name)
@@ -1454,7 +1535,17 @@ select
        join public.subjects s on s.id = fs.subject_id
       where fs.file_id = f.id),
     '[]'::json
-  ) as subjects
+  ) as subjects,
+  -- Filtering by subject used to mean fetching every file_subjects row for
+  -- that subject and sending the ids back as an `in` list. The request URL
+  -- grew with the archive, and a busy subject would eventually 414 or be
+  -- truncated into wrong results. As an array column the filter is one
+  -- `contains` on a request of fixed size.
+  coalesce(
+    (select array_agg(fs.subject_id)
+       from public.file_subjects fs where fs.file_id = f.id),
+    '{}'::uuid[]
+  ) as subject_ids
 from public.files f
 join public.profiles p on p.id = f.owner_id;
 
@@ -1539,7 +1630,7 @@ create policy "dept delete own or admin" on storage.objects
 --  reads the number out of the statement below and refuses to build without
 --  it, so the app and this file cannot drift apart.
 -- ===========================================================================
-insert into public.schema_version (id, version) values (true, 1)
+insert into public.schema_version (id, version) values (true, 2)
 on conflict (id) do update
   set version = excluded.version, applied_at = now();
 

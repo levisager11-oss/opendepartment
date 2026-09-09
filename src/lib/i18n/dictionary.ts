@@ -39,6 +39,8 @@ export const dictionary = {
     "common.and": "and",
     "setup.tooMany":
       "You have reached the maximum of 3 departments for one account. Remove one under Your departments first.",
+    "admin.truncated":
+      "Showing the most recent entries only. This department holds more than this screen lists -- read the rest in your project's Supabase dashboard.",
     "schema.badge": "UPDATE AVAILABLE",
     "schema.notice":
       "This department runs schema version {current}. Version {expected} is available.",
@@ -805,6 +807,8 @@ export const dictionary = {
     "common.and": "und",
     "setup.tooMany":
       "Sie haben das Maximum von 3 Departementen pro Konto erreicht. Entfernen Sie zuerst eines unter «Ihre Departemente».",
+    "admin.truncated":
+      "Es werden nur die neuesten Einträge angezeigt. Dieses Departement enthält mehr, als diese Ansicht auflistet -- den Rest sehen Sie im Supabase-Dashboard Ihres Projekts.",
     "schema.badge": "AKTUALISIERUNG VERFÜGBAR",
     "schema.notice":
       "Dieses Departement läuft mit Schema-Version {current}. Version {expected} ist verfügbar.",

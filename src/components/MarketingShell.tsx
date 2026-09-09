@@ -90,6 +90,12 @@ export function MarketingFooter() {
           <T k="legal.privacy" />
         </Link>
         <Link
+          href="/legal/imprint"
+          className="py-1 transition-colors hover:text-white sm:py-0"
+        >
+          <T k="legal.imprint" />
+        </Link>
+        <Link
           href="/report"
           className="py-1 transition-colors hover:text-white sm:py-0"
         >

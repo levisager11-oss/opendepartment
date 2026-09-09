@@ -46,6 +46,7 @@ const TABS: Array<{ id: Tab; key: TranslationKey }> = [
 const STORAGE_QUOTA = 1024 * 1024 * 1024;
 
 export function AdminPanel({
+  truncated,
   currentUserId,
   files,
   reports,
@@ -56,6 +57,8 @@ export function AdminPanel({
   audit,
   totalBytes,
 }: {
+  /** Lists that came back at their query limit -- see the admin page. */
+  truncated: { files: boolean; reports: boolean; audit: boolean };
   currentUserId: string;
   files: AdminFile[];
   reports: AdminReport[];
@@ -214,6 +217,14 @@ export function AdminPanel({
           })}
         </div>
       </div>
+
+      {/* Said once, under the strip, for whichever tab is showing a subset.
+          A screen that quietly shows the first 500 of 900 documents is worse
+          than one that shows 500 and says so. */}
+      {(tab === "files" || tab === "reports" || tab === "audit") &&
+        truncated[tab] && (
+          <p className="notice mb-4 text-xs">{t("admin.truncated")}</p>
+        )}
 
       <div
         role="tabpanel"

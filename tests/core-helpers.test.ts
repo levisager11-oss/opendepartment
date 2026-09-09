@@ -2,6 +2,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { scrubImage } from "@/lib/tenant/scrub";
 import { looksLikeSecretKey, parseSupabaseCredentials } from "@/lib/setup/credentials";
 import { rateLimit } from "@/lib/rate-limit";
+import { getLegalDoc } from "@/lib/legal";
 
 afterEach(() => vi.useRealTimers());
 const bytesOf = async (file: File) => [...new Uint8Array(await file.arrayBuffer())];
@@ -64,4 +65,24 @@ it("enforces separate fixed windows and permits a new request at expiry", () => 
   expect(rateLimit("audit-window-b", 2, 5000).ok).toBe(true);
   vi.advanceTimersByTime(5000);
   expect(rateLimit("audit-window-a", 2, 5000).ok).toBe(true);
+});
+
+// An imprint that exists only for departments is not an imprint for the
+// platform -- which is itself a service somebody runs and can be complained
+// about. Both locales carry it, and it must name where a complaint about a
+// DEPARTMENT goes instead, since that is not the platform's to answer.
+it.each(["en", "de"] as const)("publishes a platform imprint in %s", (locale) => {
+  const doc = getLegalDoc("imprint", locale);
+  expect(doc.title).toBe(locale === "de" ? "Impressum" : "Imprint");
+  expect(doc.sections.length).toBeGreaterThan(0);
+  const text = doc.sections.flatMap((s) => s.body).join(" ");
+  expect(text).toContain("/d/");
+  expect(text.length).toBeGreaterThan(200);
+});
+
+it("falls back to naming the missing configuration rather than a placeholder", () => {
+  const text = getLegalDoc("imprint", "en").sections[0].body.join(" ");
+  // Either real operator details, or an honest sentence about what is unset --
+  // never "[Your name here]".
+  expect(text).not.toMatch(/\[.*\]/);
 });

@@ -92,6 +92,28 @@ export default async function AdminPage({
   ] = results;
   const reports = [...(openReports ?? []), ...(closedReports ?? [])];
 
+  /**
+   * Which of these lists came back full.
+   *
+   * Every query above carries a limit and none of them said so on screen, so a
+   * department past the line was shown a subset that looked like the whole
+   * thing: an archive of 900 documents whose administration screen listed 500,
+   * and an audit log -- the accountability record -- showing the most recent
+   * hundred entries with nothing to suggest there were more.
+   *
+   * A list that came back exactly at its limit is the signal. It cannot
+   * distinguish "exactly 500 documents" from "more than 500", which is why the
+   * notice says "the most recent N" rather than claiming a number it does not
+   * have: both readings are true, and the useful half is that the screen is
+   * not the archive.
+   */
+  const truncated = {
+    files: (files ?? []).length >= 500,
+    reports:
+      (openReports ?? []).length >= 200 || (closedReports ?? []).length >= 200,
+    audit: (audit ?? []).length >= 100,
+  };
+
   type MemberRow = {
     id: string;
     username: string | null;
@@ -136,6 +158,7 @@ export default async function AdminPage({
         </div>
       )}
       <AdminPanel
+        truncated={truncated}
         currentUserId={member.userId}
         files={(files ?? []).map((f) => ({
           ...f,

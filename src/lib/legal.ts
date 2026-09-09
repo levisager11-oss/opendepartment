@@ -1,6 +1,6 @@
 import type { Locale } from "./i18n/dictionary";
 
-export type LegalDoc = "terms" | "privacy";
+export type LegalDoc = "terms" | "privacy" | "imprint";
 
 export type LegalSection = { heading: string; body: string[] };
 
@@ -56,6 +56,39 @@ export function getLegalDoc(
   const contact = contactLine();
 
   if (locale === "de") {
+    if (doc === "imprint") {
+      return {
+        title: "Impressum",
+        updated: "Angaben zur Plattform",
+        description:
+          "Betreiberangaben für OpenDepartment. Einzelne Departemente führen ihr eigenes Impressum.",
+        sections: [
+          {
+            heading: "Verantwortlich für diese Plattform",
+            body: [
+              contact ||
+                "Für diese Installation sind keine Betreiberangaben hinterlegt. Sie werden über die Umgebungsvariablen NEXT_PUBLIC_OPERATOR_NAME, NEXT_PUBLIC_OPERATOR_ADDRESS, NEXT_PUBLIC_OPERATOR_COUNTRY und NEXT_PUBLIC_CONTACT_EMAIL gesetzt.",
+              "Diese Angaben betreffen die Plattform OpenDepartment. Sie betreffen nicht die einzelnen Departemente: Für deren Inhalte ist jeweils die Stelle verantwortlich, die das Departement betreibt.",
+            ],
+          },
+          {
+            heading: "Was diese Plattform ist",
+            body: [
+              "OpenDepartment ist ein Werkzeug zum Aufsetzen satirischer, fiktiver Archive. Die Aufmachung parodiert behördliche Websites; es besteht keinerlei Verbindung zu einer staatlichen Stelle.",
+              "Die Plattform betreibt selbst kein Archiv. Dateien, Kommentare und Mitgliederkonten eines Departements liegen in der Supabase-Datenbank der jeweils verantwortlichen Stelle.",
+            ],
+          },
+          {
+            heading: "Beschwerden über ein Departement",
+            body: [
+              "Wenden Sie sich zuerst an die im Impressum des betreffenden Departements genannte Stelle. Jedes Departement führt sein eigenes Impressum unter /d/<name>/legal/imprint.",
+              `Führt das zu nichts, melden Sie das Departement über die Meldeseite dieser Plattform oder schreiben Sie an ${operator.email}. Die Plattform kann einen Verzeichniseintrag sperren; über die Inhalte in einer fremden Datenbank verfügt sie nicht.`,
+            ],
+          },
+        ],
+      };
+    }
+
     if (doc === "terms") {
       return {
         title: "Nutzungsbedingungen",
@@ -126,6 +159,39 @@ export function getLegalDoc(
           body: [
             "Sie können einen nicht gesperrten Verzeichniseintrag entfernen. Dies löscht weder Ihr Plattformkonto noch gespeicherte Missbrauchsmeldungen. Für Auskunft oder Löschung wenden Sie sich an die untenstehende Adresse.",
             contact,
+          ],
+        },
+      ],
+    };
+  }
+
+  if (doc === "imprint") {
+    return {
+      title: "Imprint",
+      updated: "Platform operator",
+      description:
+        "Who runs OpenDepartment. Individual departments publish their own imprint.",
+      sections: [
+        {
+          heading: "Responsible for this platform",
+          body: [
+            contact ||
+              "This installation has published no operator details. They are set through the NEXT_PUBLIC_OPERATOR_NAME, NEXT_PUBLIC_OPERATOR_ADDRESS, NEXT_PUBLIC_OPERATOR_COUNTRY and NEXT_PUBLIC_CONTACT_EMAIL environment variables.",
+            "These details are for the OpenDepartment platform. They are not the details for any department on it: each department is answerable for its own contents, through whoever runs it.",
+          ],
+        },
+        {
+          heading: "What this platform is",
+          body: [
+            "OpenDepartment is a tool for setting up satirical, fictional archives. It parodies the presentation of government websites and is not connected to any public authority.",
+            "The platform runs no archive of its own. A department's files, comments and member accounts live in the Supabase database of whoever is responsible for it.",
+          ],
+        },
+        {
+          heading: "Complaints about a department",
+          body: [
+            "Start with the department itself: each one publishes its own imprint at /d/<name>/legal/imprint, naming who answers for it.",
+            `If that leads nowhere, report the department through this platform's report page, or write to ${operator.email}. The platform can suspend a directory listing; it has no power over the contents of somebody else's database.`,
           ],
         },
       ],
