@@ -77,9 +77,17 @@ create table if not exists public.departments (
                    check (status in ('active', 'suspended')),
   suspended_note text,
 
-  verified_at    timestamptz,   -- last time we confirmed the schema is installed
   created_at     timestamptz not null default now()
 );
+
+-- `verified_at` is gone. It was declared as "last time we confirmed the schema
+-- is installed" and nothing ever wrote it or read it, which made it a claim
+-- the directory appeared to be making and was not. Dropped rather than
+-- back-filled, because the honest version of it is a feature nobody has asked
+-- for yet: a liveness timestamp is only worth keeping if something acts on it,
+-- such as a directory that stops listing departments whose projects have
+-- stopped answering. Re-add it with the code that uses it.
+alter table public.departments drop column if exists verified_at;
 
 create index if not exists departments_operator_idx on public.departments (operator_id);
 create index if not exists departments_public_idx

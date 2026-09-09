@@ -149,7 +149,7 @@ export const dictionary = {
     "settings.categoriesEmpty": "Keep at least one category.",
     "settings.memberQuota": "Storage per member",
     "settings.memberQuotaHint":
-      "Megabytes recorded for one member's documents. Leave empty for no limit. This checks archive records; it is not a storage or billing cap. Direct uploads and leftover objects can exceed it. Monitor actual usage in Supabase.",
+      "Megabytes one member's documents may occupy. Leave empty for no limit. Measured from the files themselves, not from what the uploader claimed. It still cannot see objects uploaded without being filed as a document -- those show up under Storage as unreferenced, an hour after upload.",
     "settings.memberQuotaNone": "No limit",
     "settings.quotaInvalid":
       "Storage per member must be a whole number of megabytes, or empty for no limit.",
@@ -939,7 +939,7 @@ export const dictionary = {
     "settings.categoriesEmpty": "Behalten Sie mindestens eine Kategorie.",
     "settings.memberQuota": "Speicher pro Mitglied",
     "settings.memberQuotaHint":
-      "Megabyte, die für die Dokumente eines Mitglieds erfasst sind. Leer lassen für kein Limit. Dies prüft Archiveinträge und begrenzt weder den tatsächlichen Speicher noch die Kosten. Direkte Uploads und zurückgebliebene Objekte können das Limit überschreiten. Prüfen Sie die Nutzung in Supabase.",
+      "Megabyte, die die Dokumente eines Mitglieds belegen dürfen. Leer lassen für kein Limit. Gemessen an den Dateien selbst, nicht an den Angaben beim Hochladen. Objekte, die ohne Dokumenteintrag hochgeladen werden, sieht das Limit weiterhin nicht -- diese erscheinen eine Stunde später unter «Speicher» als nicht zugeordnet.",
     "settings.memberQuotaNone": "Kein Limit",
     "settings.quotaInvalid":
       "Speicher pro Mitglied muss eine ganze Zahl in Megabyte sein oder leer für kein Limit.",

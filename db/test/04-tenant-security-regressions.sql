@@ -265,6 +265,68 @@ select odtest.as_owner();
 select odtest.equals('the demotion landed',
   $$select is_admin::text from public.profiles where id='a1000000-0000-0000-0000-000000000001'$$,'false');
 
+-- What a member says a file weighs is not what it weighs. Every number drawn
+-- from size_bytes -- the cap, the administration screen's storage meter, the
+-- per-member breakdown -- believed the browser until this was measured.
+select odtest.as_owner();
+alter table auth.users disable trigger on_auth_user_created;
+insert into auth.users (id,email) values
+  ('a1000000-0000-0000-0000-000000000040','audit-weights@example.test');
+insert into public.profiles (id,username,is_admin,is_banned) values
+  ('a1000000-0000-0000-0000-000000000040','auditweights',false,false);
+alter table auth.users enable trigger on_auth_user_created;
+insert into storage.objects (bucket_id,name,metadata) values
+  ('department-files','a1000000-0000-0000-0000-000000000040/heavy.png',
+   jsonb_build_object('size', 40000000));
+
+-- No `id` in these inserts: it is outside the authenticated INSERT grant on
+-- purpose, so a caller cannot choose one. The rows are found by their path.
+select odtest.as_user('a1000000-0000-0000-0000-000000000040');
+select odtest.allowed('a file may be filed with a size the browser guessed at',
+  $$insert into public.files
+      (owner_id,title,storage_path,original_name,mime_type,size_bytes,kind)
+    values (auth.uid(),'Heavy scan',
+      auth.uid()::text||'/heavy.png','heavy.png','image/png',1,'image')$$);
+select odtest.as_owner();
+select odtest.equals('the stored size is the object, not the claim',
+  $$select size_bytes::text from public.files
+     where storage_path='a1000000-0000-0000-0000-000000000040/heavy.png'$$,'40000000');
+-- As an administrator who is still one: admin_storage_usage() re-checks that,
+-- and the owner role has no auth.uid() at all.
+select odtest.as_user('a1000000-0000-0000-0000-000000000012');
+select odtest.equals('the administration screen totals the measured bytes',
+  $$select bytes::text from public.admin_storage_usage()
+     where owner_id='a1000000-0000-0000-0000-000000000040'$$,'40000000');
+
+-- The cap is now enforced against what is really there, so understating a file
+-- no longer buys room under it. Fixtures as the owner: the storage policy only
+-- lets a member write into their own folder, which the assertion above left as
+-- somebody else's session.
+select odtest.as_owner();
+update public.settings set max_member_storage_mb = 50 where id;
+insert into storage.objects (bucket_id,name,metadata) values
+  ('department-files','a1000000-0000-0000-0000-000000000040/heavier.png',
+   jsonb_build_object('size', 30000000));
+select odtest.as_user('a1000000-0000-0000-0000-000000000040');
+select odtest.denied('understating a second file does not get past the cap',
+  $$insert into public.files
+      (owner_id,title,storage_path,original_name,mime_type,size_bytes,kind)
+    values (auth.uid(),'Heavier scan',
+      auth.uid()::text||'/heavier.png','heavier.png','image/png',1,'image')$$);
+
+-- A row whose object is not there yet keeps the claimed number rather than
+-- failing: the measurement is an improvement on trust, not a precondition.
+select odtest.allowed('a file whose object cannot be measured still files',
+  $$insert into public.files
+      (owner_id,title,storage_path,original_name,mime_type,size_bytes,kind)
+    values (auth.uid(),'Unmeasured',
+      auth.uid()::text||'/absent.png','absent.png','image/png',5,'image')$$);
+select odtest.as_owner();
+select odtest.equals('an unmeasurable file keeps the size it was given',
+  $$select size_bytes::text from public.files
+     where storage_path='a1000000-0000-0000-0000-000000000040/absent.png'$$,'5');
+update public.settings set max_member_storage_mb = null where id;
+
 -- Thumbnails are objects too: every path that removes an exhibit has to hand
 -- back the small copy beside it, and the orphan sweep must not offer a live one
 -- for deletion. A thumbnail left behind is readable by every member, because
@@ -416,7 +478,7 @@ select odtest.as_owner();
 select odtest.equals('applying the schema records exactly one version row',
   $$select count(*)::text from public.schema_version$$,'1');
 select odtest.equals('the recorded version matches the stamp at the end of the file',
-  $$select version::text from public.schema_version where id$$,'3');
+  $$select version::text from public.schema_version where id$$,'4');
 select odtest.equals('re-running the file does not accumulate version rows',
   $$select count(*)::text from public.schema_version$$,'1');
 
@@ -424,7 +486,7 @@ select odtest.as_anon();
 select odtest.denied('a signed-out caller cannot read the version table directly',
   $$select * from public.schema_version$$);
 select odtest.equals('the front door still reports the version without a session',
-  $$select schema_version::text from public.department_identity()$$,'3');
+  $$select schema_version::text from public.department_identity()$$,'4');
 
 select odtest.as_user('a1000000-0000-0000-0000-000000000002');
 select odtest.denied('a member cannot read the version table directly',
@@ -438,7 +500,7 @@ select odtest.denied('an administrator cannot delete the version row',
   $$delete from public.schema_version where id$$);
 select odtest.as_owner();
 select odtest.equals('the version survives every attempt to rewrite it',
-  $$select version::text from public.schema_version where id$$,'3');
+  $$select version::text from public.schema_version where id$$,'4');
 
 select odtest.as_owner();
 \o

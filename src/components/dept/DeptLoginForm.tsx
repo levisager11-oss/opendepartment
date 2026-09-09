@@ -46,7 +46,15 @@ function mapAuthError(
 
   if (m.includes("invalid login credentials")) return t("auth.invalidCredentials");
   if (m.includes("password should be at least")) return t("auth.passwordTooShort");
-  return message;
+
+  // Anything unrecognised used to be printed as it arrived. Supabase's own
+  // wording is written for whoever is holding the keys, not for somebody
+  // trying to join an archive: it names internals, it is untranslated in a
+  // form that is otherwise bilingual, and on a signup refusal it can describe
+  // the department's configuration to a person who is not in it yet. The
+  // original still reaches the console, where it is useful.
+  if (typeof console !== "undefined") console.error("auth:", message);
+  return t("auth.genericError");
 }
 
 export function DeptLoginForm({

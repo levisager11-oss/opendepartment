@@ -8,10 +8,26 @@ const readSql = async (path) =>
   (await readFile(new URL(path, import.meta.url), "utf8"))
     .replace(/^\\.*$/gm, ""); // psql output/formatting directives only
 
+/**
+ * Each entry gets its own disposable database.
+ *
+ * The two suites that share one have cost real time twice now, in the way
+ * shared fixtures always do: a section demoted the administrator a later
+ * section assumed, and another filled the report queue to the cap a later
+ * count was asserting against. Both looked like failures of the code under
+ * test and were failures of the arrangement above it.
+ *
+ * Adding a row here is the cheap way out -- a new section that wants to reason
+ * about totals, or about who is an administrator, gets a database with nothing
+ * in it but the schema. The existing pairs stay together on purpose: they are
+ * written against each other's fixtures now, and rewriting them to prove the
+ * same things would be motion rather than progress.
+ */
 let failed = false;
 for (const [name, schema, suites] of [
   ["tenant", "../tenant-schema.sql", ["./02-rls-tests.sql", "./04-tenant-security-regressions.sql"]],
   ["control", "../control-plane.sql", ["./03-control-plane-tests.sql", "./05-control-security-regressions.sql"]],
+  ["tenant-isolated", "../tenant-schema.sql", ["./06-tenant-isolated.sql"]],
 ]) {
   const db = new PGlite({ extensions: { pgcrypto } });
   try {

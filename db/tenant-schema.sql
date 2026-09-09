@@ -315,10 +315,11 @@ alter table public.files
        'audio/wav','audio/x-wav','audio/webm','audio/ogg'))
   ) not valid;
 
--- size_bytes is whatever the browser said it was -- the real bytes are in
--- storage, which enforces the bucket's own limit. A lying value here only
--- distorts the "storage used" figure on the administration screen, but there
--- is no reason to accept a negative or absurd one.
+-- size_bytes is measured from storage.objects by enforce_member_quota() on the
+-- way in, so this is a bound on what may be stored rather than on what may be
+-- claimed. It stays because the measurement is allowed to fail -- a project
+-- where this schema's owner cannot read storage.objects falls back to the
+-- browser's number, and there is no reason to accept a negative or absurd one.
 alter table public.files drop constraint if exists files_size_sane;
 alter table public.files
   add constraint files_size_sane
@@ -749,22 +750,53 @@ create trigger reports_changed after insert or update or delete on public.report
   for each row execute function public.refresh_file_reports();
 
 -- ---------------------------------------------------------------------------
--- The per-member storage cap.
+-- The per-member storage cap, measured against the bytes that are actually
+-- there.
 --
 -- A trigger rather than a policy, because a policy cannot express "the sum of
 -- what you already have, plus this". It runs as the table owner, so it sees
 -- every member's rows regardless of who is inserting.
 --
--- Honest about what it measures: `size_bytes` is what the browser said, the
--- same caveat the constraint above already carries. A member who understates
--- it is understating their own usage, and the bucket's own file_size_limit
--- still caps each individual object -- so this bounds the ordinary case, which
--- is the one that fills a free tier by accident.
+-- WHAT CHANGED, and why it matters more than it looks. `size_bytes` was
+-- whatever the browser said it was. A member filing a 40 MB scan could claim
+-- one byte, and every number derived from the column believed them: the cap
+-- here, the "storage used" figure on the administration screen, and the
+-- per-member breakdown beside it. The department's owner was being shown a
+-- number the members could choose.
+--
+-- Storage already knows the truth. The object is uploaded before the row that
+-- describes it -- that ordering is what makes the upload recoverable -- so by
+-- the time this runs, storage.objects holds the real byte count in its
+-- metadata. Reading it back turns a claim into a measurement, and does it in
+-- the one place every insert has to pass through.
+--
+-- Wrapped, like every other reach into storage.objects in this file: that
+-- table belongs to supabase_storage_admin, and on a project where this
+-- function's owner cannot read it the upload must still work. A failed lookup
+-- falls back to the claimed value, which is exactly where this started.
+--
+-- STILL NOT CLOSED, and worth stating plainly rather than implying otherwise:
+-- objects uploaded with no `files` row at all are not counted by anything
+-- here, because there is no insert to intercept. They are what
+-- admin_orphaned_objects() lists, and an hour after upload an administrator
+-- can see and remove them. The storage policy bounds where a member may write;
+-- it cannot express a running total.
 -- ---------------------------------------------------------------------------
 create or replace function public.enforce_member_quota()
 returns trigger language plpgsql security definer set search_path = public as $fn$
-declare cap_mb integer; used bigint;
+declare cap_mb integer; used bigint; actual bigint;
 begin
+  -- Measure first, so the stored row and every figure drawn from it are the
+  -- real size whether or not this department caps anything.
+  begin
+    select (o.metadata ->> 'size')::bigint into actual
+      from storage.objects o
+     where o.bucket_id = 'department-files' and o.name = new.storage_path;
+    if actual is not null and actual >= 0 then new.size_bytes := actual; end if;
+  exception when others then
+    raise warning 'could not read the stored size of %: %', new.storage_path, sqlerrm;
+  end;
+
   select s.max_member_storage_mb into cap_mb from public.settings s where s.id;
   if cap_mb is null then return new; end if;
 
@@ -1700,7 +1732,7 @@ create policy "dept delete own or admin" on storage.objects
 --  reads the number out of the statement below and refuses to build without
 --  it, so the app and this file cannot drift apart.
 -- ===========================================================================
-insert into public.schema_version (id, version) values (true, 3)
+insert into public.schema_version (id, version) values (true, 4)
 on conflict (id) do update
   set version = excluded.version, applied_at = now();
 

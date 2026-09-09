@@ -63,6 +63,16 @@ column privilege in [db/tenant-schema.sql](db/tenant-schema.sql) as well —
 (`background: var(--accent)`) and a value carrying a semicolon reparses into
 extra declarations.
 
+**`files.size_bytes` is measured, not claimed.** The object is uploaded before
+the row describing it, so `enforce_member_quota()` reads the real byte count out
+of `storage.objects` and overwrites whatever the browser said on the way in.
+Every figure drawn from that column depends on this: the per-member cap, the
+administration screen's storage meter, `admin_storage_usage()`. The lookup is
+wrapped — a project where this schema's owner cannot read `storage.objects`
+falls back to the claimed value — so do not treat a measured size as guaranteed.
+Objects uploaded without a `files` row are still outside all of it; they are
+what `admin_orphaned_objects()` lists.
+
 **An exhibit can be two objects, not one.** `files.thumb_path` holds a small
 WebP copy made in the browser at upload (`src/lib/tenant/thumbnail.ts`), so the
 vault grid stops downloading full-resolution originals out of the department
