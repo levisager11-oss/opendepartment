@@ -5,7 +5,12 @@ import { getLegalDoc, type LegalDoc } from "@/lib/legal";
 import { MarketingShell } from "@/components/MarketingShell";
 import { pageMetadata } from "@/lib/seo";
 
-const DOCS: LegalDoc[] = ["terms", "privacy"];
+// An imprint that only exists for departments is not an imprint for the
+// platform, which is itself a service somebody operates and can be complained
+// about. The route is generated like the other two rather than being a special
+// case; getLegalDoc() renders it from the same operator identity contactLine()
+// already builds for the footer.
+const DOCS: LegalDoc[] = ["terms", "privacy", "imprint"];
 
 /**
  * Rendered per request, for two reasons that arrived together.

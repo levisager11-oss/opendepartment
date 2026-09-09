@@ -45,7 +45,18 @@ function projectRef(url: string): string | null {
   return /^https:\/\/([a-z0-9-]+)\.supabase\.(co|in)$/.exec(url)?.[1] ?? null;
 }
 
-export function DepartmentRow({ dept }: { dept: Dept }) {
+export function DepartmentRow({
+  dept,
+  schemaVersion,
+}: {
+  dept: Dept;
+  /**
+   * The version db/tenant-schema.sql currently installs, handed down from the
+   * server. Not imported: the constant lives beside the whole schema text, and
+   * this is a client component.
+   */
+  schemaVersion: number;
+}) {
   const { t, formatDate } = useI18n();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -55,6 +66,45 @@ export function DepartmentRow({ dept }: { dept: Dept }) {
   const [refreshState, setRefreshState] = useState<
     "idle" | "busy" | "done" | "failed"
   >("idle");
+  /** Null until asked, false when this project answered and is current. */
+  const [outdated, setOutdated] = useState<boolean | null>(null);
+
+  /**
+   * Ask this department what schema it is running.
+   *
+   * From the browser rather than from the account page's render, because the
+   * control plane cannot reach a tenant project cheaply: three departments
+   * would be three outbound round trips on a screen that otherwise makes one
+   * query, and a project that has been paused or deleted would hold the whole
+   * page up behind its timeout. Here a slow or dead project simply never sets
+   * the badge, and the rest of the row is already on screen.
+   *
+   * The same anonymous read as refreshName below -- department_identity() is
+   * public by design. A project that does not answer, or answers without the
+   * column because it predates the version stamp, is deliberately NOT reported
+   * as out of date from here: the operator's own department page says so with
+   * the SQL to fix it, and a badge that cannot tell "old" from "unreachable"
+   * would send people to the dashboard for the wrong reason.
+   */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const tenant = createClient(dept.supabase_url, dept.anon_key, {
+          auth: { persistSession: false, autoRefreshToken: false },
+        });
+        const { data, error } = await tenant.rpc("department_identity");
+        if (cancelled || error || !data || data.length === 0) return;
+        const version = (data[0] as { schema_version?: number }).schema_version;
+        setOutdated(typeof version !== "number" || version !== schemaVersion);
+      } catch {
+        // Unreachable. The row renders without the badge.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [dept.supabase_url, dept.anon_key, schemaVersion]);
 
   const ref = projectRef(dept.supabase_url);
   const dashboard = ref ? `https://supabase.com/dashboard/project/${ref}` : null;
@@ -421,6 +471,14 @@ export function DepartmentRow({ dept }: { dept: Dept }) {
               <span className="stamp stamp-red ml-3 stamp-sm">
                 suspended
               </span>
+            )}
+            {outdated && (
+              <Link
+                href={`/d/${dept.slug}/admin`}
+                className="stamp stamp-sm ml-3 border-gold-600 align-middle text-gold-700 hover:opacity-80"
+              >
+                {t("account.schemaOutdated")}
+              </Link>
             )}
           </p>
           <p className="docket mt-1 text-3xs text-ink-500">

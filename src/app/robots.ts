@@ -20,6 +20,7 @@ export default function robots(): MetadataRoute.Robots {
         disallow: [
           "/api/",
           "/d/*/vault",
+          "/d/*/account",
           "/d/*/admin",
           "/d/*/upload",
           "/d/*/file/",

@@ -7,6 +7,8 @@ import { TenantProvider } from "@/lib/tenant/context";
 import { DeptBanner } from "@/components/dept/DeptBanner";
 import { DeptHeader } from "@/components/dept/DeptHeader";
 import { DeptFooter } from "@/components/dept/DeptFooter";
+import { SchemaNotice } from "@/components/dept/SchemaNotice";
+import { TENANT_SCHEMA_VERSION } from "@/lib/tenant/schema-sql.generated";
 import { pageMetadata, SITE_NAME } from "@/lib/seo";
 
 export async function generateMetadata({
@@ -112,6 +114,18 @@ export default async function DepartmentLayout({
       >
         <DeptBanner />
         <DeptHeader signedIn={signedIn} username={username} isAdmin={isAdmin} />
+        {/* Gated on isAdmin, which is only true when the block above actually
+            reached this department's project and read a profile out of it. So
+            an unreachable tenant -- whose branding fell back and whose version
+            is null for that reason rather than for the interesting one --
+            cannot produce this notice. */}
+        {isAdmin && branding.schemaVersion !== TENANT_SCHEMA_VERSION && (
+          <SchemaNotice
+            current={branding.schemaVersion}
+            expected={TENANT_SCHEMA_VERSION}
+            adminHref={`/d/${slug}/admin`}
+          />
+        )}
         <main className="flex-1">{children}</main>
         <DeptFooter />
       </div>

@@ -1,6 +1,11 @@
 import { requireDeptAdmin } from "@/lib/tenant/auth";
 import { createTenantClient } from "@/lib/tenant/server";
 import { AdminPanel } from "@/components/admin/AdminPanel";
+import { AdminSchema } from "@/components/admin/AdminSchema";
+import {
+  TENANT_SCHEMA_SQL,
+  TENANT_SCHEMA_VERSION,
+} from "@/lib/tenant/schema-sql.generated";
 import type { DepartmentSettings } from "@/components/admin/types";
 import { privatePage } from "@/lib/seo";
 
@@ -87,6 +92,28 @@ export default async function AdminPage({
   ] = results;
   const reports = [...(openReports ?? []), ...(closedReports ?? [])];
 
+  /**
+   * Which of these lists came back full.
+   *
+   * Every query above carries a limit and none of them said so on screen, so a
+   * department past the line was shown a subset that looked like the whole
+   * thing: an archive of 900 documents whose administration screen listed 500,
+   * and an audit log -- the accountability record -- showing the most recent
+   * hundred entries with nothing to suggest there were more.
+   *
+   * A list that came back exactly at its limit is the signal. It cannot
+   * distinguish "exactly 500 documents" from "more than 500", which is why the
+   * notice says "the most recent N" rather than claiming a number it does not
+   * have: both readings are true, and the useful half is that the screen is
+   * not the archive.
+   */
+  const truncated = {
+    files: (files ?? []).length >= 500,
+    reports:
+      (openReports ?? []).length >= 200 || (closedReports ?? []).length >= 200,
+    audit: (audit ?? []).length >= 100,
+  };
+
   type MemberRow = {
     id: string;
     username: string | null;
@@ -112,43 +139,62 @@ export default async function AdminPage({
     (files ?? []).map((f) => [f.id as string, f.title as string])
   );
 
+  // The schema text is 73 kB and it is only worth sending to somebody who has
+  // something to do with it, so the check happens here rather than inside the
+  // component. requireDeptAdmin() got a profile out of this project, so a null
+  // version means an older schema rather than an unreachable one.
+  const outdated = member.branding.schemaVersion !== TENANT_SCHEMA_VERSION;
+
   return (
-    <AdminPanel
-      currentUserId={member.userId}
-      files={(files ?? []).map((f) => ({
-        ...f,
-        owner_username: usernameById.get(f.owner_id as string) ?? null,
-        owner_email: emailByUser.get(f.owner_id as string) ?? null,
-      }))}
-      reports={(reports ?? []).map((r) => ({
-        ...r,
-        file_title: r.file_id ? (titleByFile.get(r.file_id) ?? null) : null,
-        reporter_username: usernameById.get(r.reporter_id as string) ?? null,
-      }))}
-      users={memberRows.map((m) => ({
-        id: m.id,
-        username: m.username,
-        is_admin: m.is_admin,
-        is_banned: m.is_banned,
-        created_at: m.created_at,
-        email: m.email,
-        // Comes back from the database as a bigint, so it arrives as a string.
-        file_count: Number(m.file_count ?? 0),
-      }))}
-      invites={invites ?? []}
-      settings={(settings as DepartmentSettings | null) ?? null}
-      subjects={(subjects ?? []).map((s) => ({
-        ...s,
-        file_count: fileCountBySubject.get(s.id as string) ?? 0,
-      }))}
-      audit={(audit ?? []).map((a) => ({
-        ...a,
-        actor_username: a.actor_id ? (usernameById.get(a.actor_id) ?? null) : null,
-      }))}
-      totalBytes={(files ?? []).reduce(
-        (sum, f) => sum + Number(f.size_bytes ?? 0),
-        0
+    <>
+      {outdated && (
+        <div className="mx-auto max-w-7xl px-4 pt-6 sm:pt-8">
+          <AdminSchema
+            current={member.branding.schemaVersion}
+            expected={TENANT_SCHEMA_VERSION}
+            sql={TENANT_SCHEMA_SQL}
+            slug={slug}
+          />
+        </div>
       )}
-    />
+      <AdminPanel
+        truncated={truncated}
+        currentUserId={member.userId}
+        files={(files ?? []).map((f) => ({
+          ...f,
+          owner_username: usernameById.get(f.owner_id as string) ?? null,
+          owner_email: emailByUser.get(f.owner_id as string) ?? null,
+        }))}
+        reports={(reports ?? []).map((r) => ({
+          ...r,
+          file_title: r.file_id ? (titleByFile.get(r.file_id) ?? null) : null,
+          reporter_username: usernameById.get(r.reporter_id as string) ?? null,
+        }))}
+        users={memberRows.map((m) => ({
+          id: m.id,
+          username: m.username,
+          is_admin: m.is_admin,
+          is_banned: m.is_banned,
+          created_at: m.created_at,
+          email: m.email,
+          // Comes back from the database as a bigint, so it arrives as a string.
+          file_count: Number(m.file_count ?? 0),
+        }))}
+        invites={invites ?? []}
+        settings={(settings as DepartmentSettings | null) ?? null}
+        subjects={(subjects ?? []).map((s) => ({
+          ...s,
+          file_count: fileCountBySubject.get(s.id as string) ?? 0,
+        }))}
+        audit={(audit ?? []).map((a) => ({
+          ...a,
+          actor_username: a.actor_id ? (usernameById.get(a.actor_id) ?? null) : null,
+        }))}
+        totalBytes={(files ?? []).reduce(
+          (sum, f) => sum + Number(f.size_bytes ?? 0),
+          0
+        )}
+      />
+    </>
   );
 }

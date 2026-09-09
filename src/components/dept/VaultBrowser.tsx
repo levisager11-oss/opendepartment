@@ -6,6 +6,7 @@ import { useI18n } from "@/lib/i18n/provider";
 import { useTenant, useTenantClient } from "@/lib/tenant/context";
 import { FileCard } from "./FileCard";
 import {
+  SIGNED_URL_TTL,
   STORAGE_BUCKET,
   type CaseFile,
   type FileKind,
@@ -14,6 +15,38 @@ import {
 } from "@/lib/tenant/types";
 
 const PAGE_SIZE = 24;
+
+/**
+ * A search box's term, as a prefix tsquery.
+ *
+ * `websearch_to_tsquery` would be the obvious call and it is the wrong one
+ * here: it matches whole lexemes, so a box that searches while you type finds
+ * nothing at all until the last word is finished -- `bud` would not reach
+ * `budget`. Every token becomes a prefix instead, ANDed together, which is
+ * what a search box is expected to do.
+ *
+ * The tokens are an ALLOWLIST -- letters, digits and underscore, everything
+ * else is a separator. That is what makes assembling tsquery syntax here
+ * acceptable where assembling PostgREST filter syntax was not: no token can
+ * carry `&`, `|`, `!`, `:` or a quote, so nothing a person types becomes an
+ * operator. It also travels as a filter VALUE that PostgREST URL-encodes and
+ * hands to to_tsquery, so the worst a malformed one could do is make that
+ * function raise -- and by construction none of these are malformed.
+ *
+ * Capped at eight tokens: past that the query costs more than the answer is
+ * worth, and nobody types nine words into a search box on purpose.
+ *
+ * Null when nothing survives tokenising -- a term of pure punctuation is not a
+ * search for nothing, it is not a search.
+ */
+export function prefixSearchQuery(term: string): string | null {
+  const tokens = term
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}_]+/u)
+    .filter(Boolean)
+    .slice(0, 8);
+  return tokens.length ? tokens.map((token) => `${token}:*`).join(" & ") : null;
+}
 
 const SORTS: Record<SortKey, { column: string; ascending: boolean }> = {
   top: { column: "score", ascending: false },
@@ -110,36 +143,36 @@ export function VaultBrowser({
       setError(false);
 
       try {
-        // Subject is a many-to-many, so resolve it to a set of ids first.
-        let restrictTo: string[] | null = null;
-        if (subjectId) {
-          const { data, error: subjectError } = await supabase
-            .from("file_subjects")
-            .select("file_id")
-            .eq("subject_id", subjectId);
-          if (subjectError) throw subjectError;
-          if (stale()) return;
-          restrictTo = (data ?? []).map((row) => row.file_id as string);
-          if (restrictTo.length === 0) {
-            setFiles([]);
-            setTotal(0);
-            setPage(0);
-            setLoading(false);
-            return;
-          }
-        }
+        // Named columns rather than `*`, and spelled out in the call rather
+        // than hoisted into a constant: supabase-js reads the select list at
+        // the TYPE level, so it has to be a literal for the rows to come back
+        // typed rather than as a parse error.
+        //
+        // The view carries two columns now that exist only to be filtered on
+        // -- the tsvector and the subject id array -- and neither is worth
+        // sending to twenty-four cards. PostgREST filters independently of the
+        // select list, so leaving them out costs the filters below nothing.
+        let query = supabase
+          .from("files_public")
+          .select(
+            "id, title, description, category, kind, mime_type, size_bytes, original_name, storage_path, thumb_path, upvotes, downvotes, score, comment_count, view_count, case_number, created_at, owner_id, owner_username, subjects",
+            { count: "exact" }
+          );
 
-        let query = supabase.from("files_public").select("*", { count: "exact" });
-
-        if (restrictTo) query = query.in("id", restrictTo);
+        // One request, whatever the subject holds. This used to be a separate
+        // round trip that fetched every matching file id and sent them back as
+        // an `in` list, so the URL grew with the archive.
+        if (subjectId) query = query.contains("subject_ids", [subjectId]);
         if (category) query = query.eq("category", category);
         if (kind) query = query.eq("kind", kind);
         if (mineOnly) query = query.eq("owner_id", currentUserId);
-        if (debounced) {
-          const safe = debounced.replace(/[%,()]/g, " ");
-          query = query.or(
-            `title.ilike.%${safe}%,description.ilike.%${safe}%,original_name.ilike.%${safe}%`
-          );
+        // Not named `search`: that is the state holding the raw box contents,
+        // and shadowing it here would be one rename away from a real bug.
+        const searchQuery = debounced ? prefixSearchQuery(debounced) : null;
+        if (searchQuery) {
+          // `simple` to match the column's own configuration -- a mismatch
+          // here silently stops matching rather than failing loudly.
+          query = query.textSearch("search", searchQuery, { config: "simple" });
         }
 
         const { column, ascending } = SORTS[sort];
@@ -178,18 +211,30 @@ export function VaultBrowser({
         setPage(pageIndex);
 
         // One batched call for all image thumbnails on this page.
-        const imagePaths = rows
+        //
+        // The small copy when there is one, the original when there is not:
+        // an exhibit filed before thumbnails existed, or one whose thumbnail
+        // could not be made, still has to show a picture. The map is keyed by
+        // the card's storage_path either way, so FileCard does not have to
+        // know which of the two it got.
+        const wanted = rows
           .filter((r) => r.kind === "image")
-          .map((r) => r.storage_path);
-        if (imagePaths.length) {
+          .map((r) => ({ key: r.storage_path, path: r.thumb_path || r.storage_path }));
+        if (wanted.length) {
           const { data: signed } = await supabase.storage
             .from(STORAGE_BUCKET)
-            .createSignedUrls(imagePaths, 3600);
+            .createSignedUrls(wanted.map((w) => w.path), SIGNED_URL_TTL);
           if (signed && !stale()) {
+            const byPath = new Map(
+              signed
+                .filter((entry) => entry.signedUrl && entry.path)
+                .map((entry) => [entry.path as string, entry.signedUrl as string])
+            );
             setThumbs((prev) => {
               const next = { ...prev };
-              signed.forEach((entry) => {
-                if (entry.signedUrl && entry.path) next[entry.path] = entry.signedUrl;
+              wanted.forEach(({ key, path }) => {
+                const url = byPath.get(path);
+                if (url) next[key] = url;
               });
               return next;
             });

@@ -77,9 +77,17 @@ create table if not exists public.departments (
                    check (status in ('active', 'suspended')),
   suspended_note text,
 
-  verified_at    timestamptz,   -- last time we confirmed the schema is installed
   created_at     timestamptz not null default now()
 );
+
+-- `verified_at` is gone. It was declared as "last time we confirmed the schema
+-- is installed" and nothing ever wrote it or read it, which made it a claim
+-- the directory appeared to be making and was not. Dropped rather than
+-- back-filled, because the honest version of it is a feature nobody has asked
+-- for yet: a liveness timestamp is only worth keeping if something acts on it,
+-- such as a directory that stops listing departments whose projects have
+-- stopped answering. Re-add it with the code that uses it.
+alter table public.departments drop column if exists verified_at;
 
 create index if not exists departments_operator_idx on public.departments (operator_id);
 create index if not exists departments_public_idx
@@ -149,6 +157,96 @@ alter table public.departments
   add constraint departments_key_not_secret
   check (not public.looks_like_secret_key(anon_key)) not valid;
 
+-- ---------------------------------------------------------------------------
+-- One Supabase project, one department.
+--
+-- A department's `supabase_url` and `anon_key` are served to every visitor of
+-- its front door -- that is the whole design, and both values are public. What
+-- followed from it was not: anybody holding those two public strings could
+-- register a SECOND slug pointing at the same project. Not a copy of the
+-- archive, the archive itself, under an address somebody else chose and with a
+-- directory entry somebody else wrote.
+--
+-- Three things that costs, worst first:
+--
+--   SUSPENSION STOPS WORKING. It is the platform's only lever, and it is a
+--   flag on one row. Suspend /d/real and /d/mirror goes on resolving to the
+--   same project, so the takedown is undone by one registration. This is the
+--   reason the fix is a constraint on the DIRECTORY rather than a check in the
+--   wizard: the mirror is not a bug in setup, it is a second legitimate-looking
+--   row.
+--
+--   UNLISTED STOPS MEANING ANYTHING. An archive whose owner deliberately kept
+--   it out of /directory could be put there by a stranger, because visibility
+--   lives on the listing and the listing was not the owner's to control.
+--
+--   THE NAME IN THE DIRECTORY IS NOT THE DEPARTMENT'S. display_name and
+--   tagline are the registrant's to set. A mirror gets to caption somebody
+--   else's documents.
+--
+-- A trigger rather than a bare unique index, for the same reason so many
+-- constraints in this file are NOT VALID: a control plane re-running this file
+-- may already hold a duplicate pair, and an index that refuses to build would
+-- fail the whole migration over history rather than over new writes. The
+-- trigger only ever looks at the row being written. The index below is
+-- attempted afterwards as a backstop and skipped, loudly, when it cannot be
+-- built -- at which point the trigger is still doing the work.
+--
+-- Covers both doors. register_department() is `security definer` and owns the
+-- table, so a policy could not see it; `supabase_url` is also in the operator's
+-- own UPDATE grant, so a registered department could otherwise be repointed at
+-- a project already spoken for. A trigger fires for both.
+--
+-- What this deliberately does NOT do is prove that the registrant controls the
+-- project. It cannot: this function has no way to reach out to it, and the
+-- coordinates it is handed are public by design. It makes the binding
+-- exclusive and first-come, which is what suspension needs in order to hold.
+-- The first signup is protected separately, by the founder capability in
+-- db/tenant-schema.sql -- registering a slug for somebody else's project still
+-- does not get you an account inside it.
+-- ---------------------------------------------------------------------------
+create or replace function public.departments_one_project()
+returns trigger language plpgsql security definer set search_path = public as $fn$
+begin
+  if tg_op = 'UPDATE' and new.supabase_url is not distinct from old.supabase_url then
+    return new;
+  end if;
+
+  if exists (
+    select 1 from public.departments d
+     where d.supabase_url = new.supabase_url
+       and d.slug <> new.slug
+  ) then
+    raise exception 'PROJECT_ALREADY_REGISTERED'
+      using hint = 'That Supabase project already backs a department on this platform.';
+  end if;
+
+  return new;
+end; $fn$;
+
+revoke execute on function public.departments_one_project() from anon, authenticated, public;
+
+drop trigger if exists departments_one_project on public.departments;
+create trigger departments_one_project
+  before insert or update of supabase_url on public.departments
+  for each row execute function public.departments_one_project();
+
+-- The backstop. Two registrations in the same instant both pass the trigger's
+-- lookup and both reach the insert; the index is what refuses the loser. It is
+-- attempted rather than declared because a directory that already holds a
+-- duplicate should be told about it, not blocked from applying the trigger
+-- that stops the next one.
+do $idx$ begin
+  create unique index if not exists departments_one_project_idx
+    on public.departments (supabase_url);
+exception when unique_violation then
+  raise warning 'departments.supabase_url already holds duplicates; the exclusive index was not built. Resolve them, then re-run this file. Duplicated projects: %',
+    (select string_agg(distinct supabase_url, ', ')
+       from public.departments d
+      where exists (select 1 from public.departments o
+                     where o.supabase_url = d.supabase_url and o.slug <> d.slug));
+end $idx$;
+
 -- Slugs that must never be handed out, because they collide with app routes
 -- or invite impersonation.
 -- RLS on with no policy is deliberate here: deny-all. Nothing reads this over
@@ -200,6 +298,122 @@ alter table public.abuse_reports
     and char_length(reason)                 between 1 and 60
     and char_length(coalesce(details, ''))  <= 4000
   );
+
+-- ---------------------------------------------------------------------------
+-- WHO ANSWERS AN ABUSE REPORT.
+--
+-- report_department() has been writing into abuse_reports since it was
+-- written, and nothing has ever read them back. The platform's takedown path
+-- was a table you had to remember to open in the Supabase dashboard -- so the
+-- 25-open-report cap, the deduplication and the careful "returns quietly"
+-- design were all in service of a queue with no reader.
+--
+-- Staff is a flag on the operator row rather than a list of addresses in an
+-- environment variable. An env var can gate a screen; it cannot gate
+-- PostgREST, and the reports are one table away from anybody with the anon
+-- key. The same rule the tenant schema states about itself applies here: a
+-- check the app performs is decoration unless the database performs it too.
+--
+-- Set by hand, once, in this project's own SQL editor:
+--
+--   update public.operators set is_staff = true
+--    where id = (select id from auth.users where email = 'you@example.test');
+--
+-- Deliberately not settable from the app at all. `operators` grants UPDATE on
+-- display_name and nothing else, so this column is outside every path a
+-- signed-in caller has -- which is what stops the platform's moderation
+-- authority being one PostgREST call away from whoever registers next.
+-- ---------------------------------------------------------------------------
+alter table public.operators
+  add column if not exists is_staff boolean not null default false;
+
+create or replace function public.is_staff()
+returns boolean language sql stable security definer set search_path = public as $fn$
+  select coalesce((select o.is_staff from public.operators o where o.id = auth.uid()), false);
+$fn$;
+
+/**
+ * The queue, for whoever has to read it.
+ *
+ * Returns the department's current status alongside each report, because the
+ * first question about a complaint is always whether anything was already done
+ * about this slug -- and the second is whether the department still exists,
+ * since a report outlives the row it names.
+ */
+create or replace function public.staff_list_reports(
+  want_status text default 'open', limit_to integer default 200
+)
+returns table (id uuid, slug text, reporter_email text, reason text,
+               details text, status text, created_at timestamptz,
+               department_status text)
+language plpgsql security definer set search_path = public as $fn$
+begin
+  if not public.is_staff() then raise exception 'NOT_STAFF'; end if;
+  return query
+    select r.id, r.slug, r.reporter_email, r.reason, r.details, r.status,
+           r.created_at, d.status
+      from public.abuse_reports r
+      left join public.departments d on d.slug = r.slug
+     where want_status is null or r.status = want_status
+     order by r.created_at
+     limit greatest(1, least(coalesce(limit_to, 200), 500));
+end; $fn$;
+
+/** Close one report. The rows are never deleted: this is the takedown trail. */
+create or replace function public.staff_resolve_report(target uuid, new_status text)
+returns void language plpgsql security definer set search_path = public as $fn$
+begin
+  if not public.is_staff() then raise exception 'NOT_STAFF'; end if;
+  if new_status not in ('open', 'resolved', 'dismissed') then
+    raise exception 'UNKNOWN_STATUS';
+  end if;
+  update public.abuse_reports set status = new_status where id = target;
+  if not found then raise exception 'NO_SUCH_REPORT'; end if;
+end; $fn$;
+
+/**
+ * The lever the reports exist to reach.
+ *
+ * Suspending a department was the platform's answer to abuse and there was no
+ * way to do it except by hand in the SQL editor -- which meant the answer to a
+ * complaint depended on somebody being at a computer with the right tab open.
+ * `status` stays outside the operator's own UPDATE grant; this is a staff
+ * function and re-checks that itself.
+ *
+ * Suspension does not touch a byte of the department's data. It stops the slug
+ * resolving here, which is the whole of what this platform controls -- the
+ * contents live in a database whose keys OpenDepartment does not hold.
+ */
+create or replace function public.staff_set_department_status(
+  want_slug text, new_status text, note text default null
+)
+returns void language plpgsql security definer set search_path = public as $fn$
+begin
+  if not public.is_staff() then raise exception 'NOT_STAFF'; end if;
+  if new_status not in ('active', 'suspended') then
+    raise exception 'UNKNOWN_STATUS';
+  end if;
+  update public.departments
+     set status = new_status,
+         suspended_note = case when new_status = 'suspended'
+                               then left(trim(coalesce(note, '')), 500)
+                               else null end
+   where slug = lower(trim(want_slug));
+  if not found then raise exception 'NO_SUCH_DEPARTMENT'; end if;
+end; $fn$;
+
+-- Internals, and one of them decides who may suspend a department. Postgres
+-- grants EXECUTE to PUBLIC by default, so each of these has to say otherwise.
+revoke execute on function public.is_staff() from anon, public;
+revoke execute on function public.staff_list_reports(text, integer) from anon, public;
+revoke execute on function public.staff_resolve_report(uuid, text) from anon, public;
+revoke execute on function public.staff_set_department_status(text, text, text)
+  from anon, public;
+grant execute on function public.is_staff() to authenticated;
+grant execute on function public.staff_list_reports(text, integer) to authenticated;
+grant execute on function public.staff_resolve_report(uuid, text) to authenticated;
+grant execute on function public.staff_set_department_status(text, text, text)
+  to authenticated;
 
 -- ===========================================================================
 --  RLS
@@ -386,6 +600,7 @@ language plpgsql security definer set search_path = public as $fn$
 declare
   clean text := lower(trim(want_slug));
   owned integer;
+  failed text;
 begin
   if auth.uid() is null then raise exception 'NOT_SIGNED_IN'; end if;
 
@@ -421,7 +636,18 @@ exception
   -- and both reach the INSERT. `slug` is the primary key, so the loser gets a
   -- unique violation -- translated here into the same error the pre-check
   -- raises, so the caller has one case to handle rather than two.
+  --
+  -- Two different races land here now, though, and they are not the same
+  -- refusal: the exclusive project index can be the one that fires, and
+  -- telling somebody their slug is taken when the truth is that their PROJECT
+  -- is already registered sends them off to think of another name that will
+  -- fail in exactly the same way. The constraint name is the only thing that
+  -- distinguishes them at this point.
   when unique_violation then
+    get stacked diagnostics failed = constraint_name;
+    if failed = 'departments_one_project_idx' then
+      raise exception 'PROJECT_ALREADY_REGISTERED';
+    end if;
     raise exception 'SLUG_UNAVAILABLE';
 end; $fn$;
 
