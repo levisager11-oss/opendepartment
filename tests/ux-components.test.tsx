@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { translate, type TranslationKey } from "@/lib/i18n/dictionary";
-import { VaultBrowser } from "@/components/dept/VaultBrowser";
+import { VaultBrowser, prefixSearchQuery } from "@/components/dept/VaultBrowser";
 import { UploadForm } from "@/components/dept/UploadForm";
 import { AdminReports } from "@/components/admin/AdminReports";
 import { AdminInvites } from "@/components/admin/AdminInvites";
@@ -15,9 +15,14 @@ import { AdminStorage } from "@/components/admin/AdminStorage";
 import { CommentSection } from "@/components/dept/CommentSection";
 import { AdminDanger } from "@/components/admin/AdminDanger";
 import { AdminUsers } from "@/components/admin/AdminUsers";
+import { AdminPanel } from "@/components/admin/AdminPanel";
+import { AdminAudit } from "@/components/admin/AdminAudit";
+import { StaffReports } from "@/components/account/StaffReports";
 import { AdminFiles } from "@/components/admin/AdminFiles";
 import { DeptHeader } from "@/components/dept/DeptHeader";
 import { DeleteFileButton } from "@/components/dept/DeleteFileButton";
+import { AccountSignOut } from "@/components/account/AccountSignOut";
+import { DeptLeaveForm } from "@/components/dept/DeptLeaveForm";
 
 const runtime = vi.hoisted(() => ({
   query: "",
@@ -28,6 +33,8 @@ const runtime = vi.hoisted(() => ({
     storage: { from: vi.fn() },
   },
   storage: { upload: vi.fn(), remove: vi.fn(), createSignedUrls: vi.fn() },
+  /** An anonymous read of somebody else's department_identity(). */
+  tenantRpc: vi.fn(),
   tenant: {
     slug: "demo", supabaseUrl: "https://demo.supabase.co",
     branding: { subjectLabel: "Case", categories: ["EXHIBIT", "MEMO"], maxUploadMb: 25, openJoin: false },
@@ -50,6 +57,7 @@ vi.mock("@/lib/i18n/provider", async () => {
 });
 vi.mock("@/lib/tenant/context", () => ({ useTenant: () => runtime.tenant, useTenantClient: () => runtime.client }));
 vi.mock("@/lib/control/browser", () => ({ CONTROL_READY: true, createControlBrowserClient: () => runtime.client }));
+vi.mock("@supabase/supabase-js", () => ({ createClient: () => ({ rpc: runtime.tenantRpc }) }));
 vi.mock("@/components/dept/FileCard", () => ({ FileCard: ({ file }: { file: { title: string } }) => <article>{file.title}</article> }));
 vi.mock("@/lib/tenant/scrub", () => ({ scrubImage: async (file: File) => ({ file, scrubbed: false, unsupported: false }) }));
 
@@ -57,7 +65,8 @@ type Result = { data?: unknown; error?: unknown; count?: number };
 function query(result: Result | Promise<Result>) {
   const builder = {
     select: vi.fn(), eq: vi.fn(), in: vi.fn(), order: vi.fn(), range: vi.fn(),
-    or: vi.fn(), insert: vi.fn(), upsert: vi.fn(), update: vi.fn(), delete: vi.fn(),
+    or: vi.fn(), contains: vi.fn(), textSearch: vi.fn(),
+    insert: vi.fn(), upsert: vi.fn(), update: vi.fn(), delete: vi.fn(),
     single: vi.fn(), maybeSingle: vi.fn(),
     then: (resolve: (value: Result) => unknown, reject?: (reason: unknown) => unknown) => Promise.resolve(result).then(resolve, reject),
   };
@@ -85,9 +94,35 @@ beforeEach(() => {
   runtime.storage.remove.mockResolvedValue({ error: null });
   runtime.storage.createSignedUrls.mockResolvedValue({ data: [] });
   runtime.client.auth.getUser.mockResolvedValue({ data: { user: { id: "member" } } });
+  // Current by default, so no schema badge unless a test asks for one.
+  runtime.tenantRpc.mockResolvedValue({ data: [{ schema_version: 1 }], error: null });
   vi.spyOn(window, "confirm").mockReturnValue(true);
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
+describe("archive search terms", () => {
+  it("makes every token a prefix so a half-typed word still matches", () => {
+    expect(prefixSearchQuery("bud")).toBe("bud:*");
+    expect(prefixSearchQuery("dep bud")).toBe("dep:* & bud:*");
+  });
+  it("treats tsquery operators as separators rather than syntax", () => {
+    // The whole reason assembling a query here is acceptable: no token can
+    // carry an operator, because only letters, digits and _ survive.
+    expect(prefixSearchQuery("a & b | !c:*")).toBe("a:* & b:* & c:*");
+    expect(prefixSearchQuery("100% (budget)")).toBe("100:* & budget:*");
+    expect(prefixSearchQuery("O'Brien")).toBe("o:* & brien:*");
+  });
+  it("keeps letters outside ASCII, which are most of the archive's languages", () => {
+    expect(prefixSearchQuery("Grüsse Öffentlich")).toBe("grüsse:* & öffentlich:*");
+  });
+  it("is not a search at all when nothing survives tokenising", () => {
+    expect(prefixSearchQuery("%%% ,,, ()")).toBeNull();
+    expect(prefixSearchQuery("   ")).toBeNull();
+  });
+  it("stops at eight tokens", () => {
+    expect(prefixSearchQuery("a b c d e f g h i j")?.split(" & ")).toHaveLength(8);
+  });
+});
 
 describe("archive filters and pagination", () => {
   it("discards an older filter result whose vote lookup finishes last", async () => {
@@ -126,7 +161,7 @@ describe("archive filters and pagination", () => {
 
   it("restores shared filters, clears all of them, and follows browser history", async () => {
     window.history.replaceState({}, "", "/d/demo/vault?q=letter&sort=new&subject=case-a&category=MEMO&kind=pdf&mine=1");
-    runtime.client.from.mockImplementation((table: string) => query(table === "file_subjects" ? { data: [{ file_id: "file-1" }] } : { data: [], count: 0 }));
+    runtime.client.from.mockImplementation(() => query({ data: [], count: 0 }));
     render(<VaultBrowser subjects={[{ id: "case-a", name: "Case A" }]} currentUserId="member" />);
     expect((screen.getByRole("textbox", { name: tr("vault.search") }) as HTMLInputElement).value).toBe("letter");
     expect((screen.getByRole("combobox", { name: tr("vault.sort") }) as HTMLSelectElement).value).toBe("new");
@@ -140,6 +175,39 @@ describe("archive filters and pagination", () => {
     });
     expect((screen.getByRole("textbox", { name: tr("vault.search") }) as HTMLInputElement).value).toBe("restored");
     expect((screen.getByRole("combobox", { name: tr("vault.filter.kind") }) as HTMLSelectElement).value).toBe("audio");
+  });
+
+  it("signs the small copy when there is one and the original when there is not", async () => {
+    // The whole point of the column: a 24-card page used to download every
+    // full-resolution original out of the department owner's free tier.
+    runtime.client.from.mockReturnValue(query({
+      data: [
+        { id: "a", title: "With thumb", kind: "image", storage_path: "o/a.png", thumb_path: "o/a-thumb.webp" },
+        { id: "b", title: "Without", kind: "image", storage_path: "o/b.png", thumb_path: null },
+        { id: "c", title: "A document", kind: "pdf", storage_path: "o/c.pdf", thumb_path: null },
+      ],
+      count: 3,
+    }));
+    runtime.storage.createSignedUrls.mockResolvedValue({ data: [] });
+    render(<VaultBrowser subjects={[]} currentUserId="member" />);
+    await waitFor(() => expect(runtime.storage.createSignedUrls).toHaveBeenCalled());
+    const [paths] = runtime.storage.createSignedUrls.mock.calls[0];
+    expect(paths).toEqual(["o/a-thumb.webp", "o/b.png"]);
+    // A PDF card shows an icon, so it costs no signature at all.
+    expect(paths).not.toContain("o/c.pdf");
+  });
+
+  it("filters by subject in one request instead of fetching an id list", async () => {
+    // The id list grew with the archive and would eventually overflow the
+    // request URL. The subject is a `contains` on the view's own array now.
+    window.history.replaceState({}, "", "/d/demo/vault?subject=case-a&q=budget");
+    const builder = query({ data: [], count: 0 });
+    runtime.client.from.mockReturnValue(builder);
+    render(<VaultBrowser subjects={[{ id: "case-a", name: "Case A" }]} currentUserId="member" />);
+    await waitFor(() => expect(builder.contains).toHaveBeenCalledWith("subject_ids", ["case-a"]));
+    expect(builder.textSearch).toHaveBeenCalledWith("search", "budget:*", { config: "simple" });
+    // Every table read went to the view; nothing asked file_subjects.
+    expect(runtime.client.from.mock.calls.map((c) => c[0])).not.toContain("file_subjects");
   });
 
   it("shows a failed subject lookup as an error instead of an empty archive", async () => {
@@ -295,7 +363,7 @@ describe("action refusal feedback", () => {
   });
   it("preserves the actual listing visibility when a zero-row update is refused", async () => {
     runtime.client.from.mockReturnValue(query({ data: [], error: null }));
-    render(<DepartmentRow dept={dept} />);
+    render(<DepartmentRow dept={dept} schemaVersion={1} />);
     fireEvent.click(screen.getByRole("button", { name: tr("setup.unlisted") }));
     expect((await screen.findByRole("alert")).textContent).toBe(tr("common.actionFailed"));
     expect(screen.queryByRole("button", { name: tr("setup.public") })).toBeNull();
@@ -304,7 +372,7 @@ describe("action refusal feedback", () => {
   it("lets an owner dismiss a failed deletion and try again", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ json: async () => ({ available: false, connected: false }) }));
     runtime.client.from.mockReturnValue(query({ data: [], error: null }));
-    render(<DepartmentRow dept={dept} />);
+    render(<DepartmentRow dept={dept} schemaVersion={1} />);
     fireEvent.click(screen.getByRole("button", { name: tr("delete.open") }));
     await screen.findByText(tr("delete.noOauth"));
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "demo" } });
@@ -330,15 +398,243 @@ describe("authentication and previews", () => {
     expect(screen.getByRole("alert").textContent).toBe(tr("auth.linkInvalid"));
   });
   it("provides an explicit preview retry and recovers when a fresh URL arrives", () => {
-    const view = render(<FileViewer kind="image" url={null} mimeType="image/png" title="Exhibit" />);
+    const view = render(<FileViewer kind="image" url={null} title="Exhibit" />);
     expect(screen.getByRole("alert").textContent).toBe(tr("file.previewFailed"));
     fireEvent.click(screen.getByRole("button", { name: tr("common.retry") }));
     expect(runtime.router.refresh).toHaveBeenCalledTimes(1);
-    view.rerender(<FileViewer kind="image" url="https://storage.example/old" mimeType="image/png" title="Exhibit" />);
+    view.rerender(<FileViewer kind="image" url="https://storage.example/old" title="Exhibit" />);
     fireEvent.error(screen.getByRole("img"));
     expect(screen.getByRole("alert")).toBeTruthy();
-    view.rerender(<FileViewer kind="image" url="https://storage.example/fresh" mimeType="image/png" title="Exhibit" />);
+    view.rerender(<FileViewer kind="image" url="https://storage.example/fresh" title="Exhibit" />);
     expect(screen.getByRole("img").getAttribute("src")).toBe("https://storage.example/fresh");
+  });
+  it("says what was not cleaned, not only what was", async () => {
+    // Silence about a video read as reassurance: somebody who had seen
+    // "location and camera details were removed" on a photograph had every
+    // reason to assume the same happened here. It does not.
+    render(<UploadForm userId="member" subjects={[]} />);
+    const input = document.getElementById("upload-file") as HTMLInputElement;
+    const video = new File([new Uint8Array([1])], "clip.mp4", { type: "video/mp4" });
+    Object.defineProperty(input, "files", { value: [video], configurable: true });
+    fireEvent.change(input);
+    expect((await screen.findByRole("status")).textContent).toBe(tr("upload.metadataMedia"));
+  });
+  it("says the same for a document, whose author travels with it", async () => {
+    render(<UploadForm userId="member" subjects={[]} />);
+    const input = document.getElementById("upload-file") as HTMLInputElement;
+    const pdf = new File([new Uint8Array([1])], "memo.pdf", { type: "application/pdf" });
+    Object.defineProperty(input, "files", { value: [pdf], configurable: true });
+    fireEvent.change(input);
+    expect((await screen.findByRole("status")).textContent).toBe(tr("upload.metadataDocument"));
+  });
+  it("refuses a signup whose two passwords disagree, without a round trip", () => {
+    render(<DeptLoginForm initialMode="signup" />);
+    fireEvent.change(screen.getByLabelText(tr("auth.email")), { target: { value: "a@b.test" } });
+    fireEvent.change(screen.getByLabelText(tr("auth.password")), { target: { value: "example-password" } });
+    fireEvent.change(screen.getByLabelText(tr("auth.repeatPassword")), { target: { value: "example-passwrod" } });
+    fireEvent.click(screen.getByRole("button", { name: tr("auth.signup") }));
+    expect(screen.getByRole("alert").textContent).toBe(tr("auth.passwordMismatch"));
+    expect(runtime.client.auth.signUp).not.toHaveBeenCalled();
+  });
+  it("stops asking twice once the password is on screen", () => {
+    render(<DeptLoginForm initialMode="signup" />);
+    expect(screen.getByLabelText(tr("auth.repeatPassword"))).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: tr("auth.showPassword") }));
+    // Nothing to confirm against when you can read it.
+    expect((screen.getByLabelText(tr("auth.password")) as HTMLInputElement).type).toBe("text");
+    expect(screen.queryByLabelText(tr("auth.repeatPassword"))).toBeNull();
+  });
+  it("exports the audit log as CSV that a spreadsheet cannot misread", () => {
+    const created = vi.fn().mockReturnValue("blob:audit");
+    vi.stubGlobal("URL", { ...URL, createObjectURL: created, revokeObjectURL: vi.fn() });
+    let captured = "";
+    vi.stubGlobal("Blob", class {
+      constructor(parts: string[]) { captured = parts.join(""); }
+    });
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    render(<AdminAudit entries={[{
+      id: 1, actor_id: "a", action: "file.delete", target: "one,two\nthree",
+      detail: { reason: 'said "no"' }, created_at: "2026-01-01T00:00:00Z",
+      actor_username: "=cmd|calc",
+    }]} />);
+    fireEvent.click(screen.getByRole("button", { name: tr("admin.audit.export") }));
+    // The property that matters: a comma and a newline inside a field stay
+    // inside it. Unquoted, they would shift every later column of the one
+    // record of who deleted what -- wrong in the way that still looks right.
+    expect(captured.startsWith("\ufeff")).toBe(true);
+    expect(captured.split("\r\n")).toHaveLength(2);
+    // A username starting with = is a formula to Excel and Sheets on open.
+    expect(captured).toContain(`"\'=cmd|calc"`);
+    // Every field is quoted, including the ones that did not need it.
+    expect(captured.replace(/^\ufeff/, "").split("\r\n")[0]).toBe(
+      '"when","action","actor","target","detail"'
+    );
+  });
+  it("offers suspension on an active department and lifting it on a suspended one", async () => {
+    runtime.client.rpc.mockResolvedValue({
+      data: [{
+        id: "r1", slug: "target", reporter_email: null, reason: "illegal",
+        details: "A complaint", status: "open", created_at: "2026-01-01",
+        department_status: "active",
+      }],
+      error: null,
+    });
+    render(<StaffReports />);
+    await screen.findByText("/d/target");
+    expect(screen.getByRole("button", { name: tr("staff.suspend") })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: tr("staff.unsuspend") })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: tr("staff.suspend") }));
+    await waitFor(() => expect(runtime.client.rpc).toHaveBeenCalledWith(
+      "staff_set_department_status",
+      { want_slug: "target", new_status: "suspended", note: "illegal" }
+    ));
+  });
+  it("says so rather than emptying the queue when an action is refused", async () => {
+    runtime.client.rpc.mockImplementation((fn: string) =>
+      fn === "staff_list_reports"
+        ? Promise.resolve({ data: [{
+            id: "r1", slug: "target", reporter_email: null, reason: "illegal",
+            details: null, status: "open", created_at: "2026-01-01",
+            department_status: "active",
+          }], error: null })
+        : Promise.resolve({ data: null, error: { message: "NOT_STAFF" } }));
+    render(<StaffReports />);
+    fireEvent.click(await screen.findByRole("button", { name: tr("staff.resolve") }));
+    expect((await screen.findByRole("alert")).textContent).toBe(tr("common.actionFailed"));
+    // The complaint is still on screen: a refused action must not look like
+    // one that worked.
+    expect(screen.getByText("/d/target")).toBeTruthy();
+  });
+  it("says when a tab is showing only part of what the department holds", () => {
+    // A screen that quietly lists the first 500 of 900 documents is worse than
+    // one that lists 500 and says so.
+    render(
+      <AdminPanel
+        truncated={{ files: true, reports: false, audit: false }}
+        currentUserId="admin" files={[]} reports={[]} users={[]} invites={[]}
+        subjects={[]} settings={null} audit={[]} totalBytes={0}
+      />
+    );
+    expect(screen.getByText(tr("admin.truncated"))).toBeTruthy();
+  });
+  it("does not claim a complete tab is truncated", () => {
+    render(
+      <AdminPanel
+        truncated={{ files: false, reports: false, audit: true }}
+        currentUserId="admin" files={[]} reports={[]} users={[]} invites={[]}
+        subjects={[]} settings={null} audit={[]} totalBytes={0}
+      />
+    );
+    // Opens on files, which is complete; the audit log's notice belongs to the
+    // audit tab and must not leak onto this one.
+    expect(screen.queryByText(tr("admin.truncated"))).toBeNull();
+  });
+  it("flags a department whose project reports an older schema", async () => {
+    runtime.tenantRpc.mockResolvedValue({ data: [{ schema_version: 0 }], error: null });
+    render(<DepartmentRow dept={dept} schemaVersion={1} />);
+    const badge = await screen.findByRole("link", { name: tr("account.schemaOutdated") });
+    expect(badge.getAttribute("href")).toBe("/d/demo/admin");
+  });
+  it("flags a department too old to report a schema version at all", async () => {
+    runtime.tenantRpc.mockResolvedValue({ data: [{ department_name: "Demo" }], error: null });
+    render(<DepartmentRow dept={dept} schemaVersion={1} />);
+    expect(await screen.findByRole("link", { name: tr("account.schemaOutdated") })).toBeTruthy();
+  });
+  it("leaves the badge off a current department", async () => {
+    render(<DepartmentRow dept={dept} schemaVersion={1} />);
+    await waitFor(() => expect(runtime.tenantRpc).toHaveBeenCalled());
+    expect(screen.queryByRole("link", { name: tr("account.schemaOutdated") })).toBeNull();
+  });
+  it("does not call an unreachable project out of date", async () => {
+    // "Cannot tell" is not "behind": a paused or deleted project would send
+    // the operator to their dashboard for entirely the wrong reason.
+    runtime.tenantRpc.mockRejectedValue(new Error("offline"));
+    render(<DepartmentRow dept={dept} schemaVersion={1} />);
+    await waitFor(() => expect(runtime.tenantRpc).toHaveBeenCalled());
+    expect(screen.queryByRole("link", { name: tr("account.schemaOutdated") })).toBeNull();
+  });
+  it("ends the OpenDepartment account session and leaves the account screen", async () => {
+    runtime.client.auth.signOut.mockResolvedValue({ error: null });
+    render(<AccountSignOut />);
+    fireEvent.click(screen.getByRole("button", { name: tr("nav.signout") }));
+    await waitFor(() => expect(runtime.client.auth.signOut).toHaveBeenCalledTimes(1));
+    // Anywhere but /account: the middleware would bounce that to the login
+    // screen, which is a confusing answer to having just signed out.
+    expect(runtime.router.push).toHaveBeenCalledWith("/");
+  });
+  it("says so rather than pretending when signing out of the account fails", async () => {
+    runtime.client.auth.signOut.mockResolvedValue({ error: { message: "offline" } });
+    render(<AccountSignOut />);
+    fireEvent.click(screen.getByRole("button", { name: tr("nav.signout") }));
+    expect((await screen.findByRole("alert")).textContent).toBe(tr("common.actionFailed"));
+    expect(runtime.router.push).not.toHaveBeenCalled();
+  });
+  it("refuses to erase a membership until the confirmation matches", () => {
+    render(<DeptLeaveForm username="auditmember" />);
+    fireEvent.click(screen.getByRole("button", { name: tr("leave.start") }));
+    const submit = screen.getByRole("button", { name: tr("leave.submit") }) as HTMLButtonElement;
+    expect(submit.disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText(translate("en", "leave.confirmLabel", { name: "auditmember" })),
+      { target: { value: "auditmember" } });
+    expect((screen.getByRole("button", { name: tr("leave.submit") }) as HTMLButtonElement).disabled).toBe(false);
+    expect(runtime.client.rpc).not.toHaveBeenCalled();
+  });
+  it("explains that the last administrator cannot leave, without signing them out", async () => {
+    runtime.client.rpc.mockResolvedValue({ data: null, error: { message: "LAST_ADMIN" } });
+    render(<DeptLeaveForm username="auditadmin" />);
+    fireEvent.click(screen.getByRole("button", { name: tr("leave.start") }));
+    fireEvent.change(screen.getByLabelText(translate("en", "leave.confirmLabel", { name: "auditadmin" })),
+      { target: { value: "auditadmin" } });
+    fireEvent.click(screen.getByRole("button", { name: tr("leave.submit") }));
+    expect((await screen.findByRole("alert")).textContent).toBe(tr("leave.lastAdmin"));
+    expect(runtime.client.auth.signOut).not.toHaveBeenCalled();
+  });
+  it("removes the objects a departure hands back before the session ends", async () => {
+    runtime.client.rpc.mockResolvedValue({
+      data: { files: 1, account: "deleted", storage_paths: ["me/one.png"] }, error: null,
+    });
+    runtime.storage.remove.mockResolvedValue({ error: null });
+    runtime.client.auth.signOut.mockResolvedValue({ error: null });
+    render(<DeptLeaveForm username="auditleaver" />);
+    fireEvent.click(screen.getByRole("button", { name: tr("leave.start") }));
+    fireEvent.change(screen.getByLabelText(translate("en", "leave.confirmLabel", { name: "auditleaver" })),
+      { target: { value: "auditleaver" } });
+    fireEvent.click(screen.getByRole("button", { name: tr("leave.submit") }));
+    // The member's own session is the only thing allowed to delete their
+    // folder, so the objects have to go before it ends.
+    await waitFor(() => expect(runtime.storage.remove).toHaveBeenCalledWith(["me/one.png"]));
+    await waitFor(() => expect(runtime.client.auth.signOut).toHaveBeenCalledTimes(1));
+  });
+  it("keeps a departure whose objects survived visible to the member", async () => {
+    runtime.client.rpc.mockResolvedValue({
+      data: { files: 1, account: "deleted", storage_paths: ["me/one.png"] }, error: null,
+    });
+    runtime.storage.remove.mockResolvedValue({ error: { message: "denied" } });
+    render(<DeptLeaveForm username="auditleaver" />);
+    fireEvent.click(screen.getByRole("button", { name: tr("leave.start") }));
+    fireEvent.change(screen.getByLabelText(translate("en", "leave.confirmLabel", { name: "auditleaver" })),
+      { target: { value: "auditleaver" } });
+    fireEvent.click(screen.getByRole("button", { name: tr("leave.submit") }));
+    expect((await screen.findByRole("status")).textContent).toBe(tr("leave.doneObjectsLeft"));
+    // Not signed out behind their back: the notice is for an administrator and
+    // they have to be able to read it.
+    expect(runtime.client.auth.signOut).not.toHaveBeenCalled();
+  });
+  it("renders a document in a frame that cannot run what it is served", () => {
+    // Storage returns the Content-Type the uploader supplied, so an exhibit
+    // filed as a PDF can arrive as text/html. The sandbox is what makes that
+    // inert: no allow-scripts, and no allow-same-origin to escape through.
+    const { container } = render(
+      <FileViewer kind="pdf" url="https://storage.example/exhibit.pdf" title="Exhibit" />
+    );
+    const frame = container.querySelector("iframe");
+    expect(frame).toBeTruthy();
+    const sandbox = frame!.getAttribute("sandbox") ?? "";
+    expect(sandbox.split(/\s+/)).not.toContain("allow-scripts");
+    expect(sandbox.split(/\s+/)).not.toContain("allow-same-origin");
+    // An <object> honours the response type over its own attribute, which is
+    // the element this replaced.
+    expect(container.querySelector("object")).toBeNull();
   });
   it("labels account inputs and recovers from an unexpected auth failure", async () => {
     runtime.client.auth.signInWithPassword.mockRejectedValue(new Error("offline"));

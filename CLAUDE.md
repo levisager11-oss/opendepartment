@@ -63,6 +63,47 @@ column privilege in [db/tenant-schema.sql](db/tenant-schema.sql) as well —
 (`background: var(--accent)`) and a value carrying a semicolon reparses into
 extra declarations.
 
+**`files.size_bytes` is measured, not claimed.** The object is uploaded before
+the row describing it, so `enforce_member_quota()` reads the real byte count out
+of `storage.objects` and overwrites whatever the browser said on the way in.
+Every figure drawn from that column depends on this: the per-member cap, the
+administration screen's storage meter, `admin_storage_usage()`. The lookup is
+wrapped — a project where this schema's owner cannot read `storage.objects`
+falls back to the claimed value — so do not treat a measured size as guaranteed.
+Objects uploaded without a `files` row are still outside all of it; they are
+what `admin_orphaned_objects()` lists.
+
+**An exhibit can be two objects, not one.** `files.thumb_path` holds a small
+WebP copy made in the browser at upload (`src/lib/tenant/thumbnail.ts`), so the
+vault grid stops downloading full-resolution originals out of the department
+owner's free tier. It is nullable and stays nullable — older rows, older
+schemas and every failure of the generator produce none, and a card without one
+falls back to the original. Anything that removes an exhibit has to remove
+both: `delete_file()`, `purge_department()` and `leave_department()` all return
+the full list of paths, and `admin_orphaned_objects()` excludes an object
+referenced by *either* column, or the sweep would offer every live thumbnail
+for deletion. `delete_file()` returns jsonb from schema 3 and a bare string
+before it; `deletedObjectPaths()` in `src/lib/tenant/types.ts` reads both,
+because the app always deploys before an administrator re-runs the file.
+
+**The platform's takedown queue is staff-gated in the database.**
+`staff_list_reports()`, `staff_resolve_report()` and
+`staff_set_department_status()` are `security definer` functions in the control
+plane, all re-checking `is_staff()`. The flag is `operators.is_staff`, outside
+every UPDATE grant a signed-in caller has, set by hand in the control plane's
+own SQL editor. Do not replace this with an environment variable: an env var
+can gate the screen, but `abuse_reports` is one PostgREST call away.
+
+**A member can erase their own membership.** `leave_department(confirm)` is the
+counterpart to `purge_department()` at one person's scale: it removes their
+files, comments, votes, reports, profile, e-mail row and auth user, hands the
+storage paths back for the caller to remove (same division of labour as
+`delete_file()`), and refuses the last active administrator, who would otherwise
+leave a live archive nobody can moderate. It is reached from
+`/d/<slug>/account`, the member's own page. When adding anything that stores
+something about a member, add it to that function's delete list — the tables are
+named individually rather than left to the cascade for exactly this reason.
+
 **OpenDepartment never holds a `service_role` key for any tenant.** Every
 privileged tenant operation (member listing, file deletion, owner email
 lookup, stats) is a `security definer` Postgres function inside the
@@ -89,6 +130,11 @@ authorised for a whole organisation.
 
 Consequences that show up throughout the code:
 
+- **One Supabase project backs at most one department.** Enforced by the
+  `departments_one_project` trigger in the control plane, on INSERT and on
+  UPDATE. Both values needed to point a slug at a project are public — they are
+  served to every visitor of `/d/<slug>` — so without the constraint, suspension
+  (a flag on a single row) could be undone by registering a second slug.
 - **Two cookie realms.** The control-plane session uses the default
   Supabase cookie name. Each department gets its own cookie named
   `od-<slug>` scoped to path `/d/<slug>` (see
@@ -125,6 +171,26 @@ with no platform around it. Resolved by
 *after* the real directory lookup fails.
 
 ### Schema codegen — edit the `.sql`, never the `.ts`
+
+**Every change to `db/tenant-schema.sql` must raise the version stamp at the
+bottom of that file.** Departments run the schema in their own Supabase
+projects, so a change here reaches nobody until each administrator re-runs the
+file — and the stamp is the only thing that tells them to. It records one row
+in `public.schema_version` (deny-all; `department_identity()` hands the number
+out as `security definer`), and the app compares it against
+`TENANT_SCHEMA_VERSION`, which
+[scripts/build-schema.mjs](scripts/build-schema.mjs) reads back out of the
+statement so the two cannot drift. Forget the bump and the change ships
+silently to nobody; the codegen refuses to build if the statement is missing
+altogether. The stamp is deliberately the **last** statement in the file, so a
+paste that dies halfway does not leave a row claiming the whole file ran.
+
+The notice reaches an administrator as a strip under the department header on
+every page (`SchemaNotice`), the SQL to fix it on the administration screen
+(`AdminSchema`, sent only when there is something to run — it is 73 kB), and a
+badge per row on the operator's `/account` screen. Import
+`TENANT_SCHEMA_VERSION` from server code only and pass it down as a prop: the
+constant sits in the same generated module as the whole schema text.
 
 [db/tenant-schema.sql](db/tenant-schema.sql) is the SQL the setup wizard
 shows a new department owner to paste into their own project. Vercel only

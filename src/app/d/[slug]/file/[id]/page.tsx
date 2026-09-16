@@ -11,6 +11,7 @@ import { FileMeta } from "@/components/FileMeta";
 import { T } from "@/components/T";
 import { privatePage } from "@/lib/seo";
 import {
+  SIGNED_URL_TTL,
   STORAGE_BUCKET,
   caseLabel,
   type CaseFile,
@@ -65,7 +66,7 @@ export default async function FilePage({
   // no elevated key -- the member's own session already passes storage RLS.
   const { data: signed } = await supabase.storage
     .from(STORAGE_BUCKET)
-    .createSignedUrl(file.storage_path, 3600);
+    .createSignedUrl(file.storage_path, SIGNED_URL_TTL);
 
   const [{ data: myVote, error: voteError }, { data: commentRows, error: commentsError }] = await Promise.all([
     supabase.from("votes").select("value").eq("file_id", id).maybeSingle(),
@@ -80,7 +81,7 @@ export default async function FilePage({
   // Storage's signed download option sets Content-Disposition on its origin;
   // the browser download attribute alone cannot force a cross-origin download.
   const { data: download } = signed?.signedUrl
-    ? await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(file.storage_path, 3600, { download: file.original_name })
+    ? await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(file.storage_path, SIGNED_URL_TTL, { download: file.original_name })
     : { data: null };
 
   // Admins, and only admins, see who filed the document. The check happens
@@ -170,7 +171,6 @@ export default async function FilePage({
           <FileViewer
             kind={file.kind}
             url={signed?.signedUrl ?? null}
-            mimeType={file.mime_type}
             title={file.title}
           />
         </div>

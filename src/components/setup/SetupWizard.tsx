@@ -664,6 +664,16 @@ export function SetupWizard({
         return;
       }
 
+      // One project backs one department. Unlike a taken slug this is not
+      // fixed by going back a step and picking another name -- the project
+      // coordinates are on this step, and they are the thing that has to
+      // change. The likeliest cause by far is somebody who already finished
+      // the wizard for this project coming back through it a second time.
+      if (rpcError.message.includes("PROJECT_ALREADY_REGISTERED")) {
+        setError(t("setup.projectTaken"));
+        return;
+      }
+
       setError(t("common.error"));
       return;
     }

@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n/provider";
 import { useTenant, useTenantClient } from "@/lib/tenant/context";
-import { STORAGE_BUCKET, caseLabel, formatBytes } from "@/lib/tenant/types";
+import { deletedObjectPaths, STORAGE_BUCKET, caseLabel, formatBytes } from "@/lib/tenant/types";
 import type { AdminFile } from "./types";
 
 export function AdminFiles({ files }: { files: AdminFile[] }) {
@@ -38,14 +38,19 @@ export function AdminFiles({ files }: { files: AdminFile[] }) {
     // hands back the storage path, so no service-role key is involved.
     let rowDeleted = false;
     try {
-      const { data: path, error: rpcError } = await supabase.rpc("delete_file", {
+      const { data, error: rpcError } = await supabase.rpc("delete_file", {
         target: id, why: "admin",
       });
       if (rpcError) throw rpcError;
       rowDeleted = true;
       setRemovedIds((prev) => new Set(prev).add(id));
-      if (typeof path === "string" && path) {
-        const { error: storageError } = await supabase.storage.from(STORAGE_BUCKET).remove([path]);
+      // Both objects where there are two: an exhibit's thumbnail is as
+      // readable to every member as the exhibit was.
+      const paths = deletedObjectPaths(data);
+      if (paths.length) {
+        const { error: storageError } = await supabase.storage
+          .from(STORAGE_BUCKET)
+          .remove(paths);
         if (storageError) throw storageError;
       }
     } catch {

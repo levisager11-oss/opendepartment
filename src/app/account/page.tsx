@@ -5,6 +5,9 @@ import { MarketingShell } from "@/components/MarketingShell";
 import { Seal } from "@/components/Seal";
 import { T } from "@/components/T";
 import { DepartmentRow } from "@/components/account/DepartmentRow";
+import { AccountSignOut } from "@/components/account/AccountSignOut";
+import { TENANT_SCHEMA_VERSION } from "@/lib/tenant/schema-sql.generated";
+import { StaffReports } from "@/components/account/StaffReports";
 import { privatePage } from "@/lib/seo";
 
 export const metadata = privatePage("Your departments", { path: "/account" });
@@ -23,6 +26,12 @@ export default async function AccountPage() {
   // department's own project knows the current one. Both values are public by
   // design -- they are already handed to every visitor of /d/<slug> -- and
   // departments_read_own means an operator only ever sees their own.
+  // Whether this account moderates the platform. Asked here so the section
+  // below is not rendered at all for the people it would only ever show an
+  // error to -- the authority itself is is_staff() inside the database, which
+  // every one of that component's calls re-checks.
+  const { data: staff } = await supabase.rpc("is_staff");
+
   const { data: departments, error } = await supabase
     .from("departments")
     .select(
@@ -33,7 +42,7 @@ export default async function AccountPage() {
 
   return (
     <MarketingShell wide>
-      <div className="mb-8 flex flex-wrap items-center gap-4">
+      <div className="mb-2 flex flex-wrap items-center gap-4">
         <h1 className="font-serif text-2xl font-black break-words text-ink-900 sm:text-3xl">
           <T k="account.title" />
         </h1>
@@ -43,6 +52,15 @@ export default async function AccountPage() {
         >
           <T k="od.create" />
         </Link>
+      </div>
+
+      {/* Under the heading rather than in the shell's navigation: this is the
+          only screen the control-plane session is used from, and a sign-out in
+          the marketing header would offer itself to every reader who has no
+          account at all. */}
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-2">
+        <p className="typewriter text-xs break-all text-ink-500">{user.email}</p>
+        <AccountSignOut />
       </div>
 
       {!departments || departments.length === 0 ? (
@@ -55,10 +73,16 @@ export default async function AccountPage() {
       ) : (
         <ul className="space-y-3">
           {departments.map((dept) => (
-            <DepartmentRow key={dept.slug} dept={dept} />
+            <DepartmentRow
+              key={dept.slug}
+              dept={dept}
+              schemaVersion={TENANT_SCHEMA_VERSION}
+            />
           ))}
         </ul>
       )}
+
+      {staff === true && <StaffReports />}
     </MarketingShell>
   );
 }

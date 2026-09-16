@@ -63,10 +63,10 @@ const CONTROL_PUBLIC = ["/account/login", "/account/auth"];
  *
  * `'strict-dynamic'` means the host allowlist in script-src is ignored by
  * browsers that understand it: nothing runs unless it carries this request's
- * nonce or was loaded by something that did. The Ko-fi widget still works,
- * because it is injected by KofiButton -- an already-trusted script -- rather
- * than by a tag in the HTML. Its host stays in the list for older browsers,
- * which ignore 'strict-dynamic' and fall back to the allowlist.
+ * nonce or was loaded by something that did. There is no third-party host in
+ * script-src at all now -- the Ko-fi widget script is gone, and KofiButton is
+ * a plain link -- so an older browser falling back to the allowlist gets the
+ * same answer as a current one rather than a wider one.
  *
  * style-src keeps 'unsafe-inline'. Next emits inline styles, and the accent
  * colour reaches the page as a style ATTRIBUTE (`style={{ "--accent": ... }}`),
@@ -80,11 +80,13 @@ const SUPABASE = "https://*.supabase.co https://*.supabase.in";
 function contentSecurityPolicy(nonce: string): string {
   return [
     `default-src 'self'`,
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://storage.ko-fi.com`,
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
     `style-src 'self' 'unsafe-inline'`,
-    `img-src 'self' data: blob: ${SUPABASE} https://storage.ko-fi.com https://cdn.ko-fi.com`,
+    `img-src 'self' data: blob: ${SUPABASE}`,
     `media-src 'self' blob: ${SUPABASE}`,
-    `object-src 'self' ${SUPABASE}`,
+    // No <object> anywhere any more: the document viewer is a sandboxed
+    // iframe, so this can be the value that stops plugin documents outright.
+    `object-src 'none'`,
     `frame-src 'self' ${SUPABASE}`,
     `connect-src 'self' ${SUPABASE}`,
     `font-src 'self' data:`,

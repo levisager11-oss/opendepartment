@@ -8,6 +8,7 @@ import { useI18n } from "@/lib/i18n/provider";
 import { useTenant, useTenantClient } from "@/lib/tenant/context";
 import { KindIcon } from "@/components/KindIcon";
 import { scrubImage } from "@/lib/tenant/scrub";
+import { makeThumbnail } from "@/lib/tenant/thumbnail";
 import {
   ACCEPTED_MIME,
   STORAGE_BUCKET,
@@ -66,10 +67,25 @@ export function UploadForm({
     id: string;
     subjectIds: string[];
   } | null>(null);
-  /** What happened to the picture's metadata, so the form can say. */
-  const [scrubNote, setScrubNote] = useState<"stripped" | "unsupported" | null>(
-    null
-  );
+  /**
+   * What happened to this file's metadata, so the form can say -- and say it
+   * per kind rather than only when there is good news.
+   *
+   * Only images are scrubbed, and only some of those. The form used to be
+   * silent about everything else, which read as reassurance: somebody who had
+   * seen "location and camera details were removed" on a photograph had every
+   * reason to assume a video got the same treatment. It does not. A video
+   * carries the device and often where it was recorded, and a PDF carries
+   * whoever authored it and on what -- neither is strippable in a browser
+   * without re-encoding the file, which is not a thing to do to somebody's
+   * document behind their back.
+   *
+   * So the note says which of those happened. Being told what was NOT cleaned
+   * is the half that changes what a person does next.
+   */
+  const [scrubNote, setScrubNote] = useState<
+    "stripped" | "unsupported" | "document" | "media" | null
+  >(null);
 
   useEffect(() => () => {
     if (preview) URL.revokeObjectURL(preview);
@@ -111,8 +127,13 @@ export function UploadForm({
     if (ticket !== selectionRequest.current) return;
     setPreparing(false);
     const chosen = scrubbed.file;
+    const chosenKind = kindFromMime(chosen.type);
     if (scrubbed.scrubbed) setScrubNote("stripped");
     else if (scrubbed.unsupported) setScrubNote("unsupported");
+    else if (chosenKind === "pdf") setScrubNote("document");
+    else if (chosenKind === "video" || chosenKind === "audio") {
+      setScrubNote("media");
+    }
 
     setFile(chosen);
     if (!title) setTitle(chosen.name.replace(/\.[^.]+$/, ""));
@@ -163,17 +184,47 @@ export function UploadForm({
     try {
       if (!saved) {
         if (!write) {
-          const path = `${userId}/${crypto.randomUUID()}-${sanitiseName(file.name)}`;
+          const stem = `${userId}/${crypto.randomUUID()}`;
+          const path = `${stem}-${sanitiseName(file.name)}`;
           const { error: uploadError } = await supabase.storage
             .from(STORAGE_BUCKET)
             .upload(path, file, { contentType: file.type, upsert: false });
           if (uploadError) throw uploadError;
+
+          /**
+           * The small copy, after the original is safely stored.
+           *
+           * Deliberately in that order and deliberately swallowed: a
+           * thumbnail is an optimisation on how the vault grid loads, and no
+           * failure to make or store one may cost somebody the document they
+           * came here to file. Every failure below leaves thumb_path null,
+           * and a card with no thumbnail falls back to the original -- which
+           * is what every card did before this existed.
+           */
+          let thumbPath: string | null = null;
+          try {
+            const thumb = await makeThumbnail(file);
+            if (thumb) {
+              const candidate = `${stem}-thumb.webp`;
+              const { error: thumbError } = await supabase.storage
+                .from(STORAGE_BUCKET)
+                .upload(candidate, thumb.blob, {
+                  contentType: "image/webp",
+                  upsert: false,
+                });
+              if (!thumbError) thumbPath = candidate;
+            }
+          } catch {
+            // Nothing to say and nothing to do: file the document.
+          }
+
           write = { path, subjectIds: Array.from(picked), record: {
             owner_id: userId,
             title: title.trim().slice(0, 200),
             description: description.trim().slice(0, 2000) || null,
             category,
             storage_path: path,
+            thumb_path: thumbPath,
             original_name: file.name.slice(0, 200),
             mime_type: file.type,
             size_bytes: file.size,
@@ -201,7 +252,13 @@ export function UploadForm({
               // A transport failure is not proof the INSERT failed. Preserve
               // bytes on an uncertain read; a later retry uses this same path.
               if (!readError && /^[0-9A-Z]{5}$/.test(insertError?.code ?? "")) {
-                await supabase.storage.from(STORAGE_BUCKET).remove([write.path]);
+                // Both objects: abandoning the original and leaving its
+                // thumbnail behind creates an orphan nothing will ever point
+                // at, for an upload that never happened.
+                const abandon = [write.path];
+                const thumb = write.record.thumb_path;
+                if (typeof thumb === "string") abandon.push(thumb);
+                await supabase.storage.from(STORAGE_BUCKET).remove(abandon);
                 setPendingFile(null);
                 write = null;
               }
@@ -345,13 +402,21 @@ export function UploadForm({
           <p
             role="status"
             className={`notice text-xs ${
-              scrubNote === "stripped" ? "notice-ok" : "notice-error"
+              scrubNote === "stripped"
+                ? "notice-ok"
+                : scrubNote === "unsupported"
+                  ? "notice-error"
+                  : ""
             }`}
           >
             {t(
               scrubNote === "stripped"
                 ? "upload.metadataStripped"
-                : "upload.metadataUnsupported"
+                : scrubNote === "unsupported"
+                  ? "upload.metadataUnsupported"
+                  : scrubNote === "document"
+                    ? "upload.metadataDocument"
+                    : "upload.metadataMedia"
             )}
           </p>
         )}

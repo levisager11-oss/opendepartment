@@ -39,6 +39,43 @@ export const dictionary = {
     "common.and": "and",
     "setup.tooMany":
       "You have reached the maximum of 3 departments for one account. Remove one under Your departments first.",
+    "admin.audit.export": "Export CSV",
+    "admin.truncated":
+      "Showing the most recent entries only. This department holds more than this screen lists -- read the rest in your project's Supabase dashboard.",
+    "schema.badge": "UPDATE AVAILABLE",
+    "schema.notice":
+      "This department runs schema version {current}. Version {expected} is available.",
+    "schema.noticeUnknown":
+      "This department runs a schema older than version {expected}, from before departments recorded their version.",
+    "schema.title": "DATABASE SCHEMA OUT OF DATE",
+    "schema.body":
+      "This department is on schema version {current}; the current one is {expected}. New features and security fixes reach a department only when its own Supabase project runs the current file -- OpenDepartment holds no key to do it for you.",
+    "schema.bodyUnknown":
+      "This department is on a schema from before departments recorded their version; the current one is {expected}. New features and security fixes reach a department only when its own Supabase project runs the current file -- OpenDepartment holds no key to do it for you.",
+    "schema.step1": "Copy the SQL below.",
+    "schema.step2":
+      "Open your project's Supabase dashboard, then SQL Editor, then New query.",
+    "schema.step3": "Paste it, run it, and reload this page.",
+    "schema.safe":
+      "Safe to run on a live department: it keeps your settings, members, documents and invite codes, and does not reopen a claimed department to a new founder.",
+    "schema.howTo": "How to update",
+    "staff.title": "Abuse reports",
+    "staff.filter": "Show reports with status",
+    "staff.status.open": "Open",
+    "staff.status.resolved": "Resolved",
+    "staff.status.dismissed": "Dismissed",
+    "staff.none": "Nothing to answer.",
+    "staff.resolve": "Mark resolved",
+    "staff.dismiss": "Dismiss",
+    "staff.suspend": "Suspend department",
+    "staff.unsuspend": "Lift suspension",
+    "staff.suspended": "SUSPENDED",
+    "staff.gone": "no longer listed",
+    "staff.scope":
+      "Suspending stops the slug resolving here. It does not touch the department's own database -- OpenDepartment holds no key to it, so the contents remain entirely with whoever runs that department.",
+    "account.schemaOutdated": "Schema update available",
+    "setup.projectTaken":
+      "That Supabase project already backs a department on this platform. One project holds one archive -- check Your departments, or create a second Supabase project for this one.",
     "setup.next1":
       "Use the private founder link below to create your administrator account. Keep this link to yourself until signup is complete.",
     "setup.next2":
@@ -112,7 +149,7 @@ export const dictionary = {
     "settings.categoriesEmpty": "Keep at least one category.",
     "settings.memberQuota": "Storage per member",
     "settings.memberQuotaHint":
-      "Megabytes recorded for one member's documents. Leave empty for no limit. This checks archive records; it is not a storage or billing cap. Direct uploads and leftover objects can exceed it. Monitor actual usage in Supabase.",
+      "Megabytes one member's documents may occupy. Leave empty for no limit. Measured from the files themselves, not from what the uploader claimed. It still cannot see objects uploaded without being filed as a document -- those show up under Storage as unreferenced, an hour after upload.",
     "settings.memberQuotaNone": "No limit",
     "settings.quotaInvalid":
       "Storage per member must be a whole number of megabytes, or empty for no limit.",
@@ -131,7 +168,7 @@ export const dictionary = {
       "Megabytes, up to {cap}. Your storage bucket is resized to match when you save.",
     "settings.operator": "Who runs this department",
     "settings.operatorHint":
-      "Shown in the footer. The person named here is the one answerable for what is in the archive, which is the point of naming them.",
+      "Shown in the footer and on this department's imprint, which anybody can read without an account -- an imprint only members can see is not an imprint. So treat the contact as public: it is reachable by anyone who knows the address, and can be collected automatically. A role address is usually the better answer to that than a private one.",
     "settings.operatorName": "Name",
     "settings.operatorContact": "Contact",
     "settings.nameRequired": "A department needs a name.",
@@ -241,7 +278,7 @@ export const dictionary = {
     "od.directory": "Public departments",
     "od.directoryEmpty": "No department has made itself public yet.",
     "od.directoryNote":
-      "These are archives whose owners chose to be listed. Most departments are unlisted and reachable only by invitation.",
+      "These are archives whose owners chose to be listed. Most departments are not here: they are unlisted, and joining one needs an invite code from whoever runs it.",
 
     // --- setup wizard ---------------------------------------------------
     // --- one-click setup (only when this deployment registered an OAuth app)
@@ -383,9 +420,9 @@ export const dictionary = {
     "setup.done": "Your department is live",
     "setup.openDept": "Open your department",
     "setup.visibility": "Listing",
-    "setup.unlisted": "Unlisted -- reachable only with the link",
+    "setup.unlisted": "Unlisted -- kept out of the directory",
     "setup.unlistedHelp":
-      "Nobody finds it by browsing, and nobody joins without an invite code you hand out.",
+      "Nobody finds it by browsing and nobody joins without an invite code you hand out. It is not a secret address, though: the name has to be checked against every other one before it can be given to you, so somebody guessing names can find out that yours is taken. What is behind the door is what the invite code protects.",
     "setup.public": "Public -- listed in the directory",
     "setup.publicHelp":
       "Listed in the directory, and anybody who opens it can create an account without a code.",
@@ -517,6 +554,8 @@ export const dictionary = {
     "auth.updateBody":
       "You arrived here from a reset link, so you are signed in for the moment. Pick a new password before you go any further.",
     "auth.newPassword": "New password",
+    "auth.showPassword": "Show",
+    "auth.hidePassword": "Hide",
     "auth.repeatPassword": "Repeat it",
     "auth.passwordMismatch": "Those two do not match.",
     "auth.updateSubmit": "Set the password",
@@ -534,6 +573,29 @@ export const dictionary = {
     "onboarding.placeholder": "e.g. DEEP_THROAT",
     "onboarding.rules": "3-20 characters. Letters, digits, underscore and dash.",
     "onboarding.submit": "Confirm identity",
+
+    "member.title": "Your membership",
+    "member.body":
+      "What this department knows about you, and how to end it. This page covers this department only -- leaving here changes nothing about any other archive you belong to.",
+    "member.identity": "ON RECORD",
+    "member.username": "Filed as",
+    "member.email": "Address on file",
+    "member.emailNote":
+      "Your address is visible to this department's administrators and to nobody else. It is never shown beside your documents or comments.",
+    "member.changePassword": "Change password",
+    "leave.title": "LEAVE THIS DEPARTMENT",
+    "leave.body":
+      "Erases your membership and everything filed under it: your documents, your comments, your votes, your address and this account. It cannot be undone, and an administrator cannot restore it. The audit log keeps the date you left.",
+    "leave.start": "Leave this department",
+    "leave.confirmLabel": "Type {name} to confirm",
+    "leave.submit": "Erase my membership",
+    "leave.mismatch": "That does not match. Type it exactly as shown.",
+    "leave.lastAdmin":
+      "You are this department's only administrator. Promote somebody else first, or erase the whole department under Administration.",
+    "leave.unavailable":
+      "This department has not installed the schema update that makes leaving possible. Ask its administrator to re-run the setup SQL.",
+    "leave.doneObjectsLeft":
+      "Your membership is erased, but some of your uploaded files could not be removed from storage. Tell this department's administrator: they can clear them under Administration, Storage.",
     "onboarding.taken": "That name is already assigned to another operative.",
     "onboarding.invalid":
       "Invalid name. Use 3-20 letters, digits, underscores or dashes.",
@@ -617,6 +679,10 @@ export const dictionary = {
     "upload.errorType": "That file type is not accepted.",
     "upload.errorQuota":
       "You have reached the storage limit for this department. Delete something you filed earlier, or ask an administrator to raise the limit.",
+    "upload.metadataDocument":
+      "PDFs are uploaded exactly as they are. This one may name whoever wrote it, the software that made it and when -- none of which is removed here. Check the document's own properties first if that matters.",
+    "upload.metadataMedia":
+      "Video and audio are uploaded exactly as they are. Recordings often carry the device and sometimes where they were made -- none of which is removed here. Strip it before uploading if that matters.",
     "upload.metadataStripped":
       "Location and camera details were removed from this image before upload.",
     "upload.metadataUnsupported":
@@ -762,6 +828,43 @@ export const dictionary = {
     "common.and": "und",
     "setup.tooMany":
       "Sie haben das Maximum von 3 Departementen pro Konto erreicht. Entfernen Sie zuerst eines unter «Ihre Departemente».",
+    "admin.audit.export": "Export CSV",
+    "admin.truncated":
+      "Es werden nur die neuesten Einträge angezeigt. Dieses Departement enthält mehr, als diese Ansicht auflistet -- den Rest sehen Sie im Supabase-Dashboard Ihres Projekts.",
+    "schema.badge": "AKTUALISIERUNG VERFÜGBAR",
+    "schema.notice":
+      "Dieses Departement läuft mit Schema-Version {current}. Version {expected} ist verfügbar.",
+    "schema.noticeUnknown":
+      "Dieses Departement läuft mit einem Schema älter als Version {expected}, aus der Zeit vor der Versionserfassung.",
+    "schema.title": "DATENBANKSCHEMA VERALTET",
+    "schema.body":
+      "Dieses Departement hat Schema-Version {current}; aktuell ist {expected}. Neue Funktionen und Sicherheitskorrekturen erreichen ein Departement erst, wenn sein eigenes Supabase-Projekt die aktuelle Datei ausführt -- OpenDepartment besitzt keinen Schlüssel, um das für Sie zu tun.",
+    "schema.bodyUnknown":
+      "Dieses Departement hat ein Schema aus der Zeit vor der Versionserfassung; aktuell ist {expected}. Neue Funktionen und Sicherheitskorrekturen erreichen ein Departement erst, wenn sein eigenes Supabase-Projekt die aktuelle Datei ausführt -- OpenDepartment besitzt keinen Schlüssel, um das für Sie zu tun.",
+    "schema.step1": "Kopieren Sie das SQL unten.",
+    "schema.step2":
+      "Öffnen Sie das Supabase-Dashboard Ihres Projekts, dann «SQL Editor», dann «New query».",
+    "schema.step3": "Einfügen, ausführen und diese Seite neu laden.",
+    "schema.safe":
+      "Für ein laufendes Departement unbedenklich: Einstellungen, Mitglieder, Dokumente und Einladungscodes bleiben erhalten, und ein bereits beanspruchtes Departement wird nicht für eine neue Gründung geöffnet.",
+    "schema.howTo": "Anleitung",
+    "staff.title": "Missbrauchsmeldungen",
+    "staff.filter": "Meldungen anzeigen mit Status",
+    "staff.status.open": "Offen",
+    "staff.status.resolved": "Erledigt",
+    "staff.status.dismissed": "Abgewiesen",
+    "staff.none": "Nichts zu bearbeiten.",
+    "staff.resolve": "Als erledigt markieren",
+    "staff.dismiss": "Abweisen",
+    "staff.suspend": "Departement sperren",
+    "staff.unsuspend": "Sperre aufheben",
+    "staff.suspended": "GESPERRT",
+    "staff.gone": "nicht mehr eingetragen",
+    "staff.scope":
+      "Eine Sperre verhindert, dass die Adresse hier noch auflöst. Sie berührt die Datenbank des Departements nicht -- OpenDepartment besitzt dafür keinen Schlüssel; die Inhalte bleiben vollständig bei der verantwortlichen Stelle.",
+    "account.schemaOutdated": "Schema-Aktualisierung verfügbar",
+    "setup.projectTaken":
+      "Dieses Supabase-Projekt gehört bereits zu einem Departement auf dieser Plattform. Ein Projekt trägt ein Archiv -- prüfen Sie «Ihre Departemente» oder legen Sie für dieses ein zweites Supabase-Projekt an.",
     "setup.next1":
       "Erstellen Sie Ihr Administrationskonto über den privaten Gründerlink unten. Behalten Sie diesen Link bis zum Abschluss der Registrierung für sich.",
     "setup.next2":
@@ -836,7 +939,7 @@ export const dictionary = {
     "settings.categoriesEmpty": "Behalten Sie mindestens eine Kategorie.",
     "settings.memberQuota": "Speicher pro Mitglied",
     "settings.memberQuotaHint":
-      "Megabyte, die für die Dokumente eines Mitglieds erfasst sind. Leer lassen für kein Limit. Dies prüft Archiveinträge und begrenzt weder den tatsächlichen Speicher noch die Kosten. Direkte Uploads und zurückgebliebene Objekte können das Limit überschreiten. Prüfen Sie die Nutzung in Supabase.",
+      "Megabyte, die die Dokumente eines Mitglieds belegen dürfen. Leer lassen für kein Limit. Gemessen an den Dateien selbst, nicht an den Angaben beim Hochladen. Objekte, die ohne Dokumenteintrag hochgeladen werden, sieht das Limit weiterhin nicht -- diese erscheinen eine Stunde später unter «Speicher» als nicht zugeordnet.",
     "settings.memberQuotaNone": "Kein Limit",
     "settings.quotaInvalid":
       "Speicher pro Mitglied muss eine ganze Zahl in Megabyte sein oder leer für kein Limit.",
@@ -855,7 +958,7 @@ export const dictionary = {
       "Megabyte, höchstens {cap}. Ihr Storage-Bucket wird beim Speichern entsprechend angepasst.",
     "settings.operator": "Wer dieses Departement betreibt",
     "settings.operatorHint":
-      "Erscheint im Fussbereich. Die hier genannte Person verantwortet den Inhalt des Archivs -- genau darum wird sie genannt.",
+      "Erscheint im Fussbereich und im Impressum dieses Departements, das ohne Konto lesbar ist -- ein Impressum, das nur Mitglieder sehen, ist keines. Behandeln Sie den Kontakt daher als öffentlich: Er ist für alle erreichbar, die die Adresse kennen, und lässt sich automatisiert sammeln. Eine Funktionsadresse ist dafür meist die bessere Antwort als eine private.",
     "settings.operatorName": "Name",
     "settings.operatorContact": "Kontakt",
     "settings.nameRequired": "Ein Departement braucht einen Namen.",
@@ -967,7 +1070,7 @@ export const dictionary = {
     "od.directory": "Öffentliche Departemente",
     "od.directoryEmpty": "Noch kein Departement hat sich öffentlich gelistet.",
     "od.directoryNote":
-      "Dies sind Archive, deren Administration eine Listung gewählt hat. Die meisten Departemente sind nicht gelistet und nur auf Einladung erreichbar.",
+      "Dies sind Archive, deren Administration eine Listung gewählt hat. Die meisten Departemente stehen nicht hier: Sie sind nicht gelistet, und für den Beitritt braucht es einen Einladungscode der verantwortlichen Stelle.",
 
     // --- setup wizard ---------------------------------------------------
     // --- Ein-Klick-Einrichtung (nur mit registrierter OAuth-App) ---------
@@ -1109,9 +1212,9 @@ export const dictionary = {
     "setup.done": "Ihr Departement ist online",
     "setup.openDept": "Departement öffnen",
     "setup.visibility": "Listung",
-    "setup.unlisted": "Nicht gelistet -- nur mit dem Link erreichbar",
+    "setup.unlisted": "Nicht gelistet -- nicht im Verzeichnis",
     "setup.unlistedHelp":
-      "Niemand findet es beim Stöbern, und niemand tritt ohne einen von Ihnen verteilten Einladungscode bei.",
+      "Niemand findet es beim Stöbern, und niemand tritt ohne einen von Ihnen verteilten Einladungscode bei. Die Adresse ist aber nicht geheim: Der Name muss gegen alle anderen geprüft werden, bevor er vergeben werden kann, also lässt sich durch Raten herausfinden, dass Ihrer belegt ist. Was hinter der Tür liegt, schützt der Einladungscode.",
     "setup.public": "Öffentlich -- im Verzeichnis gelistet",
     "setup.publicHelp":
       "Im Verzeichnis gelistet, und wer es öffnet, kann ohne Code ein Konto erstellen.",
@@ -1237,6 +1340,8 @@ export const dictionary = {
     "auth.updateBody":
       "Sie sind über einen Link zum Zurücksetzen hierhergekommen und deshalb vorläufig angemeldet. Wählen Sie zuerst ein neues Passwort.",
     "auth.newPassword": "Neues Passwort",
+    "auth.showPassword": "Anzeigen",
+    "auth.hidePassword": "Verbergen",
     "auth.repeatPassword": "Wiederholen",
     "auth.passwordMismatch": "Die beiden stimmen nicht überein.",
     "auth.updateSubmit": "Passwort setzen",
@@ -1255,6 +1360,29 @@ export const dictionary = {
     "onboarding.rules":
       "3-20 Zeichen. Buchstaben, Ziffern, Unterstrich und Bindestrich.",
     "onboarding.submit": "Identität bestätigen",
+
+    "member.title": "Ihre Mitgliedschaft",
+    "member.body":
+      "Was dieses Departement über Sie weiss und wie Sie das beenden. Diese Seite betrifft nur dieses Departement -- ein Austritt hier ändert nichts an anderen Archiven, denen Sie angehören.",
+    "member.identity": "AKTENKUNDIG",
+    "member.username": "Geführt als",
+    "member.email": "Hinterlegte Adresse",
+    "member.emailNote":
+      "Ihre Adresse sehen nur die Administratoren dieses Departements und sonst niemand. Sie erscheint nie neben Ihren Dokumenten oder Kommentaren.",
+    "member.changePassword": "Passwort ändern",
+    "leave.title": "DIESES DEPARTEMENT VERLASSEN",
+    "leave.body":
+      "Löscht Ihre Mitgliedschaft und alles, was darunter abgelegt ist: Ihre Dokumente, Ihre Kommentare, Ihre Stimmen, Ihre Adresse und dieses Konto. Das lässt sich nicht rückgängig machen, auch nicht durch die Administration. Im Protokoll bleibt das Datum Ihres Austritts.",
+    "leave.start": "Departement verlassen",
+    "leave.confirmLabel": "Tippen Sie zur Bestätigung {name}",
+    "leave.submit": "Mitgliedschaft löschen",
+    "leave.mismatch": "Das stimmt nicht überein. Tippen Sie es genau wie angegeben.",
+    "leave.lastAdmin":
+      "Sie sind die einzige Administration dieses Departements. Ernennen Sie zuerst jemanden anderen oder löschen Sie unter «Verwaltung» das ganze Departement.",
+    "leave.unavailable":
+      "Dieses Departement hat die Schema-Aktualisierung für den Austritt noch nicht eingespielt. Bitten Sie die Administration, das Einrichtungs-SQL erneut auszuführen.",
+    "leave.doneObjectsLeft":
+      "Ihre Mitgliedschaft ist gelöscht, einzelne hochgeladene Dateien konnten aber nicht aus dem Speicher entfernt werden. Melden Sie das der Administration dieses Departements: Sie kann sie unter «Verwaltung», «Speicher» bereinigen.",
     "onboarding.taken": "Dieser Name ist bereits vergeben.",
     "onboarding.invalid":
       "Ungültiger Name. Verwenden Sie 3-20 Buchstaben, Ziffern, Unterstriche oder Bindestriche.",
@@ -1339,6 +1467,10 @@ export const dictionary = {
     "upload.errorType": "Dieser Dateityp wird nicht akzeptiert.",
     "upload.errorQuota":
       "Sie haben das Speicherlimit dieses Departements erreicht. Löschen Sie etwas Früheres oder bitten Sie eine Administratorin, das Limit zu erhöhen.",
+    "upload.metadataDocument":
+      "PDFs werden unverändert hochgeladen. Dieses kann festhalten, wer es verfasst hat, mit welcher Software und wann -- nichts davon wird hier entfernt. Prüfen Sie nötigenfalls zuerst die Dokumenteigenschaften.",
+    "upload.metadataMedia":
+      "Video und Audio werden unverändert hochgeladen. Aufnahmen enthalten oft das Gerät und teils den Aufnahmeort -- nichts davon wird hier entfernt. Entfernen Sie es nötigenfalls vor dem Hochladen.",
     "upload.metadataStripped":
       "Standort- und Kameradaten wurden vor dem Hochladen aus diesem Bild entfernt.",
     "upload.metadataUnsupported":

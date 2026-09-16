@@ -51,6 +51,10 @@ export function DeptHeader({
       ]
     : [];
 
+  // The signed-in name is the link to the member's own page, on both layouts.
+  // Nothing else in the header is a natural home for it, and a person looking
+  // for their own settings looks at their own name first.
+
   return (
     <header className="masthead gov-rule sticky top-0 z-40 shadow-lg">
       <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:gap-4">
@@ -118,16 +122,19 @@ export function DeptHeader({
 
           {signedIn && (
             <div className="hidden items-center gap-3 border-l border-white/15 pl-4 md:flex">
-              <span className="text-right leading-tight">
+              <Link
+                href={href("account")}
+                className="text-right leading-tight transition-opacity hover:opacity-80"
+              >
                 <span className="block text-3xs uppercase tracking-wider text-gov-100/50">
                   {t("nav.signedInAs")}
                 </span>
                 <span
-                  className="typewriter block text-sm text-accent"
+                  className="typewriter block text-sm text-accent underline-offset-2 hover:underline"
                 >
                   {username ?? "—"}
                 </span>
-              </span>
+              </Link>
               <button
                 type="button"
                 onClick={signOut}
@@ -188,14 +195,18 @@ export function DeptHeader({
               );
             })}
             <div className="flex items-center justify-between gap-3 py-2">
-              <span className="min-w-0 truncate leading-tight">
+              <Link
+                href={href("account")}
+                onClick={() => setMenuOpen(false)}
+                className="min-w-0 truncate leading-tight"
+              >
                 <span className="block text-3xs uppercase tracking-wider text-gov-100/50">
                   {t("nav.signedInAs")}
                 </span>
-                <span className="typewriter block truncate text-sm text-accent">
+                <span className="typewriter block truncate text-sm text-accent underline underline-offset-2">
                   {username ?? "—"}
                 </span>
-              </span>
+              </Link>
               <button
                 type="button"
                 onClick={signOut}

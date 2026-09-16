@@ -63,6 +63,43 @@ create table if not exists public.department_bootstrap (
 alter table public.department_bootstrap enable row level security;
 revoke all on public.department_bootstrap from anon, authenticated;
 
+-- ---------------------------------------------------------------------------
+-- Which version of this file has actually been run here.
+--
+-- Re-running this file is the documented way a department picks up a change,
+-- and until now nothing anywhere could tell whether one had. The app found out
+-- the way its users did: by calling something and getting back
+-- `function public.leave_department(unknown) does not exist`, one feature at a
+-- time, with a string in the interface apologising for it. Meanwhile a fix to
+-- a policy -- the kind of change that is the whole reason this file is
+-- versioned at all -- produces no symptom to notice, because nothing calls it.
+--
+-- So the file records what it is, and the app compares. One row, like
+-- `settings`: this is a fact about the installation, not a history of it, and
+-- a department that has re-run the file eleven times does not need eleven rows
+-- saying so. `applied_at` is the last time it was run.
+--
+-- WRITTEN AT THE END OF THIS FILE, not here. A paste into the SQL editor that
+-- fails halfway -- a permissions error, a closed browser, a statement a
+-- restricted session refuses -- must not leave behind a row claiming the whole
+-- file ran. Declaring the table early and stamping it last means the version
+-- is only ever recorded by a run that reached the bottom.
+--
+-- Deny-all, like `department_bootstrap` and `file_views`: RLS on with no
+-- policy and no grants. Nothing reads this over the API directly --
+-- department_identity() hands it out as `security definer`, which is also what
+-- lets the front door read it without a session -- and nothing but this file
+-- should ever write it. A version somebody can set by hand is a version that
+-- says whatever they wanted to be true.
+-- ---------------------------------------------------------------------------
+create table if not exists public.schema_version (
+  id         boolean primary key default true check (id),
+  version    integer not null,
+  applied_at timestamptz not null default now()
+);
+alter table public.schema_version enable row level security;
+revoke all on public.schema_version from anon, authenticated;
+
 -- A department created before open_join existed has a settings table without
 -- it, and the `if not exists` above leaves such a table alone. Re-running this
 -- file is the supported way to pick up a schema change, so add the column
@@ -278,10 +315,11 @@ alter table public.files
        'audio/wav','audio/x-wav','audio/webm','audio/ogg'))
   ) not valid;
 
--- size_bytes is whatever the browser said it was -- the real bytes are in
--- storage, which enforces the bucket's own limit. A lying value here only
--- distorts the "storage used" figure on the administration screen, but there
--- is no reason to accept a negative or absurd one.
+-- size_bytes is measured from storage.objects by enforce_member_quota() on the
+-- way in, so this is a bound on what may be stored rather than on what may be
+-- claimed. It stays because the measurement is allowed to fail -- a project
+-- where this schema's owner cannot read storage.objects falls back to the
+-- browser's number, and there is no reason to accept a negative or absurd one.
 alter table public.files drop constraint if exists files_size_sane;
 alter table public.files
   add constraint files_size_sane
@@ -299,6 +337,44 @@ alter table public.files
   add constraint files_path_is_owners
   check (split_part(storage_path, '/', 1) = owner_id::text) not valid;
 
+-- ---------------------------------------------------------------------------
+-- The small copy of a picture.
+--
+-- A vault page shows twenty-four cards, and every one of them used to be the
+-- ORIGINAL: a signed URL to the full-resolution object, scaled down by the
+-- browser after it had all arrived. Twenty-four twenty-megabyte scans is
+-- roughly half a gigabyte of egress, per visitor, per page, out of the free
+-- tier the department's own owner is paying for -- and the owner is the person
+-- who finds out, by way of an archive that stops loading.
+--
+-- The thumbnail is made in the browser at upload time, next to the metadata
+-- scrubbing that is already there, so it costs the platform nothing and the
+-- bytes still go straight to the owner's bucket.
+--
+-- Nullable on purpose, and it stays nullable. Documents filed before this
+-- existed have none, a department that has not re-run this file has none, and
+-- the generator is allowed to fail -- a browser that cannot encode WebP, an
+-- image too large to decode, a refused second upload. Every one of those ends
+-- with a card that falls back to the original, which is exactly what it did
+-- before. A thumbnail is an optimisation, so it may never be a precondition.
+--
+-- Same folder rule as storage_path, for the same reason: the delete and purge
+-- paths hand this back to the caller to remove, and a row pointing at somebody
+-- else's object should not be able to nominate it for deletion.
+-- ---------------------------------------------------------------------------
+alter table public.files add column if not exists thumb_path text;
+
+alter table public.files drop constraint if exists files_thumb_is_owners;
+alter table public.files
+  add constraint files_thumb_is_owners check (
+    thumb_path is null
+    or (split_part(thumb_path, '/', 1) = owner_id::text
+        and thumb_path <> storage_path)
+  ) not valid;
+
+create index if not exists files_thumb_idx
+  on public.files (thumb_path) where thumb_path is not null;
+
 alter table public.files drop constraint if exists files_text_lengths;
 alter table public.files
   add constraint files_text_lengths check (
@@ -307,6 +383,54 @@ alter table public.files
     and char_length(original_name) between 1 and 200
     and char_length(category) <= 60
   ) not valid;
+
+-- ---------------------------------------------------------------------------
+-- What the archive is searched by.
+--
+-- The vault used to search with `ilike '%term%'` across three columns, OR'd
+-- together in a PostgREST filter string. Three things wrong with that, and
+-- they are the same three thing:
+--
+--   NO INDEX CAN SERVE IT. A leading wildcard means a sequential scan of every
+--   row, on every keystroke after the debounce, alongside an exact `count`.
+--   Fine at a hundred documents and the reason the archive stops being usable
+--   at ten thousand -- on hardware the department's owner is paying for.
+--
+--   THE TERM WAS INTERPOLATED INTO A GRAMMAR. `or=(title.ilike.%x%,...)` is a
+--   syntax with `,` `(` `)` as separators, and the app stripped exactly those
+--   from the term before splicing it in. No escape was found, but a denylist
+--   against a grammar is a standing invitation, and it silently mangled any
+--   search containing a percent sign.
+--
+--   IT MATCHED SUBSTRINGS, NOT WORDS. Searching `art` hit every `Department`.
+--
+-- A generated tsvector fixes all three at once. `to_tsvector('simple', ...)`
+-- takes the regconfig explicitly because that is the immutable form -- the
+-- one-argument version depends on default_text_search_config and Postgres
+-- refuses it in a generated column. `simple` rather than `english`: a
+-- department names its documents in whatever language it likes, and English
+-- stemming applied to German is worse than no stemming at all.
+--
+-- The callers pass the term to websearch_to_tsquery as a VALUE rather than
+-- building syntax, so quoting and OR and negation all work and none of it is
+-- interpolation any more.
+-- ---------------------------------------------------------------------------
+--
+-- The filename is broken on its punctuation first. Postgres's parser
+-- recognises `budget.pdf` as a single `file` token, so it is not reachable by
+-- searching either `budget` or `pdf` -- and a phone camera's `IMG_2043.jpg`
+-- would be reachable only by typing it back exactly, which is not a search.
+-- Splitting on `.`, `_` and `-` turns a filename into the words it is made of.
+alter table public.files
+  add column if not exists search tsvector
+  generated always as (
+    to_tsvector('simple',
+      coalesce(title, '') || ' ' ||
+      coalesce(description, '') || ' ' ||
+      translate(coalesce(original_name, ''), '._-', '   '))
+  ) stored;
+
+create index if not exists files_search_idx on public.files using gin (search);
 
 create table if not exists public.file_subjects (
   file_id     uuid not null references public.files(id) on delete cascade,
@@ -545,6 +669,38 @@ create trigger on_auth_user_created
   for each row execute function public.handle_new_user();
 
 -- ---------------------------------------------------------------------------
+-- Keep the private address current.
+--
+-- user_emails was written once, at signup, and never again -- so a member who
+-- changed their address in Supabase Auth left the administration screen
+-- showing the old one indefinitely. That is the address an administrator uses
+-- to contact somebody about a document, and the one this table exists to hold
+-- privately; a stale copy of it is worse than none, because nothing on the
+-- screen suggests it might be wrong.
+--
+-- Confirmed addresses only. Supabase writes the requested new address into
+-- `email_change` and moves it into `email` once the person clicks the link, so
+-- following `email` means the table only ever learns an address its owner has
+-- proved they can read.
+-- ---------------------------------------------------------------------------
+create or replace function public.sync_user_email()
+returns trigger language plpgsql security definer set search_path = public as $fn$
+begin
+  update public.user_emails
+     set email = lower(trim(new.email))
+   where user_id = new.id;
+  return null;
+end; $fn$;
+
+revoke execute on function public.sync_user_email() from anon, authenticated, public;
+
+drop trigger if exists on_auth_email_changed on auth.users;
+create trigger on_auth_email_changed
+  after update of email on auth.users
+  for each row when (new.email is distinct from old.email)
+  execute function public.sync_user_email();
+
+-- ---------------------------------------------------------------------------
 -- Counter triggers
 -- ---------------------------------------------------------------------------
 create or replace function public.refresh_file_votes()
@@ -594,22 +750,53 @@ create trigger reports_changed after insert or update or delete on public.report
   for each row execute function public.refresh_file_reports();
 
 -- ---------------------------------------------------------------------------
--- The per-member storage cap.
+-- The per-member storage cap, measured against the bytes that are actually
+-- there.
 --
 -- A trigger rather than a policy, because a policy cannot express "the sum of
 -- what you already have, plus this". It runs as the table owner, so it sees
 -- every member's rows regardless of who is inserting.
 --
--- Honest about what it measures: `size_bytes` is what the browser said, the
--- same caveat the constraint above already carries. A member who understates
--- it is understating their own usage, and the bucket's own file_size_limit
--- still caps each individual object -- so this bounds the ordinary case, which
--- is the one that fills a free tier by accident.
+-- WHAT CHANGED, and why it matters more than it looks. `size_bytes` was
+-- whatever the browser said it was. A member filing a 40 MB scan could claim
+-- one byte, and every number derived from the column believed them: the cap
+-- here, the "storage used" figure on the administration screen, and the
+-- per-member breakdown beside it. The department's owner was being shown a
+-- number the members could choose.
+--
+-- Storage already knows the truth. The object is uploaded before the row that
+-- describes it -- that ordering is what makes the upload recoverable -- so by
+-- the time this runs, storage.objects holds the real byte count in its
+-- metadata. Reading it back turns a claim into a measurement, and does it in
+-- the one place every insert has to pass through.
+--
+-- Wrapped, like every other reach into storage.objects in this file: that
+-- table belongs to supabase_storage_admin, and on a project where this
+-- function's owner cannot read it the upload must still work. A failed lookup
+-- falls back to the claimed value, which is exactly where this started.
+--
+-- STILL NOT CLOSED, and worth stating plainly rather than implying otherwise:
+-- objects uploaded with no `files` row at all are not counted by anything
+-- here, because there is no insert to intercept. They are what
+-- admin_orphaned_objects() lists, and an hour after upload an administrator
+-- can see and remove them. The storage policy bounds where a member may write;
+-- it cannot express a running total.
 -- ---------------------------------------------------------------------------
 create or replace function public.enforce_member_quota()
 returns trigger language plpgsql security definer set search_path = public as $fn$
-declare cap_mb integer; used bigint;
+declare cap_mb integer; used bigint; actual bigint;
 begin
+  -- Measure first, so the stored row and every figure drawn from it are the
+  -- real size whether or not this department caps anything.
+  begin
+    select (o.metadata ->> 'size')::bigint into actual
+      from storage.objects o
+     where o.bucket_id = 'department-files' and o.name = new.storage_path;
+    if actual is not null and actual >= 0 then new.size_bytes := actual; end if;
+  exception when others then
+    raise warning 'could not read the stored size of %: %', new.storage_path, sqlerrm;
+  end;
+
   select s.max_member_storage_mb into cap_mb from public.settings s where s.id;
   if cap_mb is null then return new; end if;
 
@@ -759,15 +946,27 @@ end; $fn$;
 
 -- Deletes the row and returns the storage path so the caller can remove the
 -- object too. Storage RLS already lets an admin delete, so no elevated key.
+-- Returns the objects the caller must now remove, not just the one. An exhibit
+-- can have a thumbnail beside it, and a delete that forgot it would leave
+-- behind a small picture of a document the archive says is gone -- readable by
+-- every member, since the storage read policy is bucket-wide.
+--
+-- Dropped first because the return type changed from `text` to `jsonb`;
+-- `create or replace` refuses that. Callers written against the old shape get
+-- a bare path and keep working, which is the transient state while a
+-- department has the new app and has not yet re-run this file.
+drop function if exists public.delete_file(uuid, text);
 create or replace function public.delete_file(target uuid, why text default null)
-returns text language plpgsql security definer set search_path = public as $fn$
-declare path text; owner uuid;
+returns jsonb language plpgsql security definer set search_path = public as $fn$
+declare path text; thumb text; owner uuid;
 begin
   -- An anonymous auth.uid() is NULL. SQL's three-valued equality must never
   -- turn a failed ownership comparison into a skipped rejection branch.
   if not public.is_active_member() then raise exception 'NOT_A_MEMBER'; end if;
 
-  select f.storage_path, f.owner_id into path, owner from public.files f where f.id = target;
+  select f.storage_path, f.thumb_path, f.owner_id
+    into path, thumb, owner
+    from public.files f where f.id = target;
   if path is null then raise exception 'NOT_FOUND'; end if;
 
   if owner is distinct from auth.uid() and not public.is_admin() then
@@ -776,20 +975,57 @@ begin
 
   insert into public.audit_log (actor_id, action, target, detail)
   values (auth.uid(), 'file.delete', target::text,
-          jsonb_build_object('storage_path', path, 'reason', why));
+          jsonb_build_object('storage_path', path, 'thumb_path', thumb,
+                             'reason', why));
 
   delete from public.files where id = target;
-  return path;
+  return jsonb_build_object(
+    'storage_path', path,
+    'thumb_path', thumb,
+    'storage_paths', to_jsonb(array_remove(array[path, thumb], null))
+  );
 end; $fn$;
 
 revoke execute on function public.delete_file(uuid, text) from anon, public;
 grant execute on function public.delete_file(uuid, text) to authenticated;
 
+-- ---------------------------------------------------------------------------
+-- The two flags an administrator may change on somebody else, and the one
+-- outcome they may not arrive at.
+--
+-- Sequentially, a department cannot be left without an administrator here:
+-- is_admin() already refused a caller who is banned or demoted, and
+-- CANNOT_CHANGE_SELF means the caller is never the target -- so whoever
+-- succeeds in changing a flag is themselves an administrator who is still
+-- standing when the statement returns.
+--
+-- CONCURRENTLY it can. Two administrators who ban each other in the same
+-- instant both pass is_admin() against a snapshot taken before the other's
+-- write, and both commit. The department ends with an archive, a membership,
+-- and nobody who can moderate any of it -- a state that is not recoverable
+-- from inside the app at all. `profiles.is_admin` is outside the authenticated
+-- UPDATE grant, this function refuses a caller who is not an administrator,
+-- and there is deliberately no service_role key anywhere in this design to
+-- climb back in with. It takes the project owner opening their own SQL editor,
+-- which is a reasonable thing to document and an unreasonable thing to leave
+-- one lost race away.
+--
+-- So: the same settings-row lock the signup trigger uses, for the same reason.
+-- It orders the two transactions, which makes the loser's check read the
+-- winner's committed result instead of a snapshot that predates it. The check
+-- itself is on the OUTCOME rather than on the action -- one query instead of a
+-- case analysis over which flag, which direction and how many administrators
+-- are left -- and the raise rolls the losing ban back.
+-- ---------------------------------------------------------------------------
 create or replace function public.admin_set_flag(target uuid, flag text, value boolean)
 returns void language plpgsql security definer set search_path = public as $fn$
 begin
   if not public.is_admin() then raise exception 'NOT_ADMIN'; end if;
   if target = auth.uid() then raise exception 'CANNOT_CHANGE_SELF'; end if;
+
+  -- Ordering, not reading. Every path that can remove an administrator takes
+  -- this lock, so only one of them is ever in flight at a time.
+  perform 1 from public.settings s where s.id for update;
 
   if flag = 'is_admin' then
     update public.profiles set is_admin = value where id = target;
@@ -797,6 +1033,13 @@ begin
     update public.profiles set is_banned = value where id = target;
   else
     raise exception 'UNKNOWN_FLAG';
+  end if;
+
+  if not exists (
+    select 1 from public.profiles p where p.is_admin and not p.is_banned
+  ) then
+    raise exception 'LAST_ADMIN'
+      using hint = 'A department must keep at least one administrator who is not banned.';
   end if;
 
   insert into public.audit_log (actor_id, action, target, detail)
@@ -837,8 +1080,12 @@ begin
          -- Uploading bytes and filing metadata are separate requests. Give a
          -- normal upload an hour to finish before offering the object to purge.
          and o.created_at < now() - interval '1 hour'
+         -- Either column: a thumbnail is a referenced object too, and a
+         -- sweep that offered every one of them for deletion would be a
+         -- button that empties the vault's grid.
          and not exists (
-           select 1 from public.files f where f.storage_path = o.name
+           select 1 from public.files f
+            where f.storage_path = o.name or f.thumb_path = o.name
          )
        order by o.created_at
        limit 500;
@@ -929,10 +1176,14 @@ begin
     raise exception 'CONFIRMATION_MISMATCH';
   end if;
 
-  select coalesce(array_agg(f.storage_path order by f.created_at), '{}'),
-         count(*)
-    into paths, file_count
-    from public.files f;
+  -- Both objects per exhibit. A purge that returned only the originals would
+  -- report an erased archive while its thumbnails stayed in the bucket.
+  select coalesce(
+           array_agg(p order by p) filter (where p is not null), '{}')
+    into paths
+    from public.files f,
+         lateral unnest(array[f.storage_path, f.thumb_path]) as p;
+  select count(*) into file_count from public.files;
 
   select count(*) into members
     from public.profiles p where p.id <> auth.uid();
@@ -992,6 +1243,134 @@ end; $fn$;
 revoke execute on function public.purge_department(text) from anon, public;
 grant  execute on function public.purge_department(text) to authenticated;
 
+-- ---------------------------------------------------------------------------
+-- Leave, and take your things with you.
+--
+-- Everything else in this schema is written from the department's side: what
+-- an administrator may do to a member, what a member may do to a document.
+-- There was no answer at all to the member who simply wants out. Signing out
+-- ends a session; the profile, the e-mail address, the documents, the comments
+-- and the votes all stay, and the only person who could remove any of it was
+-- an administrator the member has no claim on. For an archive whose subject is
+-- frequently a real person that is the wrong default, and it is the one
+-- deletion the department's own privacy notice implies exists.
+--
+-- The shape is purge_department()'s, deliberately, because the problem is the
+-- same one at a smaller scale:
+--
+--   THE BYTES ARE NOT ITS JOB. The storage paths come back for the caller to
+--   remove through the storage API, which their own session is already allowed
+--   to do for their own folder. Deleting the rows out of storage.objects here
+--   would drop the metadata and leave the objects where they are.
+--
+--   THE ACCOUNT GOES TOO, when it can. A member's e-mail address should not
+--   outlive the membership it was given to. Wrapped for the same reason
+--   purge_department() wraps it: auth.users belongs to supabase_auth_admin,
+--   and on a project where this function's owner cannot delete from it the
+--   erasure should still erase everything else. The profile is gone either
+--   way, so what is left behind is a login to a department that no longer
+--   knows who they are.
+--
+--   THE LAST ADMINISTRATOR MAY NOT LEAVE. This is the check that actually
+--   bites -- unlike the one in admin_set_flag() above, which the
+--   CANNOT_CHANGE_SELF rule already makes unreachable sequentially. A sole
+--   administrator pressing this button would leave a live archive with a
+--   membership and nobody who can moderate it, and no way back in short of
+--   the project owner's SQL editor. They are told to hand the department over
+--   or erase it instead, both of which they can do from the administration
+--   screen. Same settings lock as admin_set_flag(), so two administrators
+--   leaving at once cannot both read "there is another one".
+--
+-- What it deliberately does NOT do is anonymise in place. A comment whose
+-- author row is gone is a comment attributed to nobody, and the archive is
+-- more honest with the thread missing than with a ghost in it -- so comments
+-- and votes go with the profile, by cascade.
+-- ---------------------------------------------------------------------------
+create or replace function public.leave_department(confirm text)
+returns jsonb language plpgsql security definer set search_path = public as $fn$
+declare
+  me         uuid := auth.uid();
+  handle     text;
+  paths      text[];
+  file_count bigint;
+  account    text := 'deleted';
+begin
+  if not public.is_active_member() then raise exception 'NOT_A_MEMBER'; end if;
+
+  -- Ordered against admin_set_flag() and against another member leaving.
+  perform 1 from public.settings s where s.id for update;
+
+  select p.username into handle from public.profiles p where p.id = me;
+
+  -- Typed confirmation for the same reason purge_department() asks for one:
+  -- this is irreversible, and an RPC named like this one that takes no
+  -- argument that has to match is a single mis-click from being called. A
+  -- member who never chose a username confirms with the word instead, because
+  -- there is nothing else of theirs to type.
+  if lower(trim(coalesce(confirm, ''))) is distinct from
+     lower(trim(coalesce(handle, 'leave'))) then
+    raise exception 'CONFIRMATION_MISMATCH';
+  end if;
+
+  if public.is_admin() and not exists (
+    select 1 from public.profiles p
+     where p.is_admin and not p.is_banned and p.id <> me
+  ) then
+    raise exception 'LAST_ADMIN'
+      using hint = 'Promote another administrator, or erase the department instead.';
+  end if;
+
+  -- Both objects per exhibit, for the same reason purge_department() takes
+  -- both: a thumbnail left in the bucket outlives the membership it belonged
+  -- to, and every member can still read it.
+  select coalesce(
+           array_agg(p order by p) filter (where p is not null), '{}')
+    into paths
+    from public.files f,
+         lateral unnest(array[f.storage_path, f.thumb_path]) as p
+   where f.owner_id = me;
+  select count(*) into file_count from public.files where owner_id = me;
+
+  -- Named rather than left to the cascade, for the same reason
+  -- purge_department() names its tables: a table added later with no cascade
+  -- to profiles would otherwise survive this silently. reports filed BY this
+  -- member go; reports filed ABOUT their documents go with the documents.
+  delete from public.reports    where reporter_id = me;
+  delete from public.comments   where author_id = me;
+  delete from public.votes      where user_id = me;
+  delete from public.file_views where user_id = me;
+  delete from public.files      where owner_id = me;
+  delete from public.user_emails where user_id = me;
+
+  -- The log outlives the member on purpose, and says so: an audit trail that
+  -- can be emptied by the person it is about is not one. actor_id is
+  -- `on delete set null`, so what remains is the action and its date.
+  insert into public.audit_log (actor_id, action, target, detail)
+  values (me, 'member.leave', me::text,
+          jsonb_build_object('files', file_count, 'username', handle));
+
+  delete from public.profiles where id = me;
+
+  begin
+    delete from auth.users u where u.id = me;
+  exception when others then
+    account := 'kept';
+    raise warning 'could not delete auth.users: %', sqlerrm;
+  end;
+
+  return jsonb_build_object(
+    'files', file_count,
+    'account', account,
+    'storage_paths', to_jsonb(paths)
+  );
+end; $fn$;
+
+-- Same reasoning as purge_department(): a function that erases things does not
+-- get to be reachable by the signed-out role, even though its first line would
+-- refuse them.
+revoke execute on function public.leave_department(text) from anon, public;
+grant  execute on function public.leave_department(text) to authenticated;
+
 -- Counters for the department's front door. Returns only totals -- never
 -- titles, never names.
 create or replace function public.department_stats()
@@ -1012,18 +1391,28 @@ $fn$;
 -- own imprint has to render for somebody who is not a member -- that is the
 -- whole point of an imprint. They are the address the department already
 -- publishes in its footer, not a member's.
+--
+-- schema_version rides along for the same reason the drop above exists: the
+-- app has to be able to ask an installation what it is running, and the two
+-- callers that need the answer -- a department page and the operator's account
+-- screen -- have no session in that project. A department still on an older
+-- schema has an older version of this function, which simply returns no such
+-- column; the app reads that absence as "older than the first version that
+-- could say", which is exactly what it is.
 drop function if exists public.department_identity();
 create or replace function public.department_identity()
 returns table (department_name text, tagline text, subject_label text,
                docket_prefix text, seal_top text, seal_bottom text,
                accent text, categories text[],
                max_upload_mb integer, claimed boolean, open_join boolean,
-               operator_name text, operator_contact text)
+               operator_name text, operator_contact text,
+               schema_version integer)
 language sql security definer set search_path = public as $fn$
   select s.department_name, s.tagline, s.subject_label, s.docket_prefix,
          s.seal_top, s.seal_bottom, s.accent, s.categories,
          s.max_upload_mb, s.claimed, s.open_join,
-         s.operator_name, s.operator_contact
+         s.operator_name, s.operator_contact,
+         (select v.version from public.schema_version v where v.id)
     from public.settings s where s.id;
 $fn$;
 
@@ -1160,7 +1549,7 @@ grant  update (title, description, category) on public.files to authenticated;
 -- forged scores, counters, case numbers or timestamps on a brand-new row.
 revoke insert on public.files from anon, authenticated;
 grant insert (owner_id, title, description, category, storage_path,
-              original_name, mime_type, size_bytes, kind)
+              original_name, mime_type, size_bytes, kind, thumb_path)
   on public.files to authenticated;
 
 -- FILE_SUBJECTS
@@ -1237,9 +1626,10 @@ create view public.files_public
 with (security_invoker = true) as
 select
   f.id, f.title, f.description, f.category, f.kind, f.mime_type,
-  f.size_bytes, f.original_name, f.storage_path,
+  f.size_bytes, f.original_name, f.storage_path, f.thumb_path,
   f.upvotes, f.downvotes, f.score, f.comment_count, f.view_count,
   f.case_number, f.created_at, f.owner_id,
+  f.search,
   p.username as owner_username,
   coalesce(
     (select json_agg(json_build_object('id', s.id, 'name', s.name) order by s.name)
@@ -1247,7 +1637,17 @@ select
        join public.subjects s on s.id = fs.subject_id
       where fs.file_id = f.id),
     '[]'::json
-  ) as subjects
+  ) as subjects,
+  -- Filtering by subject used to mean fetching every file_subjects row for
+  -- that subject and sending the ids back as an `in` list. The request URL
+  -- grew with the archive, and a busy subject would eventually 414 or be
+  -- truncated into wrong results. As an array column the filter is one
+  -- `contains` on a request of fixed size.
+  coalesce(
+    (select array_agg(fs.subject_id)
+       from public.file_subjects fs where fs.file_id = f.id),
+    '{}'::uuid[]
+  ) as subject_ids
 from public.files f
 join public.profiles p on p.id = f.owner_id;
 
@@ -1317,6 +1717,24 @@ create policy "dept delete own or admin" on storage.objects
     bucket_id = 'department-files'
     and ((storage.foldername(name))[1] = auth.uid()::text or public.is_admin())
   );
+
+-- ===========================================================================
+--  VERSION STAMP -- deliberately the last statement in this file.
+--
+--  Everything above has run by the time this does, which is the whole point:
+--  the row means "this file, all of it, was applied here", and a paste that
+--  died in the middle leaves the old version in place to say so.
+--
+--  WHEN YOU CHANGE THIS FILE, RAISE THIS NUMBER. It is what tells every
+--  department's administrator that there is something to re-run -- a new
+--  function they will otherwise only discover by its absence, and a corrected
+--  policy they would otherwise never discover at all. scripts/build-schema.mjs
+--  reads the number out of the statement below and refuses to build without
+--  it, so the app and this file cannot drift apart.
+-- ===========================================================================
+insert into public.schema_version (id, version) values (true, 4)
+on conflict (id) do update
+  set version = excluded.version, applied_at = now();
 
 -- ===========================================================================
 --  DONE. Go back to OpenDepartment and finish connecting your project.

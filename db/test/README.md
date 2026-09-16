@@ -29,7 +29,8 @@ and removes only its own temporary cluster.
 | `02-rls-tests.sql` | The tenant schema: 98 assertions. |
 | `03-control-plane-tests.sql` | The control plane: 46 assertions. |
 | `04-tenant-security-regressions.sql` | Anonymous deletion, protected columns, reports, founder proof and orphan cleanup regressions. |
-| `05-control-security-regressions.sql` | Operator cascade and registration serialization regressions. |
+| `05-control-security-regressions.sql` | Operator cascade, registration serialization, project binding and the staff takedown queue. |
+| `06-tenant-isolated.sql` | Its own database. For assertions about TOTALS or about who holds a role. |
 | `run.mjs` | Portable PGlite runner. |
 | `run.sh` | Native cluster runner. |
 
@@ -42,6 +43,23 @@ the historical counts above.
 The shim validates PostgreSQL authorization behavior, not Supabase's hosted
 Auth or Storage services. Single-backend PGlite does not reproduce concurrent
 transactions. Exercise those integrations separately before production rollout.
+
+## Which file a new case belongs in
+
+Each row of the runner's list gets its own disposable database. `02` and `04`
+share one, and `03` and `05` share another; `06` is alone in a third.
+
+Put a case in the shared files when it asks **can this role do this thing**,
+which is most of the suite: those read cleanly against fixtures another section
+set up, and reusing them keeps the files short.
+
+Put it in `06-tenant-isolated.sql` when it asks **how many** or **who is the
+only one** -- a count, a total, a "last administrator" floor. Both times this
+repo got such an assertion wrong, the cause was the same: another file had put
+rows in the table (`03` fills the report queue to its cap to test that cap) or
+had changed a role out from under it (`04` demotes an administrator that a
+later section then tried to act as). Neither was a failure of the code under
+test.
 
 ## Two things worth knowing before adding a test
 
