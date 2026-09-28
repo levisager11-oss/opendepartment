@@ -5,6 +5,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { getLegalDoc } from "@/lib/legal";
 import { deletedObjectPaths } from "@/lib/tenant/types";
 import { makeThumbnail } from "@/lib/tenant/thumbnail";
+import { accentInk, contrastRatio, MASTHEAD_NAVY } from "@/lib/tenant/contrast";
 
 afterEach(() => vi.useRealTimers());
 const bytesOf = async (file: File) => [...new Uint8Array(await file.arrayBuffer())];
@@ -142,4 +143,20 @@ it("does not make a second copy of an image that is already small", async () => 
   await expect(makeThumbnail(png)).resolves.toBeNull();
   expect(close).toHaveBeenCalled();
   vi.unstubAllGlobals();
+});
+
+it("puts readable ink on any accent an administrator can choose", () => {
+  expect(contrastRatio("#000000", "#ffffff")).toBeCloseTo(21, 5);
+  // The default gold keeps the navy it always had...
+  expect(accentInk("#b8860b")).toBe(MASTHEAD_NAVY);
+  expect(accentInk("#c9a227")).toBe(MASTHEAD_NAVY);
+  // ...and a dark accent stops carrying navy text on navy-ish paint.
+  expect(accentInk("#1a237e")).toBe("#ffffff");
+  expect(accentInk("#8b0000")).toBe("#ffffff");
+  for (const accent of ["#b8860b", "#1a237e", "#8b0000", "#00ff00"]) {
+    expect(contrastRatio(accent, accentInk(accent))).toBeGreaterThanOrEqual(4.5);
+  }
+  // A mid grey is the worst case for a two-ink choice and still clears the
+  // large-text floor, which is what a bold call to action is.
+  expect(contrastRatio("#777777", accentInk("#777777"))).toBeGreaterThanOrEqual(3);
 });

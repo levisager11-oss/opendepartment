@@ -142,21 +142,24 @@ describe("archive filters and pagination", () => {
     expect(screen.getByText("Current result")).toBeTruthy();
   });
 
-  it("retries pagination from a consistent page and never skips the failed page", async () => {
+  it("retries a failed page in place, keeping the cards already loaded", async () => {
     const first = Array.from({ length: 24 }, (_, i) => row(i + 1));
     const second = Array.from({ length: 24 }, (_, i) => row(i + 25));
     const responses = [
       query({ data: first, count: 60 }), query({ error: { message: "offline" } }),
-      query({ data: first, count: 60 }), query({ data: second, count: 60 }),
+      query({ data: second, count: 60 }),
     ];
     let calls = 0;
     runtime.client.from.mockImplementation((table: string) => table === "files_public" ? responses[calls++] : query({ data: [] }));
     render(<VaultBrowser subjects={[]} currentUserId="member" />);
     fireEvent.click(await screen.findByRole("button", { name: /Load more documents/ }));
-    fireEvent.click(await screen.findByRole("button", { name: tr("common.retry") }));
-    fireEvent.click(await screen.findByRole("button", { name: /Load more documents/ }));
+    expect((await screen.findByRole("alert")).textContent).toBe(tr("common.error"));
+    // What was already on screen stays there while the next page is retried.
+    expect(screen.getByText("Document 1")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: tr("common.retry") }));
     expect(await screen.findByText("Document 25")).toBeTruthy();
-    expect(responses.map((r) => r.range.mock.calls[0])).toEqual([[0, 23], [24, 47], [0, 23], [24, 47]]);
+    expect(screen.getByText("Document 1")).toBeTruthy();
+    expect(responses.map((r) => r.range.mock.calls[0])).toEqual([[0, 23], [24, 47], [24, 47]]);
   });
 
   it("restores shared filters, clears all of them, and follows browser history", async () => {
@@ -444,6 +447,16 @@ describe("authentication and previews", () => {
     expect((screen.getByLabelText(tr("auth.password")) as HTMLInputElement).type).toBe("text");
     expect(screen.queryByLabelText(tr("auth.repeatPassword"))).toBeNull();
   });
+  it("does not compare against the repeat field once it is hidden", async () => {
+    runtime.client.auth.signUp.mockResolvedValue({ data: { session: null }, error: null });
+    render(<DeptLoginForm initialMode="signup" presetInvite="ABCDEFGH" />);
+    fireEvent.click(screen.getByRole("button", { name: tr("auth.showPassword") }));
+    fireEvent.change(screen.getByLabelText(tr("auth.email")), { target: { value: "a@b.test" } });
+    fireEvent.change(screen.getByLabelText(tr("auth.password")), { target: { value: "example-password" } });
+    fireEvent.click(screen.getByRole("button", { name: tr("auth.signup") }));
+    expect((await screen.findByRole("status")).textContent).toBe(tr("auth.checkEmail"));
+    expect(runtime.client.auth.signUp).toHaveBeenCalledTimes(1);
+  });
   it("exports the audit log as CSV that a spreadsheet cannot misread", () => {
     const created = vi.fn().mockReturnValue("blob:audit");
     vi.stubGlobal("URL", { ...URL, createObjectURL: created, revokeObjectURL: vi.fn() });
@@ -620,21 +633,70 @@ describe("authentication and previews", () => {
     // they have to be able to read it.
     expect(runtime.client.auth.signOut).not.toHaveBeenCalled();
   });
-  it("renders a document in a frame that cannot run what it is served", () => {
+  it("keeps a departure whose objects survived visible to the member, even when storage reports a refusal as an empty success", async () => {
+    runtime.client.rpc.mockResolvedValue({
+      data: { files: 1, account: "deleted", storage_paths: ["me/one.png"] }, error: null,
+    });
+    runtime.storage.remove.mockResolvedValue({ data: [], error: null });
+    render(<DeptLeaveForm username="auditleaver" />);
+    fireEvent.click(screen.getByRole("button", { name: tr("leave.start") }));
+    fireEvent.change(screen.getByLabelText(translate("en", "leave.confirmLabel", { name: "auditleaver" })),
+      { target: { value: "auditleaver" } });
+    fireEvent.click(screen.getByRole("button", { name: tr("leave.submit") }));
+    expect((await screen.findByRole("status")).textContent).toBe(tr("leave.doneObjectsLeft"));
+    // Not signed out behind their back: the notice is for an administrator and
+    // they have to be able to read it.
+    expect(runtime.client.auth.signOut).not.toHaveBeenCalled();
+  });
+  it("frames a PDF only as a blob it typed itself", async () => {
     // Storage returns the Content-Type the uploader supplied, so an exhibit
-    // filed as a PDF can arrive as text/html. The sandbox is what makes that
-    // inert: no allow-scripts, and no allow-same-origin to escape through.
-    const { container } = render(
-      <FileViewer kind="pdf" url="https://storage.example/exhibit.pdf" title="Exhibit" />
-    );
-    const frame = container.querySelector("iframe");
-    expect(frame).toBeTruthy();
-    const sandbox = frame!.getAttribute("sandbox") ?? "";
-    expect(sandbox.split(/\s+/)).not.toContain("allow-scripts");
-    expect(sandbox.split(/\s+/)).not.toContain("allow-same-origin");
-    // An <object> honours the response type over its own attribute, which is
-    // the element this replaced.
-    expect(container.querySelector("object")).toBeNull();
+    // filed as a PDF can arrive as text/html. The viewer never frames the
+    // storage URL: it fetches the bytes, checks they open like a PDF and
+    // re-wraps them as application/pdf. (A sandboxed frame did the same job
+    // and blocked Chromium's PDF viewer, which is a plugin, outright.)
+    const bytes = new TextEncoder().encode("%PDF-1.4\n%fake");
+    const fetchMock = vi.fn().mockResolvedValue(new Response(bytes, { headers: { "content-type": "text/html" } }));
+    const created: Blob[] = [];
+    const original = { createObjectURL: URL.createObjectURL, revokeObjectURL: URL.revokeObjectURL };
+    vi.stubGlobal("fetch", fetchMock);
+    const createObjectURL = vi.fn((blob: Blob) => { created.push(blob); return "blob:typed"; });
+    const revokeObjectURL = vi.fn();
+    Object.assign(URL, { createObjectURL, revokeObjectURL });
+    try {
+      const { container, unmount } = render(
+        <FileViewer kind="pdf" url="https://storage.example/exhibit.pdf" title="Exhibit" />
+      );
+      await waitFor(() => expect(container.querySelector("iframe")).toBeTruthy());
+      const frame = container.querySelector("iframe")!;
+      expect(frame.getAttribute("src")).toBe("blob:typed");
+      expect(created[0].type).toBe("application/pdf");
+      expect(fetchMock.mock.calls[0][0]).toBe("https://storage.example/exhibit.pdf");
+      // An <object> honours the response type over its own attribute.
+      expect(container.querySelector("object")).toBeNull();
+      unmount();
+      expect(revokeObjectURL).toHaveBeenCalledWith("blob:typed");
+    } finally {
+      Object.assign(URL, original);
+      vi.unstubAllGlobals();
+    }
+  });
+  it("refuses to frame an exhibit whose bytes are not a PDF", async () => {
+    const html = new TextEncoder().encode("<html><script>alert(1)</script>");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(html, { headers: { "content-type": "application/pdf" } })));
+    const createObjectURL = vi.fn(() => "blob:never");
+    const original = { createObjectURL: URL.createObjectURL, revokeObjectURL: URL.revokeObjectURL };
+    Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() });
+    try {
+      const { container } = render(
+        <FileViewer kind="pdf" url="https://storage.example/smuggled.pdf" title="Exhibit" />
+      );
+      expect((await screen.findByRole("alert")).textContent).toBe(tr("file.previewFailed"));
+      expect(container.querySelector("iframe")).toBeNull();
+      expect(createObjectURL).not.toHaveBeenCalled();
+    } finally {
+      Object.assign(URL, original);
+      vi.unstubAllGlobals();
+    }
   });
   it("labels account inputs and recovers from an unexpected auth failure", async () => {
     runtime.client.auth.signInWithPassword.mockRejectedValue(new Error("offline"));

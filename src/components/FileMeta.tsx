@@ -10,7 +10,6 @@ export function FileMeta({
 }: {
   file: CaseFile;
   ownerEmail: string | null;
-  signedUrl: string | null;
 }) {
   const { t, formatDate } = useI18n();
   const { branding } = useTenant();

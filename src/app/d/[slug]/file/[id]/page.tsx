@@ -62,7 +62,7 @@ export default async function FilePage({
   const file = data as CaseFile;
 
   // Short-lived signed URL: the bucket itself is private, so this link is the
-  // only way to reach the object and it expires in an hour. Minting it needs
+  // only way to reach the object and it expires after SIGNED_URL_TTL. Minting it needs
   // no elevated key -- the member's own session already passes storage RLS.
   const { data: signed } = await supabase.storage
     .from(STORAGE_BUCKET)
@@ -175,11 +175,7 @@ export default async function FilePage({
           />
         </div>
 
-        <FileMeta
-          file={file}
-          ownerEmail={ownerEmail}
-          signedUrl={signed?.signedUrl ?? null}
-        />
+        <FileMeta file={file} ownerEmail={ownerEmail} />
 
         <div className="flex flex-wrap items-center gap-3 border-t border-paper-300 p-4 sm:p-5">
           {download?.signedUrl && (

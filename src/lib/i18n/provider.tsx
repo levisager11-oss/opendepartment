@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -36,6 +37,18 @@ export function I18nProvider({
   children: ReactNode;
 }) {
   const [locale, setLocaleState] = useState<Locale>(initialLocale);
+  /**
+   * Dates are rendered on the server first, in the server's time zone (UTC on
+   * Vercel), and then hydrated in the reader's -- and a timestamp with hours
+   * and minutes in it is a different string in Zurich than in UTC. That is a
+   * hydration mismatch on every comment, every exhibit's "filed on" line and
+   * every admin list, for anybody not sitting in UTC.
+   *
+   * So the first pass formats in UTC on both sides, which is guaranteed to
+   * agree, and the pass after hydration switches to the reader's own zone.
+   */
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
 
   const setLocale = useCallback((next: Locale) => {
     setLocaleState(next);
@@ -62,9 +75,10 @@ export function I18nProvider({
           year: "numeric",
           hour: "2-digit",
           minute: "2-digit",
+          ...(hydrated ? {} : { timeZone: "UTC" }),
         }),
     }),
-    [locale, setLocale]
+    [locale, setLocale, hydrated]
   );
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;

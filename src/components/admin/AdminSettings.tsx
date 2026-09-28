@@ -6,6 +6,7 @@ import { Spinner } from "@/components/Spinner";
 import { useI18n } from "@/lib/i18n/provider";
 import { useTenantClient } from "@/lib/tenant/context";
 import { caseLabel } from "@/lib/tenant/types";
+import { contrastRatio, MASTHEAD_NAVY } from "@/lib/tenant/contrast";
 import type { DepartmentSettings } from "./types";
 
 /**
@@ -271,7 +272,19 @@ export function AdminSettings({ settings }: { settings: DepartmentSettings }) {
           />
         </Field>
 
-        <Field id="set-accent" label={t("settings.accent")}>
+        <Field
+          id="set-accent"
+          label={t("settings.accent")}
+          // 3:1 is WCAG's floor for large or bold text, which is what the
+          // masthead sets in the accent. A warning, not a refusal: it is the
+          // department's colour to choose.
+          hint={
+            HEX.test(form.accent.trim()) &&
+            contrastRatio(form.accent.trim(), MASTHEAD_NAVY) < 3
+              ? t("settings.accentLowContrast")
+              : undefined
+          }
+        >
           <div className="flex gap-2">
             <input
               id="set-accent"

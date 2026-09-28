@@ -36,6 +36,7 @@ export const dictionary = {
     "nav.signedInAs": "Signed in as",
     "nav.language": "Language",
     "nav.home": "Home",
+    "nav.menu": "Menu",
     "common.and": "and",
     "setup.tooMany":
       "You have reached the maximum of 3 departments for one account. Remove one under Your departments first.",
@@ -143,6 +144,8 @@ export const dictionary = {
     "settings.sealBottom": "Around the bottom",
     "settings.accent": "Accent colour",
     "settings.accentInvalid": "Use a six-digit hex colour, like #b8860b.",
+    "settings.accentLowContrast":
+      "This colour is hard to read on the dark header, where it colours the top line of the seal and your username. A lighter shade will read better.",
     "settings.categories": "Categories",
     "settings.categoriesHint":
       "One per line, in the order they should appear. Existing documents keep the category they were filed under even if you remove it here.",
@@ -628,6 +631,10 @@ export const dictionary = {
     "file.submittedOn": "Filed on",
     "file.views": "views",
     "file.comments": "comments",
+    "file.viewCount_one": "{n} view",
+    "file.viewCount_other": "{n} views",
+    "file.commentCount_one": "{n} comment",
+    "file.commentCount_other": "{n} comments",
     "file.size": "Size",
     "file.type": "Type",
     "file.subjects": "Subjects",
@@ -825,6 +832,7 @@ export const dictionary = {
     "nav.signedInAs": "Angemeldet als",
     "nav.language": "Sprache",
     "nav.home": "Startseite",
+    "nav.menu": "Menü",
     "common.and": "und",
     "setup.tooMany":
       "Sie haben das Maximum von 3 Departementen pro Konto erreicht. Entfernen Sie zuerst eines unter «Ihre Departemente».",
@@ -933,6 +941,8 @@ export const dictionary = {
     "settings.accent": "Akzentfarbe",
     "settings.accentInvalid":
       "Verwenden Sie eine sechsstellige Hex-Farbe, etwa #b8860b.",
+    "settings.accentLowContrast":
+      "Diese Farbe ist auf der dunklen Kopfzeile schwer lesbar, wo sie die obere Siegelinschrift und Ihren Benutzernamen einfärbt. Ein hellerer Ton ist besser lesbar.",
     "settings.categories": "Kategorien",
     "settings.categoriesHint":
       "Eine pro Zeile, in der gewünschten Reihenfolge. Bestehende Dokumente behalten ihre Kategorie, auch wenn Sie sie hier entfernen.",
@@ -1415,6 +1425,10 @@ export const dictionary = {
     "file.submittedOn": "Eingereicht am",
     "file.views": "Aufrufe",
     "file.comments": "Notizen",
+    "file.viewCount_one": "{n} Aufruf",
+    "file.viewCount_other": "{n} Aufrufe",
+    "file.commentCount_one": "{n} Notiz",
+    "file.commentCount_other": "{n} Notizen",
     "file.size": "Grösse",
     "file.type": "Typ",
     "file.subjects": "Betreffe",

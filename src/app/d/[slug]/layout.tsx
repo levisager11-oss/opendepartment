@@ -10,6 +10,7 @@ import { DeptFooter } from "@/components/dept/DeptFooter";
 import { SchemaNotice } from "@/components/dept/SchemaNotice";
 import { TENANT_SCHEMA_VERSION } from "@/lib/tenant/schema-sql.generated";
 import { pageMetadata, SITE_NAME } from "@/lib/seo";
+import { accentInk } from "@/lib/tenant/contrast";
 
 export async function generateMetadata({
   params,
@@ -107,10 +108,17 @@ export default async function DepartmentLayout({
       anonKey={dept.anon_key}
       branding={branding}
     >
-      {/* Every accent-coloured element downstream reads this variable. */}
+      {/* Every accent-coloured element downstream reads this variable, and
+          anything written ON the accent reads --accent-ink, which is navy or
+          white depending on which one the chosen colour can carry. */}
       <div
         className="flex min-h-dvh flex-col"
-        style={{ "--accent": branding.accent } as React.CSSProperties}
+        style={
+          {
+            "--accent": branding.accent,
+            "--accent-ink": accentInk(branding.accent),
+          } as React.CSSProperties
+        }
       >
         <DeptBanner />
         <DeptHeader signedIn={signedIn} username={username} isAdmin={isAdmin} />

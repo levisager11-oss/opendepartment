@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n/provider";
 import { KindIcon } from "@/components/KindIcon";
@@ -18,7 +18,7 @@ import type { FileKind } from "@/lib/tenant/types";
  *     bucket and never pass through our server -- and turns zero storage
  *     egress into per-view egress on every department; and
  *   - caching private, time-limited content at /_next/image on our domain,
- *     where it would outlive the one-hour signature it was fetched with.
+ *     where it would outlive the short signature it was fetched with.
  *
  * So the tags stay raw. What they must not do is cost layout stability, which
  * is what MediaFrame below is for: every exhibit kind renders into the same
@@ -132,39 +132,104 @@ export function FileViewer({
     );
   }
 
-  /**
-   * PDF, in a sandboxed frame rather than an <object>.
-   *
-   * What decides how the bytes are rendered is the response's Content-Type,
-   * never a `type` attribute the markup asserts -- and that value is whatever
-   * the uploading browser said it was. Storage takes it from the client, and
-   * the storage INSERT policy checks the folder and the membership, not the
-   * media type. The CHECK constraint in db/tenant-schema.sql fences
-   * `files.mime_type` and `kind` -- the ROW -- and cannot reach the object
-   * those columns describe.
-   *
-   * So a member could file a row as application/pdf over an object stored as
-   * text/html, and an <object> would render it: a document with scripts, in a
-   * nested browsing context, on the department's own supabase.co origin, which
-   * the policy has to allow because that is where every exhibit lives. Not
-   * cross-site scripting against this app -- the session cookie is on this
-   * origin, not that one -- but active content inside a page a member trusts,
-   * which is enough for a convincing overlay, a top-level navigation attempt
-   * and a beacon carrying whoever opened the exhibit.
-   *
-   * The sandbox is what makes the media type stop mattering. With neither
-   * allow-scripts nor allow-same-origin, a smuggled HTML document is inert
-   * markup in an opaque origin, while the browser's own PDF viewer -- which is
-   * not page script -- goes on rendering an actual PDF. allow-downloads keeps
-   * that viewer's save button working; the download link beside it is the
-   * fallback either way.
-   */
+  return (
+    <PdfFrame
+      url={url}
+      title={title}
+      onError={() => setBrokenUrl(url)}
+    />
+  );
+}
+
+/** A PDF begins with `%PDF-`, allowed anywhere in its first kilobyte. */
+function looksLikePdf(bytes: ArrayBuffer): boolean {
+  const head = new Uint8Array(bytes, 0, Math.min(1024, bytes.byteLength));
+  const magic = [0x25, 0x50, 0x44, 0x46, 0x2d];
+  for (let i = 0; i + magic.length <= head.length; i++) {
+    if (magic.every((byte, j) => head[i + j] === byte)) return true;
+  }
+  return false;
+}
+
+/**
+ * PDF, fetched into a blob whose type this code chose rather than framed
+ * straight from storage.
+ *
+ * What decides how a framed document renders is the response's Content-Type,
+ * and Storage returns whatever the uploading browser said it was -- so a
+ * member could file a row as application/pdf over an object stored as
+ * text/html, and framing the signed URL would run that document's scripts in
+ * a page a member trusts.
+ *
+ * The first answer to that was a sandboxed iframe, and it made every PDF
+ * preview in Chrome, Edge and every other Chromium browser a grey "blocked"
+ * page: a sandboxed frame may not load plugins, and Chromium's PDF viewer is
+ * one. There is no sandbox token that allows it.
+ *
+ * This takes the decision away from the uploader instead. The bytes are
+ * fetched here, refused unless they open like a PDF, and re-wrapped as a Blob
+ * typed application/pdf -- so whatever the object claimed to be, the frame can
+ * only ever hand it to the browser's PDF viewer, never to the HTML parser.
+ * The blob is revoked when the URL changes or the viewer unmounts.
+ */
+function PdfFrame({
+  url,
+  title,
+  onError,
+}: {
+  url: string;
+  title: string;
+  onError: () => void;
+}) {
+  const { t } = useI18n();
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    let created: string | null = null;
+    setBlobUrl(null);
+
+    (async () => {
+      try {
+        const response = await fetch(url, {
+          credentials: "omit",
+          referrerPolicy: "no-referrer",
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const bytes = await response.arrayBuffer();
+        if (!looksLikePdf(bytes)) throw new Error("Not a PDF");
+        if (cancelled) return;
+        created = URL.createObjectURL(
+          new Blob([bytes], { type: "application/pdf" })
+        );
+        setBlobUrl(created);
+      } catch {
+        if (!cancelled) onError();
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (created) URL.revokeObjectURL(created);
+    };
+    // onError is a fresh closure each render; the fetch belongs to the URL.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url]);
+
+  if (!blobUrl) {
+    return (
+      <MediaFrame>
+        <p role="status" className="typewriter text-sm text-ink-500">
+          {t("common.loading")}
+        </p>
+      </MediaFrame>
+    );
+  }
+
   return (
     <iframe
-      src={url}
+      src={blobUrl}
       title={title}
-      sandbox="allow-downloads"
-      referrerPolicy="no-referrer"
       className="h-viewer w-full rounded-card border border-paper-400 bg-white shadow-md"
     />
   );

@@ -84,10 +84,13 @@ function contentSecurityPolicy(nonce: string): string {
     `style-src 'self' 'unsafe-inline'`,
     `img-src 'self' data: blob: ${SUPABASE}`,
     `media-src 'self' blob: ${SUPABASE}`,
-    // No <object> anywhere any more: the document viewer is a sandboxed
-    // iframe, so this can be the value that stops plugin documents outright.
+    // No <object> anywhere: the document viewer frames a blob it typed
+    // itself (see FileViewer), so this can stop plugin documents outright.
     `object-src 'none'`,
-    `frame-src 'self' ${SUPABASE}`,
+    // blob: and nothing remote. A PDF is fetched and re-wrapped as an
+    // application/pdf blob before it is framed, so no storage URL is ever
+    // loaded into a frame with whatever Content-Type its uploader chose.
+    `frame-src 'self' blob:`,
     `connect-src 'self' ${SUPABASE}`,
     `font-src 'self' data:`,
     `form-action 'self'`,

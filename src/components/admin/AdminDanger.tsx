@@ -101,11 +101,16 @@ export function AdminDanger({ departmentName }: { departmentName: string }) {
       for (let i = 0; i < paths.length; i += 100) {
         const batch = paths.slice(i, i + 100);
         try {
-          const { error: storageError } = await supabase.storage
+          const { data: gone, error: storageError } = await supabase.storage
             .from(STORAGE_BUCKET)
             .remove(batch);
+          // Refused removals come back as success with a short list, not as
+          // an error -- see DeptLeaveForm. Count what actually went.
           if (storageError) objectsFailed = true;
-          else removed += batch.length;
+          else if (Array.isArray(gone) && gone.length < batch.length) {
+            removed += gone.length;
+            objectsFailed = true;
+          } else removed += batch.length;
         } catch {
           objectsFailed = true;
         }
