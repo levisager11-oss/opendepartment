@@ -118,6 +118,10 @@ export const dictionary = {
     "abuse.slugRequired": "Please say which department this is about.",
     "abuse.unknownSlug":
       "No department resolves at that address. Check the spelling, or paste the link.",
+    "abuse.queueFull":
+      "This department already has as many open reports as the queue holds, so this one was not stored. Please write to the platform directly instead; the address is in the legal notice.",
+    "abuse.rateLimited":
+      "You have sent several reports in a short time. Wait an hour and try again, or write to the platform directly; the address is in the legal notice.",
     "abuse.sent": "Report received",
     "abuse.sentBody":
       "Somebody will read it. If you left an address we may come back to you; either way the department is not told who filed this.",
@@ -435,6 +439,10 @@ export const dictionary = {
     // --- OpenDepartment account -----------------------------------------
     "account.title": "Your departments",
     "account.none": "You have not created a department yet.",
+    "account.resetSent":
+      "If that address has an OpenDepartment account, a reset link is on its way.",
+    "account.linkInvalid":
+      "That link could not be used here. It may have expired or been opened in another browser. If you just confirmed your address, sign in below.",
     "account.signIn": "Sign in to OpenDepartment",
     "account.signInBody":
       "This account only manages your department listings. It is separate from your membership inside any department.",
@@ -550,6 +558,9 @@ export const dictionary = {
     "auth.invalidCredentials": "E-mail address or password is incorrect.",
     "auth.passwordTooShort": "Password must be at least 8 characters.",
     "auth.genericError": "Authentication failed. Please try again.",
+    "auth.emailNotConfirmed":
+      "Confirm your e-mail address first. The link is in your inbox.",
+    "auth.rateLimited": "Too many attempts. Wait a few minutes and try again.",
     "auth.working": "Verifying...",
 
     // --- setting a new password after a reset link ----------------------
@@ -914,6 +925,10 @@ export const dictionary = {
     "abuse.slugRequired": "Bitte geben Sie an, um welches Departement es geht.",
     "abuse.unknownSlug":
       "Unter dieser Adresse gibt es kein Departement. Bitte Schreibweise prüfen oder den Link einfügen.",
+    "abuse.queueFull":
+      "Zu diesem Departement sind bereits so viele offene Meldungen eingegangen, wie die Warteschlange fasst. Diese Meldung wurde deshalb nicht gespeichert. Bitte schreiben Sie der Plattform direkt; die Adresse steht im Impressum.",
+    "abuse.rateLimited":
+      "Sie haben in kurzer Zeit mehrere Meldungen gesendet. Warten Sie eine Stunde und versuchen Sie es erneut, oder schreiben Sie der Plattform direkt; die Adresse steht im Impressum.",
     "abuse.sent": "Meldung erhalten",
     "abuse.sentBody":
       "Jemand wird sie lesen. Wenn Sie eine Adresse hinterlassen haben, melden wir uns unter Umständen; dem Departement wird in keinem Fall mitgeteilt, wer die Meldung gemacht hat.",
@@ -1234,6 +1249,10 @@ export const dictionary = {
     // --- OpenDepartment-Konto -------------------------------------------
     "account.title": "Ihre Departemente",
     "account.none": "Sie haben noch kein Departement erstellt.",
+    "account.resetSent":
+      "Falls zu dieser Adresse ein OpenDepartment-Konto gehört, ist ein Link zum Zurücksetzen unterwegs.",
+    "account.linkInvalid":
+      "Dieser Link konnte hier nicht verwendet werden. Er ist möglicherweise abgelaufen oder wurde in einem anderen Browser geöffnet. Falls Sie eben Ihre Adresse bestätigt haben, melden Sie sich unten an.",
     "account.signIn": "Bei OpenDepartment anmelden",
     "account.signInBody":
       "Dieses Konto verwaltet nur Ihre Departements-Einträge. Es ist von Ihrer Mitgliedschaft innerhalb eines Departements getrennt.",
@@ -1343,6 +1362,9 @@ export const dictionary = {
     "auth.passwordTooShort": "Das Passwort muss mindestens 8 Zeichen haben.",
     "auth.genericError":
       "Die Authentifizierung ist fehlgeschlagen. Bitte erneut versuchen.",
+    "auth.emailNotConfirmed":
+      "Bestätigen Sie zuerst Ihre E-Mail-Adresse. Der Link ist in Ihrem Posteingang.",
+    "auth.rateLimited": "Zu viele Versuche. Warten Sie ein paar Minuten und versuchen Sie es erneut.",
     "auth.working": "Wird geprüft...",
 
     // --- neues Passwort nach einem Reset-Link ---------------------------

@@ -4,6 +4,24 @@ import Link from "next/link";
 import { useId, useState } from "react";
 import { useI18n } from "@/lib/i18n/provider";
 import { createControlBrowserClient } from "@/lib/control/browser";
+import type { TranslationKey } from "@/lib/i18n/dictionary";
+
+type Mode = "signin" | "signup" | "reset";
+
+/**
+ * Supabase's own wording is written for whoever holds the project keys, and it
+ * is English in a form that is otherwise bilingual. The ones a person can act
+ * on get a sentence of their own; the rest go to the console.
+ */
+function mapAuthError(message: string): TranslationKey {
+  const m = message.toLowerCase();
+  if (m.includes("invalid login credentials")) return "auth.invalidCredentials";
+  if (m.includes("email not confirmed")) return "auth.emailNotConfirmed";
+  if (m.includes("password should be at least")) return "auth.passwordTooShort";
+  if (m.includes("rate limit") || m.includes("too many")) return "auth.rateLimited";
+  if (typeof console !== "undefined") console.error("auth:", message);
+  return "auth.genericError";
+}
 
 /**
  * Inline sign-in for the last step of the wizard.
@@ -20,17 +38,23 @@ import { createControlBrowserClient } from "@/lib/control/browser";
 export function ControlAuthPanel({
   onSignedIn,
   initialMode = "signup",
+  linkFailed = false,
 }: {
   onSignedIn: () => void;
   initialMode?: "signin" | "signup";
+  /** Arrived from /account/auth/callback with a link that could not be used. */
+  linkFailed?: boolean;
 }) {
   const { t } = useI18n();
   const id = useId();
-  const [mode, setMode] = useState<"signin" | "signup">(initialMode);
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    linkFailed ? t("account.linkInvalid") : null
+  );
+  const [info, setInfo] = useState<string | null>(null);
   const [checkEmail, setCheckEmail] = useState(false);
   const [accepted, setAccepted] = useState(false);
 
@@ -44,20 +68,41 @@ export function ControlAuthPanel({
     }
     setBusy(true);
     setError(null);
+    setInfo(null);
 
     try {
       const supabase = createControlBrowserClient();
+      const callback = `${window.location.origin}/account/auth/callback`;
+
+      if (mode === "reset") {
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+          email.trim(),
+          { redirectTo: `${callback}?next=${encodeURIComponent("/account/auth/update-password")}` }
+        );
+        if (resetError) {
+          setError(t(mapAuthError(resetError.message)));
+          return;
+        }
+        // The same answer whether or not the address has an account.
+        setInfo(t("account.resetSent"));
+        setMode("signin");
+        return;
+      }
+
       const creds = { email: email.trim(), password };
 
       const { data, error: authError } =
         mode === "signup"
-          ? await supabase.auth.signUp(creds)
+          ? await supabase.auth.signUp({
+              ...creds,
+              options: { emailRedirectTo: `${callback}?next=/account` },
+            })
           : await supabase.auth.signInWithPassword(creds);
 
       setBusy(false);
 
       if (authError) {
-        setError(authError.message);
+        setError(t(mapAuthError(authError.message)));
         return;
       }
 
@@ -111,18 +156,22 @@ export function ControlAuthPanel({
         placeholder={t("auth.email")}
         className="field"
       />
-      <label className="label" htmlFor={`${id}-password`}>{t("auth.password")}</label>
-      <input
-        id={`${id}-password`}
-        type="password"
-        required
-        minLength={mode === "signup" ? 8 : undefined}
-        autoComplete={mode === "signup" ? "new-password" : "current-password"}
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        placeholder={t("auth.password")}
-        className="field"
-      />
+      {mode !== "reset" && (
+        <>
+          <label className="label" htmlFor={`${id}-password`}>{t("auth.password")}</label>
+          <input
+            id={`${id}-password`}
+            type="password"
+            required
+            minLength={mode === "signup" ? 8 : undefined}
+            autoComplete={mode === "signup" ? "new-password" : "current-password"}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder={t("auth.password")}
+            className="field"
+          />
+        </>
+      )}
 
       {/* Registering a department means taking responsibility for what other
           people put in it. Worth one deliberate click. */}
@@ -159,6 +208,7 @@ export function ControlAuthPanel({
       )}
 
       {error && <p role="alert" className="text-xs text-stamp-red">{error}</p>}
+      {info && <p role="status" className="notice notice-ok text-xs">{info}</p>}
 
       <div className="flex items-center gap-3">
         <button
@@ -167,20 +217,37 @@ export function ControlAuthPanel({
           aria-busy={busy}
           className="btn btn-primary"
         >
-          {mode === "signup" ? t("auth.signup") : t("auth.signin")}
+          {mode === "signup" ? t("auth.signup") : mode === "reset" ? t("auth.reset") : t("auth.signin")}
         </button>
         <button
           type="button"
           disabled={busy}
           onClick={() => {
-            setMode(mode === "signup" ? "signin" : "signup");
+            setMode(mode === "signin" ? "signup" : "signin");
             setError(null);
+            setInfo(null);
           }}
           className="py-1.5 text-xs text-ink-500 underline sm:py-0"
         >
-          {mode === "signup" ? t("auth.toSignin") : t("auth.toSignup")}
+          {mode === "signin" ? t("auth.toSignup") : t("auth.toSignin")}
         </button>
       </div>
+      {/* Without this, a forgotten password locked an operator out of the one
+          account that can delist or delete their departments. */}
+      {mode === "signin" && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => {
+            setMode("reset");
+            setError(null);
+            setInfo(null);
+          }}
+          className="py-1.5 text-xs text-ink-500 underline sm:py-0"
+        >
+          {t("auth.forgot")}
+        </button>
+      )}
     </form>
   );
 }

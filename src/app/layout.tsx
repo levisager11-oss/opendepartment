@@ -40,7 +40,7 @@ const specialElite = Special_Elite({
 
 const DESCRIPTION =
   "Run your own parody document archive. Members upload exhibits, vote and " +
-  "argue in the comments -- stored in a Supabase project you own, not ours. " +
+  "argue in the comments, stored in a Supabase project you own, not ours. " +
   "Free, invite-only by default, about five minutes to set up.";
 
 /**
@@ -56,8 +56,11 @@ const DESCRIPTION =
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: `${SITE_NAME} -- run your own files`,
-    template: `%s -- ${SITE_NAME}`,
+    default: `${SITE_NAME} · run your own files`,
+    // " · " rather than the "--" the prose in this codebase uses: a title is
+    // what a search result and a browser tab show, and a double hyphen reads
+    // as a typo there.
+    template: `%s · ${SITE_NAME}`,
   },
   description: DESCRIPTION,
   applicationName: SITE_NAME,
@@ -78,13 +81,13 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: SITE_NAME,
-    title: `${SITE_NAME} -- run your own files`,
+    title: `${SITE_NAME} · run your own files`,
     description: DESCRIPTION,
     url: "/",
   },
   twitter: {
     card: "summary_large_image",
-    title: `${SITE_NAME} -- run your own files`,
+    title: `${SITE_NAME} · run your own files`,
     description: DESCRIPTION,
   },
   // Note for anyone adding a page below: a page that sets `openGraph` or

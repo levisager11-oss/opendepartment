@@ -489,6 +489,21 @@ grant  update (display_name, tagline, visibility, supabase_url, anon_key)
 -- department can only have so many open complaints at once.
 drop policy if exists abuse_insert on public.abuse_reports;
 
+-- ---------------------------------------------------------------------------
+-- Who has been filing, recently. A digest of the caller's address and of any
+-- contact address they gave, one row per accepted report, kept for a day.
+-- Deny-all like abuse_reports: only report_department() reads or writes it,
+-- and it never holds an address in the clear -- a reporter is somebody who
+-- may well have good reason not to be found.
+-- ---------------------------------------------------------------------------
+create table if not exists public.abuse_throttle (
+  sender text not null,
+  at     timestamptz not null default now()
+);
+create index if not exists abuse_throttle_sender_idx on public.abuse_throttle (sender, at);
+alter table public.abuse_throttle enable row level security;
+revoke all on public.abuse_throttle from anon, authenticated;
+
 /**
  * File a complaint about a whole department.
  *
@@ -496,24 +511,38 @@ drop policy if exists abuse_insert on public.abuse_reports;
  * just been shown something about themselves, and asking them to register
  * first is asking them not to bother.
  *
- * Two bounds instead of an account. A report has to name a department that
- * actually resolves -- so the table cannot be filled with rows about slugs
- * that were never taken -- and a department can hold only so many OPEN
- * reports at once. The cap is not a limit on how much wrong one department can
- * do; it is the observation that the twenty-sixth open complaint about the
- * same archive tells whoever reads these nothing the first twenty-five did
- * not, while an unbounded queue tells them nothing at all.
+ * Bounds instead of an account:
  *
- * Returns quietly in the duplicate case rather than raising. Whether a
- * specific complaint has already been filed is not something an anonymous
- * caller should be able to ask, and the person filing it does not care.
+ *  - A report has to name a department that actually resolves, so the table
+ *    cannot be filled with rows about slugs that were never taken.
+ *  - One SENDER may file five an hour. The sender is the client address
+ *    PostgREST hands over in `request.headers` (best effort: whatever the
+ *    platform's proxies put there) and, separately, the contact address if
+ *    one was given. Without this the open-queue cap below was a weapon: an
+ *    owner could fill their own department's queue with junk from one
+ *    browser, and every real complaint after that was dropped.
+ *  - A department can hold only so many OPEN reports at once. The
+ *    twenty-sixth open complaint about the same archive tells whoever reads
+ *    these nothing the first twenty-five did not. Reaching it now raises
+ *    QUEUE_FULL, so the form can tell the reporter and point them elsewhere
+ *    instead of thanking them for a report nobody will see.
+ *
+ * Still quiet in the duplicate case. Whether a specific complaint has already
+ * been filed is not something an anonymous caller should be able to ask, and
+ * the person filing it does not care.
  */
 create or replace function public.report_department(
   want_slug text, why text, detail text default null,
   contact text default null
 ) returns void
 language plpgsql security definer set search_path = public as $fn$
-declare clean text := lower(trim(want_slug)); open_count integer;
+declare
+  clean      text := lower(trim(want_slug));
+  who        text := nullif(lower(trim(coalesce(contact, ''))), '');
+  headers    json;
+  address    text;
+  keys       text[] := '{}';
+  open_count integer;
 begin
   if not exists (
     select 1 from public.departments d where d.slug = clean
@@ -521,21 +550,49 @@ begin
     raise exception 'NO_SUCH_DEPARTMENT';
   end if;
 
+  begin
+    headers := nullif(current_setting('request.headers', true), '')::json;
+  exception when others then
+    headers := null;
+  end;
+  address := coalesce(
+    nullif(trim(headers ->> 'cf-connecting-ip'), ''),
+    nullif(trim(headers ->> 'x-real-ip'), ''),
+    nullif(trim(split_part(headers ->> 'x-forwarded-for', ',', 1)), '')
+  );
+  if address is not null then
+    keys := keys || encode(sha256(convert_to('ip:' || address, 'UTF8')), 'hex');
+  end if;
+  if who is not null then
+    keys := keys || encode(sha256(convert_to('contact:' || who, 'UTF8')), 'hex');
+  end if;
+
+  delete from public.abuse_throttle t where t.at < now() - interval '1 day';
+
+  if exists (
+    select 1 from public.abuse_throttle t
+     where t.sender = any(keys) and t.at > now() - interval '1 hour'
+     group by t.sender having count(*) >= 5
+  ) then
+    raise exception 'RATE_LIMITED';
+  end if;
+
   select count(*) into open_count
     from public.abuse_reports r
    where r.slug = clean and r.status = 'open';
 
   if open_count >= 25 then
-    -- Already answered, as far as this queue is concerned.
-    return;
+    raise exception 'QUEUE_FULL';
   end if;
 
+  insert into public.abuse_throttle (sender) select unnest(keys);
+
   -- The same person saying the same thing twice is one report.
-  if contact is not null and exists (
+  if who is not null and exists (
     select 1 from public.abuse_reports r
      where r.slug = clean
-       and r.reporter_email = lower(trim(contact))
-       and r.reason = why
+       and r.reporter_email = who
+       and r.reason = left(trim(why), 60)
        and r.status = 'open'
   ) then
     return;
@@ -543,7 +600,7 @@ begin
 
   insert into public.abuse_reports (slug, reporter_email, reason, details)
   values (clean,
-          nullif(lower(trim(coalesce(contact, ''))), ''),
+          who,
           left(trim(why), 60),
           nullif(left(trim(coalesce(detail, '')), 4000), ''));
 end; $fn$;

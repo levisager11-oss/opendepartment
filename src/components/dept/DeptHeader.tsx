@@ -30,9 +30,12 @@ export function DeptHeader({
     setSigningOut(true);
     setSignOutFailed(false);
     // Scoped to this department's cookie only: signing out of one archive
-    // leaves your membership in every other one alone.
+    // leaves your membership in every other one alone. And to this browser
+    // only: Supabase's default scope is "global", which revokes the member's
+    // sessions for this department on every device they use -- not what a
+    // button in the header of one tab says it will do.
     try {
-      const { error } = await supabase.auth.signOut();
+      const { error } = await supabase.auth.signOut({ scope: "local" });
       if (error) throw error;
       router.push(href());
       router.refresh();

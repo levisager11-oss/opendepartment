@@ -122,8 +122,21 @@ export async function middleware(request: NextRequest) {
   // Every path out of here gets the policy, redirects included: one missed
   // branch is one unprotected page, and there are five of them below.
   response.headers.set("content-security-policy", csp);
+
+  // The same address answers in English or German depending on the language
+  // cookie and Accept-Language (lib/i18n/detect.ts), and signed-in pages
+  // depend on the session cookie. Saying so keeps a shared cache from handing
+  // one reader's page to the next. The generated files below say the same
+  // thing to everybody and stay cacheable as one copy.
+  if (!LOCALE_INVARIANT.some((p) => request.nextUrl.pathname.startsWith(p))) {
+    response.headers.append("vary", "Cookie, Accept-Language");
+  }
   return response;
 }
+
+const LOCALE_INVARIANT = [
+  "/api/", "/robots.txt", "/sitemap.xml", "/opengraph-image", "/icon",
+];
 
 async function dispatch(
   request: NextRequest,

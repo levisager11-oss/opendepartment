@@ -23,6 +23,7 @@ import { DeptHeader } from "@/components/dept/DeptHeader";
 import { DeleteFileButton } from "@/components/dept/DeleteFileButton";
 import { AccountSignOut } from "@/components/account/AccountSignOut";
 import { DeptLeaveForm } from "@/components/dept/DeptLeaveForm";
+import { ReportForm } from "@/components/ReportForm";
 
 const runtime = vi.hoisted(() => ({
   query: "",
@@ -698,6 +699,53 @@ describe("authentication and previews", () => {
       vi.unstubAllGlobals();
     }
   });
+  it.each([["QUEUE_FULL", "abuse.queueFull"], ["RATE_LIMITED", "abuse.rateLimited"]] as const)(
+    "tells a reporter when a complaint was not stored (%s)", async (code, key) => {
+      runtime.client.rpc.mockResolvedValue({ data: null, error: { message: code } });
+      render(<ReportForm presetSlug="packed-dept" />);
+      fireEvent.click(screen.getByRole("button", { name: tr("abuse.submit") }));
+      const alert = await screen.findByRole("alert");
+      expect(alert.textContent).toContain(tr(key));
+      expect(alert.querySelector("a")?.getAttribute("href")).toBe("/legal/imprint");
+      expect(screen.queryByText(tr("abuse.sent"))).toBeNull();
+    });
+  it("lets an operator who forgot their password ask for a reset link", async () => {
+    runtime.client.auth.resetPasswordForEmail.mockResolvedValue({ data: {}, error: null });
+    render(<ControlAuthPanel initialMode="signin" onSignedIn={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: tr("auth.forgot") }));
+    expect(screen.queryByLabelText(tr("auth.password"))).toBeNull();
+    fireEvent.change(screen.getByLabelText(tr("auth.email")), { target: { value: "owner@example.com" } });
+    fireEvent.click(screen.getByRole("button", { name: tr("auth.reset") }));
+    expect((await screen.findByRole("status")).textContent).toBe(tr("account.resetSent"));
+    const [address, options] = runtime.client.auth.resetPasswordForEmail.mock.calls[0];
+    expect(address).toBe("owner@example.com");
+    expect(options.redirectTo).toBe(
+      `${window.location.origin}/account/auth/callback?next=${encodeURIComponent("/account/auth/update-password")}`
+    );
+  });
+  it("sends an operator's confirmation mail back to a route that can use it", async () => {
+    runtime.client.auth.signUp.mockResolvedValue({ data: { session: null }, error: null });
+    render(<ControlAuthPanel initialMode="signup" onSignedIn={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText(tr("auth.email")), { target: { value: "owner@example.com" } });
+    fireEvent.change(screen.getByLabelText(tr("auth.password")), { target: { value: "long-enough" } });
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: tr("auth.signup") }));
+    expect((await screen.findByRole("status")).textContent).toBe(tr("auth.checkEmail"));
+    expect(runtime.client.auth.signUp.mock.calls[0][0].options.emailRedirectTo)
+      .toBe(`${window.location.origin}/account/auth/callback?next=/account`);
+  });
+  it("does not print Supabase's own wording at an operator", async () => {
+    runtime.client.auth.signInWithPassword.mockResolvedValue({
+      data: { session: null }, error: { message: "Database error querying schema public.operators" },
+    });
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    render(<ControlAuthPanel initialMode="signin" onSignedIn={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText(tr("auth.email")), { target: { value: "owner@example.com" } });
+    fireEvent.change(screen.getByLabelText(tr("auth.password")), { target: { value: "password" } });
+    fireEvent.click(screen.getByRole("button", { name: tr("auth.signin") }));
+    expect((await screen.findByRole("alert")).textContent).toBe(tr("auth.genericError"));
+    log.mockRestore();
+  });
   it("labels account inputs and recovers from an unexpected auth failure", async () => {
     runtime.client.auth.signInWithPassword.mockRejectedValue(new Error("offline"));
     render(<ControlAuthPanel initialMode="signin" onSignedIn={vi.fn()} />);
@@ -794,6 +842,13 @@ describe("rejected requests and partial deletion", () => {
     expect(runtime.router.push).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: tr("nav.signout") }));
     await waitFor(() => expect(runtime.router.push).toHaveBeenCalledWith("/d/demo"));
+  });
+
+  it("signs a member out of this browser only, not every device they use", async () => {
+    runtime.client.auth.signOut.mockResolvedValue({ error: null });
+    render(<DeptHeader signedIn username="Member" isAdmin={false} />);
+    fireEvent.click(screen.getByRole("button", { name: tr("nav.signout") }));
+    await waitFor(() => expect(runtime.client.auth.signOut).toHaveBeenCalledWith({ scope: "local" }));
   });
 
   it("retries only object cleanup after a file row was deleted", async () => {

@@ -8,9 +8,9 @@ export const metadata = privatePage("Sign in", { path: "/account/login" });
 export default async function AccountLoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string }>;
+  searchParams: Promise<{ next?: string; error?: string }>;
 }) {
-  const { next } = await searchParams;
+  const { next, error } = await searchParams;
 
   // Only same-site paths. An open redirect here would let a crafted link
   // bounce someone off a trusted domain the instant they authenticate.
@@ -19,7 +19,7 @@ export default async function AccountLoginPage({
   return (
     <MarketingShell>
       <div className="mx-auto max-w-md">
-        <AccountLoginForm target={target} />
+        <AccountLoginForm target={target} linkFailed={error === "link"} />
       </div>
     </MarketingShell>
   );
