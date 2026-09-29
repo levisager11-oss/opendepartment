@@ -92,6 +92,10 @@ export function VaultBrowser({
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
+  // Whether the load in flight adds a page or replaces the grid. Only a
+  // replacement says so above the grid: a line appearing up there while
+  // somebody scrolls at the bottom shoves everything they are reading down.
+  const [appending, setAppending] = useState(false);
   const [error, setError] = useState(false);
   // Which page the failed request was for. A failed "load more" must retry
   // that page and keep the cards already on screen, not start over.
@@ -159,6 +163,7 @@ export function VaultBrowser({
       const stale = () => ticket !== latestRequest.current;
 
       setLoading(true);
+      setAppending(!replace);
       setError(false);
 
       try {
@@ -276,6 +281,38 @@ export function VaultBrowser({
     void load(0, true);
     return () => { latestRequest.current += 1; };
   }, [filtersReady, load]);
+
+  /**
+   * Infinite scroll, on top of the button rather than instead of it. The
+   * "load more" button stays where it was -- a keyboard, a screen reader and
+   * a browser without IntersectionObserver still page with it -- and the
+   * observer simply presses it for you once it comes within a screen of the
+   * viewport.
+   *
+   * Nothing loads while a load is in flight or after one failed: a failure
+   * leaves the retry button in charge, so a flaky connection does not turn
+   * scrolling into a request loop. The effect re-runs whenever a page lands,
+   * and observing afresh reports the button's current position -- so on a
+   * screen tall enough to show it straight away, pages keep coming until it
+   * is pushed out of view.
+   */
+  const moreRef = useRef<HTMLDivElement>(null);
+  const canLoadMore = !loading && !error && files.length > 0 && files.length < total;
+  useEffect(() => {
+    const target = moreRef.current;
+    if (!target || !canLoadMore || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          observer.disconnect();
+          void load(page + 1, false);
+        }
+      },
+      { rootMargin: "0px 0px 600px 0px" }
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [canLoadMore, load, page]);
 
   const hasFilters = Boolean(search || sort !== "top" || subjectId || category || kind || mineOnly);
 
@@ -461,7 +498,7 @@ export function VaultBrowser({
         </div>
       ) : (
         <>
-          {loading && <p role="status" className="mb-3 text-sm text-ink-500">{t("vault.loading")}</p>}
+          {loading && !appending && <p role="status" className="mb-3 text-sm text-ink-500">{t("vault.loading")}</p>}
           <div aria-busy={loading} className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {files.map((file) => (
               <FileCard
@@ -487,7 +524,7 @@ export function VaultBrowser({
           )}
 
           {!error && files.length < total && (
-            <div className="mt-8 text-center">
+            <div ref={moreRef} className="mt-8 text-center">
               <button
                 type="button"
                 onClick={() => load(page + 1, false)}

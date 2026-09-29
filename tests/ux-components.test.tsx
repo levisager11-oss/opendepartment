@@ -164,6 +164,39 @@ describe("archive filters and pagination", () => {
     expect(responses.map((r) => r.range.mock.calls[0])).toEqual([[0, 23], [24, 47], [24, 47]]);
   });
 
+  it("loads the next page when the end of the grid scrolls into view, and stops after a failure", async () => {
+    const observers: Array<{ fire: (visible: boolean) => void; disconnect: () => void }> = [];
+    vi.stubGlobal("IntersectionObserver", class {
+      disconnected = false;
+      constructor(private callback: (entries: Array<{ isIntersecting: boolean }>) => void) {}
+      observe() { observers.push({ fire: (visible) => { if (!this.disconnected) this.callback([{ isIntersecting: visible }]); }, disconnect: () => this.disconnect() }); }
+      disconnect() { this.disconnected = true; }
+    });
+    const pages = [
+      query({ data: Array.from({ length: 24 }, (_, i) => row(i + 1)), count: 60 }),
+      query({ data: Array.from({ length: 24 }, (_, i) => row(i + 25)), count: 60 }),
+      query({ error: { message: "offline" } }),
+    ];
+    let calls = 0;
+    runtime.client.from.mockImplementation((table: string) => table === "files_public" ? pages[calls++] : query({ data: [] }));
+    render(<VaultBrowser subjects={[]} currentUserId="member" />);
+    await screen.findByText("Document 1");
+    // Out of view: nothing happens.
+    act(() => observers.at(-1)!.fire(false));
+    expect(calls).toBe(1);
+    act(() => observers.at(-1)!.fire(true));
+    expect(await screen.findByText("Document 25")).toBeTruthy();
+    await waitFor(() => expect(observers.length).toBeGreaterThan(1));
+    act(() => observers.at(-1)!.fire(true));
+    expect((await screen.findByRole("alert")).textContent).toBe(tr("common.error"));
+    // A failed page hands control to the retry button; scrolling does not
+    // keep firing requests at a connection that just refused one.
+    const before = calls;
+    act(() => observers.forEach((o) => o.fire(true)));
+    expect(calls).toBe(before);
+    expect(pages.map((p) => p.range.mock.calls[0])).toEqual([[0, 23], [24, 47], [48, 71]]);
+  });
+
   it("restores shared filters, clears all of them, and follows browser history", async () => {
     window.history.replaceState({}, "", "/d/demo/vault?q=letter&sort=new&subject=case-a&category=MEMO&kind=pdf&mine=1");
     runtime.client.from.mockImplementation(() => query({ data: [], count: 0 }));
