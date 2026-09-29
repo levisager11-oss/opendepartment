@@ -24,6 +24,9 @@ import { DeleteFileButton } from "@/components/dept/DeleteFileButton";
 import { AccountSignOut } from "@/components/account/AccountSignOut";
 import { DeptLeaveForm } from "@/components/dept/DeptLeaveForm";
 import { ReportForm } from "@/components/ReportForm";
+import { SubjectIndex } from "@/components/dept/SubjectIndex";
+import { ExhibitNav } from "@/components/dept/ExhibitNav";
+import { EditFileDetails } from "@/components/dept/EditFileDetails";
 
 const runtime = vi.hoisted(() => ({
   query: "",
@@ -38,7 +41,8 @@ const runtime = vi.hoisted(() => ({
   tenantRpc: vi.fn(),
   tenant: {
     slug: "demo", supabaseUrl: "https://demo.supabase.co",
-    branding: { subjectLabel: "Case", categories: ["EXHIBIT", "MEMO"], maxUploadMb: 25, openJoin: false },
+    branding: { subjectLabel: "Case", categories: ["EXHIBIT", "MEMO"], maxUploadMb: 25, openJoin: false,
+      departmentName: "Demo Files", sealTop: "DEMO FILES" },
     href: (path = "") => `/d/demo${path ? `/${path}` : ""}`,
   },
 }));
@@ -61,6 +65,15 @@ vi.mock("@/lib/control/browser", () => ({ CONTROL_READY: true, createControlBrow
 vi.mock("@supabase/supabase-js", () => ({ createClient: () => ({ rpc: runtime.tenantRpc }) }));
 vi.mock("@/components/dept/FileCard", () => ({ FileCard: ({ file }: { file: { title: string } }) => <article>{file.title}</article> }));
 vi.mock("@/lib/tenant/scrub", () => ({ scrubImage: async (file: File) => ({ file, scrubbed: false, unsupported: false }) }));
+// The progress-reporting upload talks XMLHttpRequest to storage. Components
+// are tested against the storage mock through the library path it falls back
+// to; the XHR half has tests of its own.
+vi.mock("@/lib/tenant/upload-object", () => ({
+  uploadObject: async (client: { storage: { from: (b: string) => { upload: (...a: unknown[]) => Promise<{ error: unknown }> } } }, _coords: unknown, path: string, file: File) => {
+    const { error } = await client.storage.from("department-files").upload(path, file, { contentType: file.type, upsert: false });
+    return { error };
+  },
+}));
 
 type Result = { data?: unknown; error?: unknown; count?: number };
 function query(result: Result | Promise<Result>) {
@@ -163,11 +176,61 @@ describe("archive filters and pagination", () => {
     expect(responses.map((r) => r.range.mock.calls[0])).toEqual([[0, 23], [24, 47], [24, 47]]);
   });
 
+  it("loads the next page when the end of the grid scrolls into view, and stops after a failure", async () => {
+    const observers: Array<{ fire: (visible: boolean) => void; disconnect: () => void }> = [];
+    vi.stubGlobal("IntersectionObserver", class {
+      disconnected = false;
+      constructor(private callback: (entries: Array<{ isIntersecting: boolean }>) => void) {}
+      observe() { observers.push({ fire: (visible) => { if (!this.disconnected) this.callback([{ isIntersecting: visible }]); }, disconnect: () => this.disconnect() }); }
+      disconnect() { this.disconnected = true; }
+    });
+    const pages = [
+      query({ data: Array.from({ length: 24 }, (_, i) => row(i + 1)), count: 60 }),
+      query({ data: Array.from({ length: 24 }, (_, i) => row(i + 25)), count: 60 }),
+      query({ error: { message: "offline" } }),
+    ];
+    let calls = 0;
+    runtime.client.from.mockImplementation((table: string) => table === "files_public" ? pages[calls++] : query({ data: [] }));
+    render(<VaultBrowser subjects={[]} currentUserId="member" />);
+    await screen.findByText("Document 1");
+    // Out of view: nothing happens.
+    act(() => observers.at(-1)!.fire(false));
+    expect(calls).toBe(1);
+    act(() => observers.at(-1)!.fire(true));
+    expect(await screen.findByText("Document 25")).toBeTruthy();
+    await waitFor(() => expect(observers.length).toBeGreaterThan(1));
+    act(() => observers.at(-1)!.fire(true));
+    expect((await screen.findByRole("alert")).textContent).toBe(tr("common.error"));
+    // A failed page hands control to the retry button; scrolling does not
+    // keep firing requests at a connection that just refused one.
+    const before = calls;
+    act(() => observers.forEach((o) => o.fire(true)));
+    expect(calls).toBe(before);
+    expect(pages.map((p) => p.range.mock.calls[0])).toEqual([[0, 23], [24, 47], [48, 71]]);
+  });
+
+  it("records what it showed, in order, for the exhibit page to step through", async () => {
+    window.history.replaceState({}, "", "/d/demo/vault?sort=new");
+    const pages = [
+      query({ data: Array.from({ length: 24 }, (_, i) => row(i + 1)), count: 30 }),
+      query({ data: Array.from({ length: 6 }, (_, i) => row(i + 25)), count: 30 }),
+    ];
+    let calls = 0;
+    runtime.client.from.mockImplementation((table: string) => table === "files_public" ? pages[calls++] : query({ data: [] }));
+    render(<VaultBrowser subjects={[]} currentUserId="member" />);
+    fireEvent.click(await screen.findByRole("button", { name: /Load more documents/ }));
+    await screen.findByText("Document 30");
+    const trail = JSON.parse(sessionStorage.getItem("od.vault.trail:demo")!);
+    expect(trail.search).toBe("?sort=new");
+    expect(trail.total).toBe(30);
+    expect(trail.items.map((item: { id: string }) => item.id)).toEqual(Array.from({ length: 30 }, (_, i) => `file-${i + 1}`));
+  });
+
   it("restores shared filters, clears all of them, and follows browser history", async () => {
     window.history.replaceState({}, "", "/d/demo/vault?q=letter&sort=new&subject=case-a&category=MEMO&kind=pdf&mine=1");
     runtime.client.from.mockImplementation(() => query({ data: [], count: 0 }));
     render(<VaultBrowser subjects={[{ id: "case-a", name: "Case A" }]} currentUserId="member" />);
-    expect((screen.getByRole("textbox", { name: tr("vault.search") }) as HTMLInputElement).value).toBe("letter");
+    expect((screen.getByRole("searchbox", { name: tr("vault.search") }) as HTMLInputElement).value).toBe("letter");
     expect((screen.getByRole("combobox", { name: tr("vault.sort") }) as HTMLSelectElement).value).toBe("new");
     expect((screen.getByRole("checkbox") as HTMLInputElement).checked).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: tr("vault.clear") }));
@@ -177,7 +240,7 @@ describe("archive filters and pagination", () => {
       window.history.pushState({}, "", "/d/demo/vault?q=restored&kind=audio");
       window.dispatchEvent(new PopStateEvent("popstate"));
     });
-    expect((screen.getByRole("textbox", { name: tr("vault.search") }) as HTMLInputElement).value).toBe("restored");
+    expect((screen.getByRole("searchbox", { name: tr("vault.search") }) as HTMLInputElement).value).toBe("restored");
     expect((screen.getByRole("combobox", { name: tr("vault.filter.kind") }) as HTMLSelectElement).value).toBe("audio");
   });
 
@@ -285,6 +348,82 @@ describe("upload recovery", () => {
   });
 });
 
+describe("filing several documents at once", () => {
+  const pdf = (name: string) => new File(["%PDF-1.4"], name, { type: "application/pdf" });
+  function addFiles(files: File[]) {
+    fireEvent.change(screen.getByLabelText(tr("upload.dropzone")), { target: { files } });
+  }
+
+  it("files each with its own title and the shared details, then opens the member's own filings", async () => {
+    const inserts = [query({ data: { id: "f1" }, error: null }), query({ data: { id: "f2" }, error: null })];
+    let n = 0;
+    runtime.client.from.mockImplementation(() => inserts[n++]);
+    render(<UploadForm userId="member" subjects={[]} />);
+    addFiles([pdf("minutes.pdf"), pdf("agenda.pdf")]);
+    const second = await screen.findByRole("textbox", { name: translate("en", "upload.titleFor", { name: "agenda.pdf" }) });
+    fireEvent.change(second, { target: { value: "The agenda" } });
+    fireEvent.change(screen.getByLabelText(tr("upload.descriptionAll")), { target: { value: "Both from Tuesday" } });
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: translate("en", "upload.submitMany", { n: 2 }) }));
+    await waitFor(() => expect(runtime.router.push).toHaveBeenCalledWith("/d/demo/vault?sort=new&mine=1"));
+    expect(runtime.storage.upload).toHaveBeenCalledTimes(2);
+    expect(inserts[0].insert.mock.calls[0][0]).toMatchObject({ title: "minutes", description: "Both from Tuesday", category: "EXHIBIT" });
+    expect(inserts[1].insert.mock.calls[0][0]).toMatchObject({ title: "The agenda", description: "Both from Tuesday" });
+  });
+
+  it("keeps what was filed and retries only what was not", async () => {
+    const calls: string[] = [];
+    let insertCount = 0;
+    runtime.client.from.mockImplementation(() => {
+      insertCount += 1;
+      calls.push(`from#${insertCount}`);
+      // 1: first insert ok. 2: second refused by the quota. 3: its read-back
+      // finds nothing. 4: the retry's insert goes through.
+      if (insertCount === 1) return query({ data: { id: "f1" }, error: null });
+      if (insertCount === 2) return query({ error: { code: "P0001", message: "QUOTA_EXCEEDED" } });
+      if (insertCount === 3) return query({ data: null, error: null });
+      return query({ data: { id: "f2" }, error: null });
+    });
+    render(<UploadForm userId="member" subjects={[]} />);
+    addFiles([pdf("one.pdf"), pdf("two.pdf")]);
+    await screen.findByRole("textbox", { name: translate("en", "upload.titleFor", { name: "two.pdf" }) });
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: translate("en", "upload.submitMany", { n: 2 }) }));
+    expect((await screen.findByRole("alert")).textContent).toBe(translate("en", "upload.someFailed", { n: 1, total: 2 }));
+    expect(screen.getByText(tr("upload.errorQuota"))).toBeTruthy();
+    expect(screen.getByRole("link", { name: new RegExp(tr("upload.filed")) }).getAttribute("href")).toBe("/d/demo/file/f1");
+    fireEvent.click(screen.getByRole("button", { name: tr("upload.retryFailed") }));
+    await waitFor(() => expect(runtime.router.push).toHaveBeenCalledWith("/d/demo/vault?sort=new&mine=1"));
+    // The first document was not uploaded or inserted a second time.
+    expect(runtime.storage.upload).toHaveBeenCalledTimes(3);
+    expect(runtime.storage.upload.mock.calls.map((c) => String(c[0]).endsWith("-one.pdf"))).toEqual([true, false, false]);
+  });
+
+  it("takes a pasted image as a file", async () => {
+    render(<UploadForm userId="member" subjects={[]} />);
+    const event = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(event, "clipboardData", { value: { files: [new File(["png"], "image.png", { type: "image/png" })] } });
+    const createObjectURL = vi.fn(() => "blob:preview");
+    const original = URL.createObjectURL;
+    Object.assign(URL, { createObjectURL });
+    try {
+      act(() => { window.dispatchEvent(event); });
+      expect(await screen.findByText("image.png")).toBeTruthy();
+      expect(event.defaultPrevented).toBe(true);
+      expect((screen.getByLabelText(tr("upload.fileTitle")) as HTMLInputElement).value).toBe("image");
+    } finally {
+      Object.assign(URL, { createObjectURL: original });
+    }
+  });
+
+  it("takes at most ten files at once and says so", async () => {
+    render(<UploadForm userId="member" subjects={[]} />);
+    addFiles(Array.from({ length: 11 }, (_, i) => pdf(`doc-${i}.pdf`)));
+    expect((await screen.findByRole("alert")).textContent).toContain(translate("en", "upload.tooMany", { max: 10 }));
+    await waitFor(() => expect(screen.getAllByRole("textbox", { name: /Title for/ })).toHaveLength(10));
+  });
+});
+
 describe("action refusal feedback", () => {
   it("keeps a refused comment while preserving a parallel successful deletion", async () => {
     const refused = deferred();
@@ -341,6 +480,20 @@ describe("action refusal feedback", () => {
     expect(runtime.storage.remove).toHaveBeenCalledWith(["member/exhibit.pdf"]);
     expect(runtime.client.from).not.toHaveBeenCalled();
     expect(runtime.router.refresh).toHaveBeenCalledTimes(1);
+  });
+  it("removes an exhibit's thumbnail along with it when deleting from a report", async () => {
+    // Schema 3 and later answer with jsonb naming both objects. Read as the
+    // bare string it used to be, neither was removed and the tab still said
+    // "Done." -- leaving the reported exhibit readable in storage.
+    runtime.client.rpc.mockResolvedValue({
+      data: { storage_path: "member/exhibit.png", thumb_path: "member/exhibit-thumb.webp",
+        storage_paths: ["member/exhibit.png", "member/exhibit-thumb.webp"] },
+      error: null,
+    });
+    render(<AdminReports reports={[{ ...reports[0], file_id: "file-1" }]} />);
+    fireEvent.click(screen.getByRole("button", { name: tr("admin.reports.deleteFile") }));
+    expect((await screen.findByRole("status")).textContent).toBe(tr("common.done"));
+    expect(runtime.storage.remove).toHaveBeenCalledWith(["member/exhibit.png", "member/exhibit-thumb.webp"]);
   });
   it.each([{ data: [] }, { data: null, error: { message: "permission denied" } }])("keeps a refused report action visible: %j", async (response) => {
     runtime.client.from.mockReturnValue(query(response));
@@ -884,5 +1037,189 @@ describe("rejected requests and partial deletion", () => {
     expect((await screen.findByRole("alert")).textContent).toBe(tr("danger.objectsLeft"));
     expect(screen.queryByRole("button", { name: tr("file.delete") })).toBeNull();
     expect(runtime.router.refresh).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("navigation and form guidance", () => {
+  it("offers a signed-out visitor a way to sign in from the header", () => {
+    render(<DeptHeader signedIn={false} username={null} isAdmin={false} />);
+    expect(screen.getByRole("link", { name: tr("nav.signin") }).getAttribute("href")).toBe("/d/demo/login");
+  });
+
+  it("does not print the department's name twice in its own header", () => {
+    // The wizard stamps the name, capitalised, as the seal's top legend.
+    render(<DeptHeader signedIn={false} username={null} isAdmin={false} />);
+    expect(screen.getByText("Demo Files")).toBeTruthy();
+    // The seal draws its legend either way; this is about the text line.
+    expect(screen.queryByText("DEMO FILES", { selector: "span" })).toBeNull();
+  });
+
+  it("keeps a seal legend that says something the name does not", () => {
+    const original = runtime.tenant.branding.sealTop;
+    runtime.tenant.branding.sealTop = "MINISTRY OF STAPLERS";
+    try {
+      render(<DeptHeader signedIn={false} username={null} isAdmin={false} />);
+      expect(screen.getByText("MINISTRY OF STAPLERS", { selector: "span" })).toBeTruthy();
+    } finally {
+      runtime.tenant.branding.sealTop = original;
+    }
+  });
+
+  it("closes the phone menu on Escape", () => {
+    const { container } = render(<DeptHeader signedIn username="Member" isAdmin={false} />);
+    fireEvent.click(screen.getByRole("button", { name: tr("nav.menu") }));
+    expect(container.querySelector("#dept-mobile-menu")).toBeTruthy();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(container.querySelector("#dept-mobile-menu")).toBeNull();
+  });
+
+  it("opens the administration tab named in the address and records the next one there", () => {
+    render(
+      <AdminPanel
+        initialTab="subjects"
+        truncated={{ files: false, reports: false, audit: false }}
+        currentUserId="admin" files={[]} reports={[]} users={[]} invites={[]}
+        subjects={[]} settings={null} audit={[]} totalBytes={0}
+      />
+    );
+    expect(screen.getByRole("tab", { name: tr("admin.tab.subjects") }).getAttribute("aria-selected")).toBe("true");
+    fireEvent.click(screen.getByRole("tab", { name: tr("admin.tab.audit") }));
+    expect(new URLSearchParams(window.location.search).get("tab")).toBe("audit");
+  });
+
+  it("ignores a tab in the address that does not exist", () => {
+    render(
+      <AdminPanel
+        initialTab="nonsense"
+        truncated={{ files: false, reports: false, audit: false }}
+        currentUserId="admin" files={[]} reports={[]} users={[]} invites={[]}
+        subjects={[]} settings={null} audit={[]} totalBytes={0}
+      />
+    );
+    expect(screen.getByRole("tab", { name: tr("admin.tab.files") }).getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("says what an upload still needs instead of only greying out the button", () => {
+    render(<UploadForm userId="member" subjects={[]} />);
+    const all = [tr("upload.needs.file"), tr("upload.needs.title"), tr("upload.needs.accept")].join(", ");
+    expect(screen.getByText(translate("en", "upload.needs", { items: all }))).toBeTruthy();
+    fireEvent.click(screen.getByRole("checkbox"));
+    const rest = [tr("upload.needs.file"), tr("upload.needs.title")].join(", ");
+    expect(screen.getByText(translate("en", "upload.needs", { items: rest }))).toBeTruthy();
+  });
+
+  it("files a case note with Ctrl+Enter", async () => {
+    const insert = query({ data: { id: "c1", file_id: "file-1", author_id: "member", body: "Seen it.", created_at: "2026-01-01" }, error: null });
+    runtime.client.from.mockReturnValue(insert);
+    render(<CommentSection fileId="file-1" currentUserId="member" currentUsername="Member" isAdmin={false} initialComments={[]} />);
+    const box = screen.getByRole("textbox");
+    fireEvent.change(box, { target: { value: "Seen it." } });
+    fireEvent.keyDown(box, { key: "Enter", ctrlKey: true });
+    expect(await screen.findByText("Seen it.")).toBeTruthy();
+    expect(insert.insert).toHaveBeenCalledWith({ file_id: "file-1", author_id: "member", body: "Seen it." });
+    expect((box as HTMLTextAreaElement).value).toBe("");
+  });
+
+  it("lists each subject as a way into the vault filtered to it", () => {
+    render(<SubjectIndex isAdmin={false} subjects={[
+      { id: "case-a", name: "Case A", description: "The first one", count: 3, latest: "2026-01-02" },
+      { id: "case b", name: "Case B", description: null, count: 0, latest: null },
+    ]} />);
+    expect(screen.getByRole("link", { name: /Case A/ }).getAttribute("href")).toBe("/d/demo/vault?subject=case-a");
+    // An id is a UUID in practice, but the link must not depend on that.
+    expect(screen.getByRole("link", { name: /Case B/ }).getAttribute("href")).toBe("/d/demo/vault?subject=case%20b");
+    expect(screen.getByText(tr("subjects.noDescription"))).toBeTruthy();
+    expect(screen.queryByRole("link", { name: tr("subjects.manage") })).toBeNull();
+  });
+
+  it("points an administrator with no subjects at where they are made", () => {
+    render(<SubjectIndex isAdmin subjects={[]} />);
+    expect(screen.getByRole("link", { name: tr("subjects.manage") }).getAttribute("href")).toBe("/d/demo/admin?tab=subjects");
+  });
+
+  it("steps through the documents the vault showed, by link and by arrow key", async () => {
+    sessionStorage.setItem("od.vault.trail:demo", JSON.stringify({
+      search: "?sort=new", total: 3,
+      items: [{ id: "a", title: "First" }, { id: "b", title: "Second" }, { id: "c", title: "Third" }],
+    }));
+    render(<ExhibitNav fileId="b" currentUserId="member" />);
+    expect((await screen.findByRole("link", { name: /First/ })).getAttribute("href")).toBe("/d/demo/file/a");
+    expect(screen.getByRole("link", { name: /Third/ }).getAttribute("href")).toBe("/d/demo/file/c");
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    expect(runtime.router.push).toHaveBeenCalledWith("/d/demo/file/c");
+  });
+
+  it("leaves the arrow keys to a field that has focus", async () => {
+    sessionStorage.setItem("od.vault.trail:demo", JSON.stringify({
+      search: "", total: 2, items: [{ id: "a", title: "First" }, { id: "b", title: "Second" }],
+    }));
+    render(<><ExhibitNav fileId="a" currentUserId="member" /><textarea aria-label="note" /></>);
+    await screen.findByRole("link", { name: /Second/ });
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "note" }), { key: "ArrowRight" });
+    expect(runtime.router.push).not.toHaveBeenCalled();
+  });
+
+  it("offers no neighbours for a document reached without the vault", () => {
+    const { container } = render(<ExhibitNav fileId="b" currentUserId="member" />);
+    expect(container.querySelector("nav")).toBeNull();
+  });
+
+  it("fetches the vault's next page, with its filters, when the loaded list ends here", async () => {
+    sessionStorage.setItem("od.vault.trail:demo", JSON.stringify({
+      search: "?sort=new&mine=1", total: 30, items: Array.from({ length: 24 }, (_, i) => ({ id: `f${i}`, title: `Doc ${i}` })),
+    }));
+    const page = query({ data: [{ id: "f24", title: "Doc 24" }], count: 30 });
+    runtime.client.from.mockReturnValue(page);
+    render(<ExhibitNav fileId="f23" currentUserId="member" />);
+    expect((await screen.findByRole("link", { name: /Doc 24/ })).getAttribute("href")).toBe("/d/demo/file/f24");
+    expect(page.range).toHaveBeenCalledWith(24, 47);
+    expect(page.eq).toHaveBeenCalledWith("owner_id", "member");
+    expect(page.order).toHaveBeenCalledWith("created_at", { ascending: false });
+    expect(JSON.parse(sessionStorage.getItem("od.vault.trail:demo")!).items).toHaveLength(25);
+  });
+
+  const editable = { title: "Old title", description: null, category: "EXHIBIT", subjectIds: ["case-a"] };
+  const editSubjects = [{ id: "case-a", name: "Case A" }, { id: "case-b", name: "Case B" }];
+
+  it("does not call a refused correction saved", async () => {
+    runtime.client.from.mockReturnValue(query({ data: [], error: null }));
+    render(<EditFileDetails fileId="file-1" initial={editable} subjects={editSubjects} />);
+    fireEvent.click(screen.getByRole("button", { name: tr("file.edit") }));
+    fireEvent.click(screen.getByRole("button", { name: tr("common.save") }));
+    expect((await screen.findByRole("alert")).textContent).toBe(tr("common.actionFailed"));
+    expect(runtime.router.refresh).not.toHaveBeenCalled();
+  });
+
+  it("saves the details and swaps one subject for another", async () => {
+    const update = query({ data: [{ id: "file-1" }], error: null });
+    const add = query({ error: null });
+    const remove = query({ error: null });
+    const readback = query({ data: [], error: null });
+    runtime.client.from.mockReturnValueOnce(update).mockReturnValueOnce(add)
+      .mockReturnValueOnce(remove).mockReturnValueOnce(readback);
+    render(<EditFileDetails fileId="file-1" initial={editable} subjects={editSubjects} />);
+    fireEvent.click(screen.getByRole("button", { name: tr("file.edit") }));
+    fireEvent.change(screen.getByLabelText(tr("upload.fileTitle")), { target: { value: "  New title  " } });
+    fireEvent.click(screen.getByRole("button", { name: /Case A/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Case B/ }));
+    fireEvent.click(screen.getByRole("button", { name: tr("common.save") }));
+    await waitFor(() => expect(runtime.router.refresh).toHaveBeenCalledTimes(1));
+    expect(update.update).toHaveBeenCalledWith({ title: "New title", description: null, category: "EXHIBIT" });
+    expect(add.upsert).toHaveBeenCalledWith([{ file_id: "file-1", subject_id: "case-b" }], { onConflict: "file_id,subject_id", ignoreDuplicates: true });
+    expect(remove.in).toHaveBeenCalledWith("subject_id", ["case-a"]);
+    expect(screen.queryByLabelText(tr("upload.fileTitle"))).toBeNull();
+  });
+
+  it("says which half of a correction landed when the subjects did not", async () => {
+    runtime.client.from.mockReturnValueOnce(query({ data: [{ id: "file-1" }], error: null }))
+      .mockReturnValueOnce(query({ error: null }))
+      // The delete answers without error, but the link is still there.
+      .mockReturnValueOnce(query({ data: [{ subject_id: "case-a" }], error: null }));
+    render(<EditFileDetails fileId="file-1" initial={editable} subjects={editSubjects} />);
+    fireEvent.click(screen.getByRole("button", { name: tr("file.edit") }));
+    fireEvent.click(screen.getByRole("button", { name: /Case A/ }));
+    fireEvent.click(screen.getByRole("button", { name: tr("common.save") }));
+    expect((await screen.findByRole("alert")).textContent).toBe(tr("file.editSubjectsFailed"));
+    expect(runtime.router.refresh).not.toHaveBeenCalled();
   });
 });

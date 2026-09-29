@@ -7,6 +7,10 @@ import { VoteButtons } from "@/components/dept/VoteButtons";
 import { CommentSection } from "@/components/dept/CommentSection";
 import { ReportButton } from "@/components/dept/ReportButton";
 import { DeleteFileButton } from "@/components/dept/DeleteFileButton";
+import { VaultBackLink } from "@/components/dept/VaultBackLink";
+import { PrintButton } from "@/components/dept/PrintButton";
+import { ExhibitNav } from "@/components/dept/ExhibitNav";
+import { EditFileDetails } from "@/components/dept/EditFileDetails";
 import { FileMeta } from "@/components/FileMeta";
 import { T } from "@/components/T";
 import { privatePage } from "@/lib/seo";
@@ -16,6 +20,7 @@ import {
   caseLabel,
   type CaseFile,
   type Comment,
+  type Subject,
 } from "@/lib/tenant/types";
 
 export const dynamic = "force-dynamic";
@@ -106,16 +111,40 @@ export default async function FilePage({
     };
   });
 
-  const canDelete = file.owner_id === member.userId || member.profile.is_admin;
+  const isOwner = file.owner_id === member.userId;
+  const canDelete = isOwner || member.profile.is_admin;
+
+  // The subject picker for the edit form. Only the owner may edit -- the
+  // schema's UPDATE grant and files_update_own say so -- so only the owner's
+  // page pays for the read.
+  let allSubjects: Subject[] = [];
+  if (isOwner) {
+    const { data: subjectRows, error: subjectsError } = await supabase
+      .from("subjects")
+      .select("id, name, description")
+      .order("name");
+    if (subjectsError) throw new Error("Could not load subjects.");
+    allSubjects = (subjectRows ?? []) as Subject[];
+  }
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 sm:py-8">
-      <Link
-        href={`/d/${slug}/vault`}
-        className="docket mb-4 inline-flex items-center gap-1 hover:text-gov-800 text-2xs text-ink-500"
-      >
-        <span aria-hidden>←</span> <T k="file.back" />
-      </Link>
+      <VaultBackLink />
+      <ExhibitNav fileId={file.id} currentUserId={member.userId} />
+
+      {/* Print only. The banner that says PARODY is screen chrome and drops
+          out of a printout with the rest of it -- and a printed page that
+          looks official and does not say it is a parody is exactly what this
+          product must never produce. So the label is restated here, with
+          which archive the page came from. */}
+      <div className="mb-4 hidden border-b-2 border-ink-900 pb-2 print:block">
+        <p className="font-serif text-lg font-bold text-ink-900">
+          {member.branding.departmentName}
+        </p>
+        <p className="text-xs text-ink-700">
+          <T k="gov.parody" /> · <T k="gov.disclaimer" />
+        </p>
+      </div>
 
       <div className="paper-tab ml-6 inline-block px-4 py-1">
         <span className="docket text-ink-700 text-2xs">
@@ -126,11 +155,13 @@ export default async function FilePage({
 
       <article className="paper">
         <header className="flex flex-wrap items-start gap-3 border-b border-paper-300 p-4 sm:gap-4 sm:p-5">
-          <VoteButtons
-            fileId={file.id}
-            initialScore={file.score}
-            initialVote={myVote?.value ?? 0}
-          />
+          <div className="print:hidden">
+            <VoteButtons
+              fileId={file.id}
+              initialScore={file.score}
+              initialVote={myVote?.value ?? 0}
+            />
+          </div>
 
           <div className="min-w-0 flex-1">
             <h1 className="font-serif text-xl leading-tight font-black break-words text-gov-900 sm:text-2xl">
@@ -167,17 +198,28 @@ export default async function FilePage({
           </div>
         </header>
 
-        <div className="border-b border-paper-300 bg-paper-200 p-2 sm:p-4">
+        <div
+          className={`border-b border-paper-300 bg-paper-200 p-2 sm:p-4 print:bg-transparent ${
+            file.kind === "image" ? "" : "print:hidden"
+          }`}
+        >
           <FileViewer
             kind={file.kind}
             url={signed?.signedUrl ?? null}
             title={file.title}
           />
         </div>
+        {/* A framed PDF, a video or a recording cannot be printed from the
+            page around it; say so where it would have been. */}
+        {file.kind !== "image" && (
+          <p className="hidden border-b border-paper-300 p-4 text-sm text-ink-700 print:block">
+            <T k="file.printOmitted" />
+          </p>
+        )}
 
         <FileMeta file={file} ownerEmail={ownerEmail} />
 
-        <div className="flex flex-wrap items-center gap-3 border-t border-paper-300 p-4 sm:p-5">
+        <div className="flex flex-wrap items-center gap-3 border-t border-paper-300 p-4 sm:p-5 print:hidden">
           {download?.signedUrl && (
             <a
               href={download.signedUrl}
@@ -188,13 +230,25 @@ export default async function FilePage({
             </a>
           )}
 
+          <PrintButton />
+
+          {isOwner && (
+            <EditFileDetails
+              fileId={file.id}
+              initial={{
+                title: file.title,
+                description: file.description,
+                category: file.category,
+                subjectIds: file.subjects.map((s) => s.id),
+              }}
+              subjects={allSubjects}
+            />
+          )}
+
           <ReportButton fileId={file.id} />
 
           {canDelete && (
-            <DeleteFileButton
-              fileId={file.id}
-              isOwner={file.owner_id === member.userId}
-            />
+            <DeleteFileButton fileId={file.id} isOwner={isOwner} />
           )}
         </div>
       </article>

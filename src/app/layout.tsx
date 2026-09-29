@@ -4,6 +4,7 @@ import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { I18nProvider } from "@/lib/i18n/provider";
 import { CookieNotice } from "@/components/CookieNotice";
+import { SkipLink } from "@/components/SkipLink";
 import { detectLocale } from "@/lib/i18n/detect";
 import { SITE_NAME, SITE_URL } from "@/lib/seo";
 
@@ -126,6 +127,7 @@ export default async function RootLayout({
     >
       <body className="flex min-h-dvh flex-col">
         <I18nProvider initialLocale={locale}>
+          <SkipLink />
           {children}
           {/* Site-wide on purpose: the department shell is a separate tree,
               and a notice that only appeared on the platform's own pages

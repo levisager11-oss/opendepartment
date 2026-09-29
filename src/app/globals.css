@@ -611,3 +611,34 @@ body {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
+
+/* ===========================================================================
+   PRINT
+
+   An exhibit page prints as a case file: the record, its metadata and its
+   notes, on white. Everything that is screen furniture carries print:hidden
+   where it is rendered; what is left here is the paper itself, which on
+   screen is a tinted card with a shadow and on a printer is ink wasted on a
+   background nobody asked for.
+   =========================================================================== */
+@media print {
+  @page {
+    margin: 14mm;
+  }
+  body {
+    background: #fff;
+    background-image: none;
+  }
+  .paper {
+    background: #fff;
+    box-shadow: none;
+  }
+  .paper-tab {
+    background: #fff;
+  }
+  /* Keeps a note or a metadata row from being split across two sheets. */
+  li,
+  dl > div {
+    break-inside: avoid;
+  }
+}

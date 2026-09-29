@@ -10,7 +10,7 @@ export function DeptFooter() {
   const { branding, href, slug } = useTenant();
 
   return (
-    <footer className="mt-16 gov-rule-top bg-gov-950 text-gov-100">
+    <footer className="mt-16 gov-rule-top bg-gov-950 text-gov-100 print:hidden">
       <div className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-4 py-8 sm:gap-8 sm:py-10 md:grid-cols-[auto_1fr_auto]">
         <div className="flex items-start gap-4">
           <Seal

@@ -63,12 +63,19 @@ export default async function MemberAccountPage({
         <p className="mt-4 text-xs text-ink-400">
           <T k="member.emailNote" />
         </p>
-        <Link
-          href={`/d/${slug}/auth/update-password`}
-          className="btn btn-ghost mt-4"
-        >
-          <T k="member.changePassword" />
-        </Link>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Link
+            href={`/d/${slug}/auth/update-password`}
+            className="btn btn-ghost"
+          >
+            <T k="member.changePassword" />
+          </Link>
+          {/* The page describes what leaving would erase; this is where to
+              see it. The vault's own "my submissions" filter, pre-set. */}
+          <Link href={`/d/${slug}/vault?mine=1`} className="btn btn-ghost">
+            <T k="member.mySubmissions" />
+          </Link>
+        </div>
       </div>
 
       <DeptLeaveForm username={member.profile.username} />

@@ -134,7 +134,9 @@ export default async function DepartmentLayout({
             adminHref={`/d/${slug}/admin`}
           />
         )}
-        <main className="flex-1">{children}</main>
+        <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">
+          {children}
+        </main>
         <DeptFooter />
       </div>
     </TenantProvider>

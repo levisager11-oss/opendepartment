@@ -78,9 +78,14 @@ export function CommentSection({
   }
 
   return (
-    <section className="mt-8">
+    // Printed, a file with no notes should not end on an empty "no notes"
+    // panel; with notes, they are part of the case file.
+    <section className={`mt-8 ${comments.length === 0 ? "print:hidden" : ""}`}>
       <div className="paper-tab ml-6 inline-block px-4 py-1">
-        <span className="docket text-ink-700 text-2xs">{t("comments.title")}</span>
+        <span className="docket text-ink-700 text-2xs">
+          {t("comments.title")}
+          {comments.length > 0 && <> · {comments.length}</>}
+        </span>
       </div>
 
       <div className="paper p-4 sm:p-5">
@@ -117,7 +122,7 @@ export function CommentSection({
                             remove(comment.id);
                           }
                         }}
-                        className="ml-auto cursor-pointer text-xs text-ink-400 underline hover:text-stamp-red"
+                        className="ml-auto cursor-pointer text-xs text-ink-400 underline hover:text-stamp-red print:hidden"
                       >
                         {t("comments.delete")}
                       </button>
@@ -132,7 +137,7 @@ export function CommentSection({
           </ul>
         )}
 
-        <form onSubmit={post} className="mt-5 border-t border-paper-300 pt-5">
+        <form onSubmit={post} className="mt-5 border-t border-paper-300 pt-5 print:hidden">
           <textarea
             className="field min-h-20 resize-y"
             placeholder={t("comments.placeholder")}
@@ -140,6 +145,14 @@ export function CommentSection({
             disabled={busy}
             value={body}
             onChange={(e) => setBody(e.target.value)}
+            onKeyDown={(e) => {
+              // The one multi-line field people type into over and over; the
+              // keyboard way to send it is the one every chat box has taught.
+              if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                e.currentTarget.form?.requestSubmit();
+              }
+            }}
             maxLength={2000}
           />
           {error && (
@@ -150,6 +163,8 @@ export function CommentSection({
           <div className="mt-3 flex items-center justify-between">
             <span className="docket text-3xs text-ink-500">
               {body.length} / 2000
+              {/* Not on a phone, which has no Ctrl key to press. */}
+              <span className="hidden sm:inline"> · {t("comments.shortcut")}</span>
             </span>
             <button
               type="submit"
