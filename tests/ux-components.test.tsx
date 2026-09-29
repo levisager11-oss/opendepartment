@@ -25,6 +25,7 @@ import { AccountSignOut } from "@/components/account/AccountSignOut";
 import { DeptLeaveForm } from "@/components/dept/DeptLeaveForm";
 import { ReportForm } from "@/components/ReportForm";
 import { SubjectIndex } from "@/components/dept/SubjectIndex";
+import { ExhibitNav } from "@/components/dept/ExhibitNav";
 
 const runtime = vi.hoisted(() => ({
   query: "",
@@ -196,6 +197,23 @@ describe("archive filters and pagination", () => {
     act(() => observers.forEach((o) => o.fire(true)));
     expect(calls).toBe(before);
     expect(pages.map((p) => p.range.mock.calls[0])).toEqual([[0, 23], [24, 47], [48, 71]]);
+  });
+
+  it("records what it showed, in order, for the exhibit page to step through", async () => {
+    window.history.replaceState({}, "", "/d/demo/vault?sort=new");
+    const pages = [
+      query({ data: Array.from({ length: 24 }, (_, i) => row(i + 1)), count: 30 }),
+      query({ data: Array.from({ length: 6 }, (_, i) => row(i + 25)), count: 30 }),
+    ];
+    let calls = 0;
+    runtime.client.from.mockImplementation((table: string) => table === "files_public" ? pages[calls++] : query({ data: [] }));
+    render(<VaultBrowser subjects={[]} currentUserId="member" />);
+    fireEvent.click(await screen.findByRole("button", { name: /Load more documents/ }));
+    await screen.findByText("Document 30");
+    const trail = JSON.parse(sessionStorage.getItem("od.vault.trail:demo")!);
+    expect(trail.search).toBe("?sort=new");
+    expect(trail.total).toBe(30);
+    expect(trail.items.map((item: { id: string }) => item.id)).toEqual(Array.from({ length: 30 }, (_, i) => `file-${i + 1}`));
   });
 
   it("restores shared filters, clears all of them, and follows browser history", async () => {
@@ -1031,5 +1049,46 @@ describe("navigation and form guidance", () => {
   it("points an administrator with no subjects at where they are made", () => {
     render(<SubjectIndex isAdmin subjects={[]} />);
     expect(screen.getByRole("link", { name: tr("subjects.manage") }).getAttribute("href")).toBe("/d/demo/admin?tab=subjects");
+  });
+
+  it("steps through the documents the vault showed, by link and by arrow key", async () => {
+    sessionStorage.setItem("od.vault.trail:demo", JSON.stringify({
+      search: "?sort=new", total: 3,
+      items: [{ id: "a", title: "First" }, { id: "b", title: "Second" }, { id: "c", title: "Third" }],
+    }));
+    render(<ExhibitNav fileId="b" currentUserId="member" />);
+    expect((await screen.findByRole("link", { name: /First/ })).getAttribute("href")).toBe("/d/demo/file/a");
+    expect(screen.getByRole("link", { name: /Third/ }).getAttribute("href")).toBe("/d/demo/file/c");
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    expect(runtime.router.push).toHaveBeenCalledWith("/d/demo/file/c");
+  });
+
+  it("leaves the arrow keys to a field that has focus", async () => {
+    sessionStorage.setItem("od.vault.trail:demo", JSON.stringify({
+      search: "", total: 2, items: [{ id: "a", title: "First" }, { id: "b", title: "Second" }],
+    }));
+    render(<><ExhibitNav fileId="a" currentUserId="member" /><textarea aria-label="note" /></>);
+    await screen.findByRole("link", { name: /Second/ });
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "note" }), { key: "ArrowRight" });
+    expect(runtime.router.push).not.toHaveBeenCalled();
+  });
+
+  it("offers no neighbours for a document reached without the vault", () => {
+    const { container } = render(<ExhibitNav fileId="b" currentUserId="member" />);
+    expect(container.querySelector("nav")).toBeNull();
+  });
+
+  it("fetches the vault's next page, with its filters, when the loaded list ends here", async () => {
+    sessionStorage.setItem("od.vault.trail:demo", JSON.stringify({
+      search: "?sort=new&mine=1", total: 30, items: Array.from({ length: 24 }, (_, i) => ({ id: `f${i}`, title: `Doc ${i}` })),
+    }));
+    const page = query({ data: [{ id: "f24", title: "Doc 24" }], count: 30 });
+    runtime.client.from.mockReturnValue(page);
+    render(<ExhibitNav fileId="f23" currentUserId="member" />);
+    expect((await screen.findByRole("link", { name: /Doc 24/ })).getAttribute("href")).toBe("/d/demo/file/f24");
+    expect(page.range).toHaveBeenCalledWith(24, 47);
+    expect(page.eq).toHaveBeenCalledWith("owner_id", "member");
+    expect(page.order).toHaveBeenCalledWith("created_at", { ascending: false });
+    expect(JSON.parse(sessionStorage.getItem("od.vault.trail:demo")!).items).toHaveLength(25);
   });
 });

@@ -8,57 +8,26 @@ import { FileCard } from "./FileCard";
 import { SkeletonCardGrid } from "@/components/Skeleton";
 import { lastVaultKey } from "@/lib/tenant/vault-return";
 import {
+  VAULT_KINDS as KINDS,
+  VAULT_PAGE_SIZE as PAGE_SIZE,
+  vaultFiltersFromSearch,
+  vaultRangeQuery,
+  vaultSearchFromFilters,
+  writeVaultTrail,
+  type VaultFilters,
+} from "@/lib/tenant/vault-query";
+import {
   SIGNED_URL_TTL,
   STORAGE_BUCKET,
   type CaseFile,
-  type FileKind,
   type SortKey,
   type Subject,
 } from "@/lib/tenant/types";
 
-const PAGE_SIZE = 24;
+// Kept importable from here: the search-term tests, and anything else that
+// knew it as the vault's, still find it.
+export { prefixSearchQuery } from "@/lib/tenant/vault-query";
 
-/**
- * A search box's term, as a prefix tsquery.
- *
- * `websearch_to_tsquery` would be the obvious call and it is the wrong one
- * here: it matches whole lexemes, so a box that searches while you type finds
- * nothing at all until the last word is finished -- `bud` would not reach
- * `budget`. Every token becomes a prefix instead, ANDed together, which is
- * what a search box is expected to do.
- *
- * The tokens are an ALLOWLIST -- letters, digits and underscore, everything
- * else is a separator. That is what makes assembling tsquery syntax here
- * acceptable where assembling PostgREST filter syntax was not: no token can
- * carry `&`, `|`, `!`, `:` or a quote, so nothing a person types becomes an
- * operator. It also travels as a filter VALUE that PostgREST URL-encodes and
- * hands to to_tsquery, so the worst a malformed one could do is make that
- * function raise -- and by construction none of these are malformed.
- *
- * Capped at eight tokens: past that the query costs more than the answer is
- * worth, and nobody types nine words into a search box on purpose.
- *
- * Null when nothing survives tokenising -- a term of pure punctuation is not a
- * search for nothing, it is not a search.
- */
-export function prefixSearchQuery(term: string): string | null {
-  const tokens = term
-    .toLowerCase()
-    .split(/[^\p{L}\p{N}_]+/u)
-    .filter(Boolean)
-    .slice(0, 8);
-  return tokens.length ? tokens.map((token) => `${token}:*`).join(" & ") : null;
-}
-
-const SORTS: Record<SortKey, { column: string; ascending: boolean }> = {
-  top: { column: "score", ascending: false },
-  new: { column: "created_at", ascending: false },
-  worst: { column: "score", ascending: true },
-  views: { column: "view_count", ascending: false },
-  discussed: { column: "comment_count", ascending: false },
-};
-
-const KINDS: FileKind[] = ["image", "pdf", "video", "audio"];
 const KIND_KEYS = {
   image: "vault.kind.image",
   pdf: "vault.kind.pdf",
@@ -106,17 +75,16 @@ export function VaultBrowser({
   // history keeps the current filters shareable without refetching the route.
   useEffect(() => {
     function restoreFilters() {
-      const params = new URLSearchParams(window.location.search);
-      const query = params.get("q") ?? "";
-      const requestedSort = params.get("sort") ?? "top";
-      const requestedKind = params.get("kind") ?? "";
-      setSearch(query);
-      setDebounced(query.trim());
-      setSort(Object.hasOwn(SORTS, requestedSort) ? requestedSort as SortKey : "top");
-      setSubjectId(params.get("subject") ?? "");
-      setCategory(params.get("category") ?? "");
-      setKind(KINDS.includes(requestedKind as FileKind) ? requestedKind : "");
-      setMineOnly(params.get("mine") === "1");
+      const filters = vaultFiltersFromSearch(window.location.search);
+      // The box shows what was in the address, untrimmed; the query uses the
+      // trimmed term the parser returns.
+      setSearch(new URLSearchParams(window.location.search).get("q") ?? "");
+      setDebounced(filters.q);
+      setSort(filters.sort);
+      setSubjectId(filters.subject);
+      setCategory(filters.category);
+      setKind(filters.kind);
+      setMineOnly(filters.mine);
       setFiltersReady(true);
     }
     restoreFilters();
@@ -157,6 +125,11 @@ export function VaultBrowser({
   // controls above it.
   const latestRequest = useRef(0);
 
+  // Everything loaded for the current filters, in order: the list the
+  // exhibit page's previous/next links walk. Replaced with the first page of
+  // a new query, extended by every page after it.
+  const trail = useRef<Array<{ id: string; title: string }>>([]);
+
   const load = useCallback(
     async (pageIndex: number, replace: boolean) => {
       const ticket = ++latestRequest.current;
@@ -167,50 +140,25 @@ export function VaultBrowser({
       setError(false);
 
       try {
-        // Named columns rather than `*`, and spelled out in the call rather
-        // than hoisted into a constant: supabase-js reads the select list at
-        // the TYPE level, so it has to be a literal for the rows to come back
-        // typed rather than as a parse error.
-        //
-        // The view carries two columns now that exist only to be filtered on
-        // -- the tsvector and the subject id array -- and neither is worth
-        // sending to twenty-four cards. PostgREST filters independently of the
-        // select list, so leaving them out costs the filters below nothing.
-        let query = supabase
-          .from("files_public")
-          .select(
-            "id, title, description, category, kind, mime_type, size_bytes, original_name, storage_path, thumb_path, upvotes, downvotes, score, comment_count, view_count, case_number, created_at, owner_id, owner_username, subjects",
-            { count: "exact" }
-          );
-
-        // One request, whatever the subject holds. This used to be a separate
-        // round trip that fetched every matching file id and sent them back as
-        // an `in` list, so the URL grew with the archive.
-        if (subjectId) query = query.contains("subject_ids", [subjectId]);
-        if (category) query = query.eq("category", category);
-        if (kind) query = query.eq("kind", kind);
-        if (mineOnly) query = query.eq("owner_id", currentUserId);
-        // Not named `search`: that is the state holding the raw box contents,
-        // and shadowing it here would be one rename away from a real bug.
-        const searchQuery = debounced ? prefixSearchQuery(debounced) : null;
-        if (searchQuery) {
-          // `simple` to match the column's own configuration -- a mismatch
-          // here silently stops matching rather than failing loudly.
-          query = query.textSearch("search", searchQuery, { config: "simple" });
-        }
-
-        const { column, ascending } = SORTS[sort];
-        query = query
-          .order(column, { ascending })
-          .order("created_at", { ascending: false })
-          .order("id", { ascending: false })
-          .range(pageIndex * PAGE_SIZE, pageIndex * PAGE_SIZE + PAGE_SIZE - 1);
-
+        const filters: VaultFilters = {
+          q: debounced, sort, subject: subjectId, category, kind, mine: mineOnly,
+        };
+        // Named columns rather than `*`. The view carries two columns that
+        // exist only to be filtered on -- the tsvector and the subject id
+        // array -- and neither is worth sending to twenty-four cards.
+        const query = vaultRangeQuery(
+          supabase,
+          "id, title, description, category, kind, mime_type, size_bytes, original_name, storage_path, thumb_path, upvotes, downvotes, score, comment_count, view_count, case_number, created_at, owner_id, owner_username, subjects",
+          filters,
+          currentUserId,
+          pageIndex * PAGE_SIZE,
+          pageIndex * PAGE_SIZE + PAGE_SIZE - 1
+        );
         const { data, count, error } = await query;
         if (error) throw error;
         if (stale()) return;
 
-        const rows = (data ?? []) as CaseFile[];
+        const rows = (data ?? []) as unknown as CaseFile[];
 
         // Merge in this member's own votes. RLS means the query can only ever
         // return their own rows, so nobody can see how anyone else voted.
@@ -233,6 +181,14 @@ export function VaultBrowser({
         setTotal(count ?? 0);
         setFiles((prev) => (replace ? rows : [...prev, ...rows]));
         setPage(pageIndex);
+
+        const loaded = rows.map((r) => ({ id: r.id, title: r.title }));
+        trail.current = replace ? loaded : [...trail.current, ...loaded];
+        writeVaultTrail(slug, {
+          search: vaultSearchFromFilters(filters),
+          total: count ?? 0,
+          items: trail.current,
+        });
 
         // One batched call for all image thumbnails on this page.
         //
@@ -273,7 +229,7 @@ export function VaultBrowser({
         if (!stale()) setLoading(false);
       }
     },
-    [supabase, debounced, sort, subjectId, category, kind, mineOnly, currentUserId]
+    [supabase, debounced, sort, subjectId, category, kind, mineOnly, currentUserId, slug]
   );
 
   useEffect(() => {

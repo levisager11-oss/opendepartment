@@ -9,6 +9,7 @@ import { ReportButton } from "@/components/dept/ReportButton";
 import { DeleteFileButton } from "@/components/dept/DeleteFileButton";
 import { VaultBackLink } from "@/components/dept/VaultBackLink";
 import { PrintButton } from "@/components/dept/PrintButton";
+import { ExhibitNav } from "@/components/dept/ExhibitNav";
 import { FileMeta } from "@/components/FileMeta";
 import { T } from "@/components/T";
 import { privatePage } from "@/lib/seo";
@@ -113,6 +114,7 @@ export default async function FilePage({
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 sm:py-8">
       <VaultBackLink />
+      <ExhibitNav fileId={file.id} currentUserId={member.userId} />
 
       {/* Print only. The banner that says PARODY is screen chrome and drops
           out of a printout with the rest of it -- and a printed page that
