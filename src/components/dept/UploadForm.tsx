@@ -9,6 +9,7 @@ import { useTenant, useTenantClient } from "@/lib/tenant/context";
 import { KindIcon } from "@/components/KindIcon";
 import { scrubImage } from "@/lib/tenant/scrub";
 import { makeThumbnail } from "@/lib/tenant/thumbnail";
+import { uploadObject } from "@/lib/tenant/upload-object";
 import {
   ACCEPTED_MIME,
   STORAGE_BUCKET,
@@ -39,7 +40,7 @@ export function UploadForm({
 
   // Categories and the size cap are per-department settings, so they arrive
   // through context rather than being compiled in from env vars.
-  const { branding, href } = useTenant();
+  const { branding, href, supabaseUrl, anonKey } = useTenant();
   const supabase = useTenantClient();
   const categories = branding.categories;
   const maxUploadMb = branding.maxUploadMb;
@@ -55,6 +56,9 @@ export function UploadForm({
 
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
+  // 0..1 while the bytes are travelling, null when there is no number to
+  // show -- before the upload starts, after it, or on the library path.
+  const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [preparing, setPreparing] = useState(false);
   const selectionRequest = useRef(0);
@@ -200,9 +204,15 @@ export function UploadForm({
         if (!write) {
           const stem = `${userId}/${crypto.randomUUID()}`;
           const path = `${stem}-${sanitiseName(file.name)}`;
-          const { error: uploadError } = await supabase.storage
-            .from(STORAGE_BUCKET)
-            .upload(path, file, { contentType: file.type, upsert: false });
+          setProgress(0);
+          const { error: uploadError } = await uploadObject(
+            supabase,
+            { supabaseUrl, anonKey },
+            path,
+            file,
+            setProgress
+          );
+          setProgress(null);
           if (uploadError) throw uploadError;
 
           /**
@@ -582,12 +592,32 @@ export function UploadForm({
         </button>
 
         {busy && (
-          <div
-            className="h-1.5 flex-1 overflow-hidden rounded-full bg-paper-300"
-            role="progressbar"
-            aria-label={t("upload.progress")}
-          >
-            <div className="h-full w-1/3 animate-indeterminate bg-gov-700" />
+          // A real percentage while the file is travelling; the moving bar
+          // only for the steps nobody can measure -- the thumbnail, the
+          // database row, the subject links.
+          <div className="flex flex-1 items-center gap-3">
+            <div
+              className="h-1.5 flex-1 overflow-hidden rounded-full bg-paper-300"
+              role="progressbar"
+              aria-label={t("upload.progress")}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={progress === null ? undefined : Math.round(progress * 100)}
+            >
+              {progress === null ? (
+                <div className="h-full w-1/3 animate-indeterminate bg-gov-700" />
+              ) : (
+                <div
+                  className="h-full bg-gov-700 transition-[width] duration-200 ease-out"
+                  style={{ width: `${Math.max(2, progress * 100)}%` }}
+                />
+              )}
+            </div>
+            {progress !== null && (
+              <span className="typewriter w-10 shrink-0 text-right text-xs tabular-nums text-ink-700">
+                {Math.round(progress * 100)}%
+              </span>
+            )}
           </div>
         )}
 

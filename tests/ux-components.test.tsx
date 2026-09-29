@@ -65,6 +65,15 @@ vi.mock("@/lib/control/browser", () => ({ CONTROL_READY: true, createControlBrow
 vi.mock("@supabase/supabase-js", () => ({ createClient: () => ({ rpc: runtime.tenantRpc }) }));
 vi.mock("@/components/dept/FileCard", () => ({ FileCard: ({ file }: { file: { title: string } }) => <article>{file.title}</article> }));
 vi.mock("@/lib/tenant/scrub", () => ({ scrubImage: async (file: File) => ({ file, scrubbed: false, unsupported: false }) }));
+// The progress-reporting upload talks XMLHttpRequest to storage. Components
+// are tested against the storage mock through the library path it falls back
+// to; the XHR half has tests of its own.
+vi.mock("@/lib/tenant/upload-object", () => ({
+  uploadObject: async (client: { storage: { from: (b: string) => { upload: (...a: unknown[]) => Promise<{ error: unknown }> } } }, _coords: unknown, path: string, file: File) => {
+    const { error } = await client.storage.from("department-files").upload(path, file, { contentType: file.type, upsert: false });
+    return { error };
+  },
+}));
 
 type Result = { data?: unknown; error?: unknown; count?: number };
 function query(result: Result | Promise<Result>) {
