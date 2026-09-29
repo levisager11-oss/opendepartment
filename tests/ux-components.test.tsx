@@ -26,6 +26,7 @@ import { DeptLeaveForm } from "@/components/dept/DeptLeaveForm";
 import { ReportForm } from "@/components/ReportForm";
 import { SubjectIndex } from "@/components/dept/SubjectIndex";
 import { ExhibitNav } from "@/components/dept/ExhibitNav";
+import { EditFileDetails } from "@/components/dept/EditFileDetails";
 
 const runtime = vi.hoisted(() => ({
   query: "",
@@ -1090,5 +1091,50 @@ describe("navigation and form guidance", () => {
     expect(page.eq).toHaveBeenCalledWith("owner_id", "member");
     expect(page.order).toHaveBeenCalledWith("created_at", { ascending: false });
     expect(JSON.parse(sessionStorage.getItem("od.vault.trail:demo")!).items).toHaveLength(25);
+  });
+
+  const editable = { title: "Old title", description: null, category: "EXHIBIT", subjectIds: ["case-a"] };
+  const editSubjects = [{ id: "case-a", name: "Case A" }, { id: "case-b", name: "Case B" }];
+
+  it("does not call a refused correction saved", async () => {
+    runtime.client.from.mockReturnValue(query({ data: [], error: null }));
+    render(<EditFileDetails fileId="file-1" initial={editable} subjects={editSubjects} />);
+    fireEvent.click(screen.getByRole("button", { name: tr("file.edit") }));
+    fireEvent.click(screen.getByRole("button", { name: tr("common.save") }));
+    expect((await screen.findByRole("alert")).textContent).toBe(tr("common.actionFailed"));
+    expect(runtime.router.refresh).not.toHaveBeenCalled();
+  });
+
+  it("saves the details and swaps one subject for another", async () => {
+    const update = query({ data: [{ id: "file-1" }], error: null });
+    const add = query({ error: null });
+    const remove = query({ error: null });
+    const readback = query({ data: [], error: null });
+    runtime.client.from.mockReturnValueOnce(update).mockReturnValueOnce(add)
+      .mockReturnValueOnce(remove).mockReturnValueOnce(readback);
+    render(<EditFileDetails fileId="file-1" initial={editable} subjects={editSubjects} />);
+    fireEvent.click(screen.getByRole("button", { name: tr("file.edit") }));
+    fireEvent.change(screen.getByLabelText(tr("upload.fileTitle")), { target: { value: "  New title  " } });
+    fireEvent.click(screen.getByRole("button", { name: /Case A/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Case B/ }));
+    fireEvent.click(screen.getByRole("button", { name: tr("common.save") }));
+    await waitFor(() => expect(runtime.router.refresh).toHaveBeenCalledTimes(1));
+    expect(update.update).toHaveBeenCalledWith({ title: "New title", description: null, category: "EXHIBIT" });
+    expect(add.upsert).toHaveBeenCalledWith([{ file_id: "file-1", subject_id: "case-b" }], { onConflict: "file_id,subject_id", ignoreDuplicates: true });
+    expect(remove.in).toHaveBeenCalledWith("subject_id", ["case-a"]);
+    expect(screen.queryByLabelText(tr("upload.fileTitle"))).toBeNull();
+  });
+
+  it("says which half of a correction landed when the subjects did not", async () => {
+    runtime.client.from.mockReturnValueOnce(query({ data: [{ id: "file-1" }], error: null }))
+      .mockReturnValueOnce(query({ error: null }))
+      // The delete answers without error, but the link is still there.
+      .mockReturnValueOnce(query({ data: [{ subject_id: "case-a" }], error: null }));
+    render(<EditFileDetails fileId="file-1" initial={editable} subjects={editSubjects} />);
+    fireEvent.click(screen.getByRole("button", { name: tr("file.edit") }));
+    fireEvent.click(screen.getByRole("button", { name: /Case A/ }));
+    fireEvent.click(screen.getByRole("button", { name: tr("common.save") }));
+    expect((await screen.findByRole("alert")).textContent).toBe(tr("file.editSubjectsFailed"));
+    expect(runtime.router.refresh).not.toHaveBeenCalled();
   });
 });

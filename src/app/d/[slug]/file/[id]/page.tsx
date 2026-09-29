@@ -10,6 +10,7 @@ import { DeleteFileButton } from "@/components/dept/DeleteFileButton";
 import { VaultBackLink } from "@/components/dept/VaultBackLink";
 import { PrintButton } from "@/components/dept/PrintButton";
 import { ExhibitNav } from "@/components/dept/ExhibitNav";
+import { EditFileDetails } from "@/components/dept/EditFileDetails";
 import { FileMeta } from "@/components/FileMeta";
 import { T } from "@/components/T";
 import { privatePage } from "@/lib/seo";
@@ -19,6 +20,7 @@ import {
   caseLabel,
   type CaseFile,
   type Comment,
+  type Subject,
 } from "@/lib/tenant/types";
 
 export const dynamic = "force-dynamic";
@@ -109,7 +111,21 @@ export default async function FilePage({
     };
   });
 
-  const canDelete = file.owner_id === member.userId || member.profile.is_admin;
+  const isOwner = file.owner_id === member.userId;
+  const canDelete = isOwner || member.profile.is_admin;
+
+  // The subject picker for the edit form. Only the owner may edit -- the
+  // schema's UPDATE grant and files_update_own say so -- so only the owner's
+  // page pays for the read.
+  let allSubjects: Subject[] = [];
+  if (isOwner) {
+    const { data: subjectRows, error: subjectsError } = await supabase
+      .from("subjects")
+      .select("id, name, description")
+      .order("name");
+    if (subjectsError) throw new Error("Could not load subjects.");
+    allSubjects = (subjectRows ?? []) as Subject[];
+  }
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 sm:py-8">
@@ -216,13 +232,23 @@ export default async function FilePage({
 
           <PrintButton />
 
+          {isOwner && (
+            <EditFileDetails
+              fileId={file.id}
+              initial={{
+                title: file.title,
+                description: file.description,
+                category: file.category,
+                subjectIds: file.subjects.map((s) => s.id),
+              }}
+              subjects={allSubjects}
+            />
+          )}
+
           <ReportButton fileId={file.id} />
 
           {canDelete && (
-            <DeleteFileButton
-              fileId={file.id}
-              isOwner={file.owner_id === member.userId}
-            />
+            <DeleteFileButton fileId={file.id} isOwner={isOwner} />
           )}
         </div>
       </article>
