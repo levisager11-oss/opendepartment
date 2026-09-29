@@ -172,6 +172,16 @@ with no platform around it. Resolved by
 [src/lib/control/dev.ts](src/lib/control/dev.ts) and consulted only
 *after* the real directory lookup fails.
 
+A pinned URL may be a **self-hosted Supabase** as well as the cloud:
+`pinnedOrigin()` accepts a bare `https://` origin anywhere, or `http://` on
+loopback only, and skips anything else with a warning. The proxy adds every
+non-cloud pinned origin (and a self-hosted control plane's) to the CSP's
+`connect-src`/`img-src`/`media-src`, because the browser talks to the project
+directly. Those origins come from the deployment's environment only -- the
+wizard's probe and the control plane's CHECK constraint still hold every
+*registered* department to `*.supabase.co`, and that is deliberate: widening
+them would turn the probe into an SSRF.
+
 ### Schema codegen — edit the `.sql`, never the `.ts`
 
 **Every change to `db/tenant-schema.sql` must raise the version stamp at the

@@ -1,9 +1,10 @@
 # OpenDepartment
 
-Run your own parody document archive. A generalisation of
+Run your own private archive, dressed up as a records office. A generalisation of
 [The Lorenzo Files](https://the-lorenzo-files.vercel.app/): anyone can create a
 department, name it after anything, invite their own people, and keep every
-byte of it in a Supabase project they own.
+byte of it in a Supabase project they own -- on supabase.com or on
+[their own server](#running-on-your-own-server).
 
 The [September 2026 audit](AUDIT.md) records the current security fixes,
 verification, remaining limitations and rollout steps. New installations use
@@ -173,6 +174,58 @@ somebody registered through the wizard.
 To fill a department with something to look at, run `db/seed-demo.sql`: five
 subjects, twelve exhibits, comments, mixed votes, one open report, and three
 demo members (password `demopass123`) so scores are not all from one person.
+
+## Running on your own server
+
+Supabase is open source, and a department does not care whether the project it
+talks to is on supabase.com or on a machine you own. For somebody who wants
+nothing of theirs on anybody else's servers, the whole stack can be yours:
+
+1. **Run Supabase yourself.** Follow Supabase's self-hosting guide
+   (https://supabase.com/docs/guides/self-hosting/docker): clone their
+   repository, copy `docker/.env.example`, set your own secrets and start it
+   with Docker Compose. Put it behind HTTPS -- a reverse proxy such as Caddy or
+   nginx in front of the Kong gateway -- at an address like
+   `https://supabase.example.org`.
+2. **Install the schema.** Open Studio on that server, then the SQL editor,
+   and run [`db/tenant-schema.sql`](db/tenant-schema.sql). Follow
+   [founder setup](docs/AUDIT-BOOTSTRAP.md) for the first administrator, as
+   for any pinned department.
+3. **Configure auth** in the server's `.env`: `SITE_URL` and
+   `ADDITIONAL_REDIRECT_URLS` must include
+   `https://YOUR-DEPLOYMENT/d/<slug>/auth/callback`, and either
+   `ENABLE_EMAIL_AUTOCONFIRM=true` or a working SMTP block -- the same e-mail
+   decision the wizard asks a cloud owner to make.
+4. **Deploy your own copy of this app** with the department pinned to it:
+
+   ```bash
+   STATIC_DEPARTMENTS={"files":{"url":"https://supabase.example.org","key":"YOUR_ANON_KEY","name":"The Files"}}
+   ```
+
+   No control plane, no wizard and no OpenDepartment account are involved.
+
+What is accepted, and why (`pinnedOrigin()` in
+[src/lib/control/dev.ts](src/lib/control/dev.ts)):
+
+- **HTTPS, always**, with one exception: plain HTTP on `localhost`,
+  `127.0.0.1` or `[::1]`, which is what `supabase start` serves and which no
+  browser but your own can reach. Anything else over HTTP would carry members'
+  sessions in the clear, and the entry is skipped with a warning at startup.
+- **A bare origin** -- no path, query or credentials. Every client call appends
+  its own path, and the value also widens the policy below.
+- **The Content-Security-Policy follows.** The browser talks to a department's
+  project directly (sign-in, uploads, the vault's queries), so the proxy adds
+  each self-hosted origin to `connect-src`, `img-src` and `media-src`, and the
+  control plane's too when that is self-hosted. These come only from the
+  deployment's own environment. A department registered through the public
+  wizard is still held to `*.supabase.co` by the probe and by the control
+  plane's CHECK constraint -- self-hosting is for deployments that pin.
+
+Nothing in the schema depends on Supabase's cloud: `npm run test:rls` already
+runs it against plain PostgreSQL with stand-ins for Supabase Auth and Storage.
+What differs is operational -- backups, upgrades and storage limits are yours,
+and the storage service's own `FILE_SIZE_LIMIT` caps an upload before the
+bucket's limit is ever reached.
 
 ## One-click setup (optional)
 

@@ -578,6 +578,8 @@ export const dictionary = {
     "danger.nextBody":
       "The archive is empty and its door is shut. The Supabase project it lives in still exists -- delete that too if you are finished with it.",
     "danger.nextProject": "Open the project in Supabase",
+    "danger.nextSelfHosted":
+      "This department runs on a self-hosted Supabase at {url}. Delete the project there too, through that server's own Studio or database, if you are finished with it.",
     "danger.nextListing": "Remove the listing",
 
     // --- landing --------------------------------------------------------
@@ -1428,6 +1430,8 @@ export const dictionary = {
     "danger.nextBody":
       "Das Archiv ist leer und seine Tür ist zu. Das Supabase-Projekt, in dem es liegt, existiert weiterhin -- löschen Sie auch das, wenn Sie damit fertig sind.",
     "danger.nextProject": "Projekt in Supabase öffnen",
+    "danger.nextSelfHosted":
+      "Dieses Departement läuft auf einem selbst betriebenen Supabase unter {url}. Löschen Sie das Projekt auch dort, über das Studio oder die Datenbank dieses Servers, wenn Sie es nicht mehr brauchen.",
     "danger.nextListing": "Eintrag entfernen",
 
     // --- landing --------------------------------------------------------

@@ -1,6 +1,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { resolveDepartmentCached } from "@/lib/control/cache";
+import { isSupabaseCloud, pinnedOrigin, selfHostedOrigins } from "@/lib/control/dev";
 import { tenantCookieConfig } from "@/lib/tenant/cookies";
 
 type CookieBundle = { name: string; value: string; options?: CookieOptions };
@@ -75,9 +76,33 @@ const CONTROL_PUBLIC = ["/account/login", "/account/auth"];
  * instead: a CHECK constraint in the tenant schema, a hex test on the way out
  * of getBranding(), and the assertions covering both.
  */
-const SUPABASE = "https://*.supabase.co https://*.supabase.in";
+const SUPABASE_CLOUD = "https://*.supabase.co https://*.supabase.in";
+
+/**
+ * Where the browser may reach a Supabase project: the cloud, plus every
+ * self-hosted server this deployment was configured with -- a pinned
+ * department's own (lib/control/dev.ts), and the control plane's when that is
+ * self-hosted too. Both come from the deployment's own environment, never from
+ * a request or a directory row, so nothing a visitor or an operator types can
+ * widen this list; a department registered through the wizard is still held
+ * to the cloud pattern by the probe and by a CHECK constraint.
+ */
+function backendOrigins(): string[] {
+  const extra = new Set(selfHostedOrigins());
+  const control = pinnedOrigin(process.env.NEXT_PUBLIC_CONTROL_SUPABASE_URL ?? "");
+  if (control && !isSupabaseCloud(control)) extra.add(control);
+  return [...extra];
+}
 
 function contentSecurityPolicy(nonce: string): string {
+  const selfHosted = backendOrigins();
+  const SUPABASE = [SUPABASE_CLOUD, ...selfHosted].join(" ");
+  // upgrade-insecure-requests would rewrite a loopback http:// project to
+  // https:// and break it. pinnedOrigin() only lets http through for
+  // localhost, so this is only ever dropped on a developer's own machine.
+  const upgrade = selfHosted.some((origin) => origin.startsWith("http:"))
+    ? []
+    : [`upgrade-insecure-requests`];
   return [
     `default-src 'self'`,
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
@@ -96,7 +121,7 @@ function contentSecurityPolicy(nonce: string): string {
     `form-action 'self'`,
     `base-uri 'self'`,
     `frame-ancestors 'none'`,
-    `upgrade-insecure-requests`,
+    ...upgrade,
   ].join("; ");
 }
 
