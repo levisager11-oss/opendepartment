@@ -208,11 +208,18 @@ overwritten otherwise.
 
 - `src/app/d/[slug]/*` — everything inside one department (front door,
   `login`, `join` invite redemption, `auth/callback`, `onboarding`,
-  `access-denied`, `vault`, `upload`, `file/[id]`, `admin`). Every page
-  under here should start from `requireDepartment` /
+  `access-denied`, `vault`, `subjects`, `upload`, `file/[id]`, `account`,
+  `admin`). Every page under here should start from `requireDepartment` /
   `requireMember` / `requireDeptAdmin` /
   `getMember` in [src/lib/tenant/auth.ts](src/lib/tenant/auth.ts) rather
   than querying Supabase directly for auth state.
+- The vault's filtered, ordered read lives in
+  [src/lib/tenant/vault-query.ts](src/lib/tenant/vault-query.ts), and both
+  the vault and the exhibit page's previous/next links build it there. The
+  vault records what it showed (per tab, sessionStorage) and the exhibit page
+  walks that list, fetching the next page with the same query when it runs
+  out — so a change to the filters or the order goes in that one module, or
+  "next" stops being the card beside this one.
 - `src/app/(marketing pages)`, `src/app/new`, `src/app/directory`,
   `src/app/account/*` — the platform level (register a department, browse
   the public directory, manage an OpenDepartment account). Guarded by
