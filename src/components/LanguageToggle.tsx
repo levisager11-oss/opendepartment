@@ -21,7 +21,7 @@ export function LanguageToggle() {
 
   return (
     <div
-      className="flex items-center rounded-full border border-paper-300 bg-paper-100 p-0.5 text-xs font-semibold"
+      className="flex items-center rounded-control border border-paper-300 bg-paper-100 p-0.5 text-xs font-semibold"
       role="group"
       aria-label={t("nav.language")}
     >
@@ -33,7 +33,7 @@ export function LanguageToggle() {
           type="button"
           onClick={() => pick(code)}
           aria-current={locale === code ? "true" : undefined}
-          className={`min-w-8 cursor-pointer rounded-full px-2 py-1.5 uppercase transition-colors sm:py-1 ${
+          className={`min-w-8 cursor-pointer rounded-tag px-2 py-1.5 uppercase transition-colors sm:py-1 ${
             locale === code
               ? "bg-paper-50 text-ink-900 shadow-sm"
               : "text-ink-500 hover:text-ink-900"

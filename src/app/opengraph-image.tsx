@@ -7,7 +7,7 @@ export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
 const GOLD = "#c9a227";
-const BLUE = "#0061fe";
+const BLUE = "#0050d8";
 const INK = "#1c1b1f";
 
 /**
@@ -47,7 +47,7 @@ export default async function Image() {
           <div style={{ display: "flex", flexDirection: "column", maxWidth: 680 }}>
             <div style={{ display: "flex", alignItems: "center", marginBottom: 44 }}>
               <svg width="56" height="56" viewBox="0 0 32 32">
-                <rect width="32" height="32" rx="8" fill={BLUE} />
+                <rect width="32" height="32" rx="6" fill={BLUE} />
                 <path
                   d="M7.5 11a1.5 1.5 0 0 1 1.5-1.5h4.6l2 2H23a1.5 1.5 0 0 1 1.5 1.5v8.5A1.5 1.5 0 0 1 23 23H9a1.5 1.5 0 0 1-1.5-1.5z"
                   fill="#ffffff"

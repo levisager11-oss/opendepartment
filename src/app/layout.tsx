@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Bricolage_Grotesque, Inter, Special_Elite } from "next/font/google";
+import { Bricolage_Grotesque, IBM_Plex_Mono, Public_Sans, Special_Elite } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { I18nProvider } from "@/lib/i18n/provider";
@@ -9,25 +9,38 @@ import { detectLocale } from "@/lib/i18n/detect";
 import { SITE_NAME, SITE_URL } from "@/lib/seo";
 
 /**
- * Three families. Inter sets everything a person reads or types; Bricolage
- * Grotesque sets the headlines, and is the one place the product is allowed a
- * bit of character; Special Elite is kept for the rubber stamps, the last
- * piece of typewriter the parody still leans on. It ships one weight over the
- * latin subset and only ever sets short strings.
+ * Four families, each chosen rather than defaulted to.
  *
- * Inter and Bricolage are variable fonts, so leaving `weight` out fetches one
- * file each that covers every weight the app uses -- naming weights would
- * fetch one static file per weight instead.
+ *  - Public Sans sets everything a person reads or types. It is the typeface
+ *    of the U.S. Web Design System -- what real government sites are set in --
+ *    so the parody wears the actual uniform instead of a startup's.
+ *  - Bricolage Grotesque sets the headlines, and is the one place the product
+ *    is allowed some character.
+ *  - IBM Plex Mono sets docket numbers and other filing marks.
+ *  - Special Elite is kept for the rubber stamps, the last piece of typewriter
+ *    the parody still leans on. One weight, latin only, short strings.
+ *
+ * Public Sans and Bricolage are variable fonts, so leaving `weight` out fetches
+ * one file each that covers every weight the app uses -- naming weights would
+ * fetch one static file per weight instead. Plex Mono is not variable, and is
+ * only ever set at two weights.
  */
-const inter = Inter({
+const publicSans = Public_Sans({
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--font-public-sans",
   display: "swap",
 });
 
 const bricolage = Bricolage_Grotesque({
   subsets: ["latin"],
   variable: "--font-bricolage",
+  display: "swap",
+});
+
+const plexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-plex-mono",
   display: "swap",
 });
 
@@ -124,7 +137,7 @@ export default async function RootLayout({
   return (
     <html
       lang={locale}
-      className={`${inter.variable} ${bricolage.variable} ${specialElite.variable}`}
+      className={`${publicSans.variable} ${bricolage.variable} ${plexMono.variable} ${specialElite.variable}`}
     >
       <body className="flex min-h-dvh flex-col">
         <I18nProvider initialLocale={locale}>

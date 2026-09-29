@@ -591,7 +591,7 @@ export function UploadForm({
                 className={`mx-auto ${
                   items.length
                     ? "mb-1 text-ink-400"
-                    : "mb-4 box-content rounded-full bg-gov-100 p-4 text-gov-800"
+                    : "mb-3 text-gov-800"
                 }`}
                 width={items.length ? 24 : 30}
                 height={items.length ? 24 : 30}

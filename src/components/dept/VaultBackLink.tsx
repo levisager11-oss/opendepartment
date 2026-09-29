@@ -32,7 +32,7 @@ export function VaultBackLink() {
   return (
     <Link
       href={target}
-      className="inline-flex w-fit items-center gap-1.5 rounded-full border border-paper-300 bg-paper-50 px-3 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-paper-400 hover:text-ink-900 print:hidden"
+      className="inline-flex w-fit items-center gap-1.5 rounded-control border border-paper-300 bg-paper-50 px-3 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-paper-400 hover:text-ink-900 print:hidden"
     >
       <span aria-hidden>←</span> {t("file.back")}
     </Link>

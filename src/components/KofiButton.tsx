@@ -39,7 +39,7 @@ export function KofiButton({ className = "" }: { className?: string }) {
         className="inline-block rounded-control px-4 py-2 text-sm font-bold text-gov-950 transition-opacity hover:opacity-90"
         style={{ backgroundColor: KOFI_COLOR }}
       >
-        ☕ Support me on Ko-fi
+        Support me on Ko-fi
       </a>
     </div>
   );

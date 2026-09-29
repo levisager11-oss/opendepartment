@@ -9,17 +9,7 @@ import {
   caseLabel,
   formatBytes,
   type CaseFile,
-  type FileKind,
 } from "@/lib/tenant/types";
-
-/** A tint per kind, so a document without a picture still reads at a glance. */
-export const KIND_TINT: Record<FileKind, string> = {
-  image: "bg-sky-50 text-sky-600",
-  pdf: "bg-rose-50 text-rose-600",
-  video: "bg-violet-50 text-violet-600",
-  audio: "bg-emerald-50 text-emerald-600",
-  other: "bg-amber-50 text-amber-700",
-};
 
 const ICON = {
   comment: "M4 5h16v11H9l-5 4z",
@@ -50,7 +40,10 @@ function Thumb({
   iconSize: number;
 }) {
   return (
-    <div className={`relative overflow-hidden ${className} ${thumbnail ? "bg-paper-200" : KIND_TINT[file.kind]}`}>
+    // No picture: the kind's own mark on plain paper. One neutral for every
+    // kind -- a colour per kind turned the grid into a rainbow that said
+    // nothing the label under the mark does not.
+    <div className={`relative overflow-hidden ${className} ${thumbnail ? "bg-paper-200" : "bg-paper-100 text-ink-400"}`}>
       {thumbnail ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -58,7 +51,7 @@ function Thumb({
           alt=""
           loading="lazy"
           decoding="async"
-          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+          className="h-full w-full object-cover"
         />
       ) : (
         <div className="flex h-full w-full flex-col items-center justify-center gap-1">
@@ -131,7 +124,7 @@ export function FileCard({
       <Link href={href(`file/${file.id}`)} className="flex flex-1 flex-col">
         <div className="relative">
           <Thumb file={file} thumbnail={thumbnail} className="aspect-[16/10] w-full" iconSize={36} />
-          <span className="docket absolute top-2.5 left-2.5 rounded-md bg-paper-50/90 px-1.5 py-0.5 text-3xs text-ink-700 shadow-sm backdrop-blur">
+          <span className="docket absolute top-2.5 left-2.5 rounded-tag border border-paper-300 bg-paper-50 px-1.5 py-0.5 text-3xs text-ink-700">
             {docket}
           </span>
         </div>

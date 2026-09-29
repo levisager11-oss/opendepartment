@@ -151,7 +151,7 @@ export function getLegalDoc(
           heading: "3. Cookies",
           body: [
             "Cookies speichern Ihre Anmeldung am OpenDepartment-Konto, die gewählte Sprache und den gelesenen Cookie-Hinweis. Die optionale Supabase-Einrichtung verwendet ausserdem kurzlebige Cookies für den Verbindungsablauf und einen verschlüsselten, kontogebundenen Management-API-Token.",
-            "Die App bindet Vercel Analytics für Zugriffsstatistiken ein; dieses Skript setzt keine Cookies. Die Startseite enthält einen gewöhnlichen Link zu Ko-fi -- kein Skript und kein Widget von dort, Ihr Browser verbindet sich mit Ko-fi erst, wenn Sie den Link anklicken. Ein besuchtes Departement setzt ein eigenes Sitzungs-Cookie, das auf seinen URL-Pfad beschränkt ist.",
+            "Die App bindet Vercel Analytics für Zugriffsstatistiken ein; dieses Skript setzt keine Cookies. Die Startseite enthält einen gewöhnlichen Link zu Ko-fi – kein Skript und kein Widget von dort, Ihr Browser verbindet sich mit Ko-fi erst, wenn Sie den Link anklicken. Ein besuchtes Departement setzt ein eigenes Sitzungs-Cookie, das auf seinen URL-Pfad beschränkt ist.",
           ],
         },
         {
@@ -257,7 +257,7 @@ export function getLegalDoc(
         heading: "3. Cookies",
         body: [
           "Cookies keep your OpenDepartment account session, chosen language and dismissed notice. Optional Supabase setup also uses short-lived cookies for its connection flow and an encrypted, account-bound Management API token.",
-          "The app includes Vercel Analytics for traffic statistics; that script sets no cookies. The homepage carries an ordinary link to Ko-fi -- no script and no widget from them, and your browser only reaches Ko-fi if you follow the link. A department you visit sets its own session cookie, scoped to that department's URL path.",
+          "The app includes Vercel Analytics for traffic statistics; that script sets no cookies. The homepage carries an ordinary link to Ko-fi – no script and no widget from them, and your browser only reaches Ko-fi if you follow the link. A department you visit sets its own session cookie, scoped to that department's URL path.",
         ],
       },
       {

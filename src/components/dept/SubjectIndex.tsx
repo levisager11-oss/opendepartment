@@ -16,15 +16,6 @@ export type SubjectSummary = {
 
 const FOLDER = "M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z";
 
-/** Folders in a few colours, so a row of them is not a row of one grey box. */
-const FOLDER_TINTS = [
-  "bg-gov-100 text-gov-800",
-  "bg-amber-100 text-amber-700",
-  "bg-emerald-100 text-emerald-700",
-  "bg-violet-100 text-violet-700",
-  "bg-rose-100 text-rose-700",
-];
-
 /**
  * The subject register: every subject as a card that opens the vault filtered
  * to it. Until this existed the only way to see what subjects there were was
@@ -57,11 +48,6 @@ export function SubjectIndex({
 
       {subjects.length === 0 ? (
         <div className="paper px-6 py-16 text-center">
-          <span className="mx-auto mb-5 flex size-16 items-center justify-center rounded-2xl bg-gov-100 text-gov-800">
-            <svg aria-hidden width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
-              <path d={FOLDER} />
-            </svg>
-          </span>
           <span className="stamp stamp-red text-sm">NO RECORDS</span>
           <p className="mt-5 text-ink-500">{t("subjects.empty")}</p>
           {isAdmin && (
@@ -72,7 +58,7 @@ export function SubjectIndex({
         </div>
       ) : (
         <ul className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {subjects.map((subject, i) => (
+          {subjects.map((subject) => (
             <li key={subject.id} className="flex">
               <Link
                 href={`${href("vault")}?subject=${encodeURIComponent(subject.id)}`}
@@ -80,12 +66,10 @@ export function SubjectIndex({
                   subject.count === 0 ? "opacity-70" : ""
                 }`}
               >
-                <span className={`mb-4 flex size-11 items-center justify-center rounded-xl ${FOLDER_TINTS[i % FOLDER_TINTS.length]}`}>
-                  <svg aria-hidden width="22" height="22" viewBox="0 0 24 24" fill="currentColor" fillOpacity="0.18" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
+                <h2 className="flex items-start gap-2 text-base font-semibold break-words text-ink-900 group-hover:text-gov-800">
+                  <svg aria-hidden width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" className="mt-0.5 shrink-0 text-ink-400">
                     <path d={FOLDER} />
                   </svg>
-                </span>
-                <h2 className="text-base font-semibold break-words text-ink-900 group-hover:text-gov-800">
                   {subject.name}
                 </h2>
                 {subject.description ? (

@@ -51,7 +51,7 @@ export function SkeletonFileCard() {
         <SkeletonLine width="w-1/2" className="mt-4 h-2.5" />
       </div>
       <div className="flex items-center justify-between border-t border-paper-300 px-3 py-2">
-        <SkeletonBlock className="h-8 w-24 rounded-full" />
+        <SkeletonBlock className="h-8 w-24" />
         <SkeletonLine width="w-16" />
       </div>
     </article>

@@ -161,7 +161,7 @@ export function DeptHeader({
                 key={link.href}
                 href={link.href}
                 aria-current={active ? "page" : undefined}
-                className={`rounded-full px-3.5 py-1.5 text-sm font-medium whitespace-nowrap transition-colors ${
+                className={`rounded-control px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors ${
                   active
                     ? "bg-paper-200 text-ink-900"
                     : "text-ink-500 hover:bg-paper-200/70 hover:text-ink-900"
@@ -201,7 +201,7 @@ export function DeptHeader({
                 aria-expanded={userOpen}
                 aria-controls="dept-user-menu"
                 aria-label={`${t("nav.signedInAs")} ${username ?? "—"}`}
-                className="flex cursor-pointer items-center gap-2 rounded-full border border-paper-300 bg-paper-50 py-1 pr-3 pl-1 text-sm font-medium text-ink-900 transition-colors hover:border-paper-400 hover:bg-paper-100"
+                className="flex cursor-pointer items-center gap-2 rounded-control border border-paper-300 bg-paper-50 py-1 pr-3 pl-1 text-sm font-medium text-ink-900 transition-colors hover:border-paper-400 hover:bg-paper-100"
               >
                 <span className="flex size-7 items-center justify-center rounded-full bg-accent text-xs font-bold text-accent-ink">
                   {initial}

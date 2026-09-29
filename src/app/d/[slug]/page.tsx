@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
 import { requireDepartment } from "@/lib/tenant/auth";
 import { Seal } from "@/components/Seal";
-import { T } from "@/components/T";
+import { T, TStamp } from "@/components/T";
 
 /**
  * A department's front door, seen by someone who is not signed in.
@@ -60,24 +60,20 @@ export default async function DepartmentFrontDoor({
   }
 
   return (
-    <div className="relative overflow-hidden">
-      {/* A wash of the department's own colour behind the door. */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-[28rem] bg-[radial-gradient(55%_60%_at_50%_0%,color-mix(in_srgb,var(--accent)_22%,transparent),transparent_75%)]" />
-      <div className="relative mx-auto max-w-3xl px-4 py-14 text-center sm:py-20">
+    <div>
+      <div className="mx-auto max-w-3xl px-4 py-14 text-center sm:py-20">
         <Seal
           size={128}
-          className="mx-auto mb-7 drop-shadow-xl"
+          className="mx-auto mb-7"
           top={branding.sealTop}
           bottom={branding.sealBottom}
           accent={branding.accent}
           idPrefix="door"
         />
 
-        <p className="chip mb-4 border border-paper-300 bg-paper-50 text-ink-700 shadow-sm">
-          <svg aria-hidden width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d={branding.openJoin ? "M6 11h12v10H6z M8.5 11V8a3.5 3.5 0 0 1 6.8-1.2" : "M6 11h12v10H6z M8.5 11V8a3.5 3.5 0 0 1 7 0v3"} />
-          </svg>
-          <T k={branding.openJoin ? "dept.frontDoorOpen" : "dept.frontDoor"} />
+        {/* Stamped, the way a records office marks what may be opened. */}
+        <p className={`stamp stamp-sm mb-5 text-2xs ${branding.openJoin ? "stamp-green" : "stamp-red"}`}>
+          <TStamp k={branding.openJoin ? "dept.frontDoorOpen" : "dept.frontDoor"} />
         </p>
 
         <h1 className="mb-4 font-display text-4xl font-extrabold tracking-tight break-words text-ink-900 sm:text-5xl">
@@ -93,13 +89,13 @@ export default async function DepartmentFrontDoor({
             <dd> after it, so the other way round read out "12: documents on
             file" as if 12 were the heading. flex-col-reverse keeps the number
             on top. */}
-        <dl className="mx-auto mb-10 grid max-w-lg grid-cols-3 gap-3 sm:mb-12 sm:gap-4">
+        <dl className="mx-auto mb-10 grid max-w-lg grid-cols-3 divide-x divide-paper-300 border-y border-paper-300 sm:mb-12">
           {[
             { n: stats.files, label: "landing.stat.files" },
             { n: stats.subjects, label: "landing.stat.subjects" },
             { n: stats.members, label: "landing.stat.members" },
           ].map((s) => (
-            <div key={s.label} className="paper flex flex-col-reverse px-2 py-4 sm:px-3 sm:py-5">
+            <div key={s.label} className="flex flex-col-reverse px-2 py-4 sm:px-3">
               <dt className="mt-1 text-xs text-ink-500">
                 <T k={s.label as never} />
               </dt>

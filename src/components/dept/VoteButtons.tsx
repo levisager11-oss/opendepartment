@@ -72,7 +72,7 @@ export function VoteButtons({
     <div
       className={`flex items-center select-none ${
         layout === "row"
-          ? "gap-0.5 rounded-full border border-paper-300 bg-paper-50 px-0.5"
+          ? "gap-0.5 rounded-control border border-paper-300 bg-paper-50 px-0.5"
           : "flex-col gap-0.5"
       }`}
       title={failed ? t("common.error") : undefined}
@@ -87,7 +87,7 @@ export function VoteButtons({
         disabled={pending}
         aria-label={t("vote.up")}
         aria-pressed={vote === 1}
-        className={`${pad} cursor-pointer rounded-full transition-colors ${
+        className={`${pad} cursor-pointer rounded-tag transition-colors ${
           vote === 1
             ? "text-stamp-green"
             : "text-ink-400 hover:bg-paper-200 hover:text-stamp-green"
@@ -128,7 +128,7 @@ export function VoteButtons({
         disabled={pending}
         aria-label={t("vote.down")}
         aria-pressed={vote === -1}
-        className={`${pad} cursor-pointer rounded-full transition-colors ${
+        className={`${pad} cursor-pointer rounded-tag transition-colors ${
           vote === -1
             ? "text-stamp-red"
             : "text-ink-400 hover:bg-paper-200 hover:text-stamp-red"

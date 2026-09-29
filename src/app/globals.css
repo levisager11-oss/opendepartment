@@ -5,9 +5,16 @@
 
    One modern product surface with the parody kept in the details:
      * the chrome is clean and light -- white cards on a warm off-white page,
-       one bright blue for actions, a grotesk display face, soft radii;
+       one blue for actions, small radii, flat surfaces;
      * the joke lives in small things that stay recognisable -- the seal, the
        docket numbers, the rubber stamps, the redaction bar, the PARODY label.
+
+   Every default here was picked for a reason rather than left at a
+   framework's: the blue and the text face are the ones real government sites
+   use (the U.S. Web Design System's "primary-vivid" and Public Sans), so the
+   parody wears the actual uniform. What is deliberately absent: gradients,
+   glows, glass, hover motion, a rainbow of tints -- the marks of a page nobody
+   made decisions about.
 
    The token NAMES predate this and are kept on purpose, because six hundred
    call sites read them: "gov" is the brand blue scale, "paper" is the neutral
@@ -26,15 +33,15 @@
    (btn-sm, field-sm, stamp-sm), never an override.
    =========================================================================== */
 @theme {
-  /* --- brand blue. 800 is the action colour; 900/950 are the near-black
-         navy used for headings and the few dark surfaces. --- */
-  --color-gov-950: #0a1530;
-  --color-gov-900: #101a2e;
-  --color-gov-800: #0061fe;
-  --color-gov-700: #1a6fff;
-  --color-gov-600: #3d84ff;
-  --color-gov-100: #e7efff;
-  --color-gov-50: #f3f7ff;
+  /* --- brand blue: USWDS primary-vivid for actions, its darker steps for
+         the few navy surfaces, its lightest for selected states. --- */
+  --color-gov-950: #0b1a33;
+  --color-gov-900: #162e51;
+  --color-gov-800: #0050d8;
+  --color-gov-700: #1a60e0;
+  --color-gov-600: #2672de;
+  --color-gov-100: #d9e8f6;
+  --color-gov-50: #eff6fb;
   --color-gold-500: #c9a227;
   --color-gold-400: #d4b23a;
   --color-gold-300: #e8cf7a;
@@ -63,18 +70,20 @@
   --color-redact: #16130f;
 
   /* --- focus --- */
-  --color-ring: #0061fe;
+  --color-ring: #0050d8;
   --color-ring-on-dark: #9cc0ff;
 
   /* --- type ---
-     A grotesk for display, Inter for everything a person reads or types,
-     the system monospace for docket numbers, and Special Elite for the one
-     place the typewriter still earns its download: the rubber stamps. */
-  --font-display: var(--font-bricolage), var(--font-inter), system-ui, sans-serif;
-  --font-sans: var(--font-inter), system-ui, -apple-system, "Segoe UI", sans-serif;
+     Bricolage Grotesque for headlines, Public Sans for everything a person
+     reads or types, IBM Plex Mono for docket numbers -- a typewriter's
+     descendant, which is what a docket was typed on -- and Special Elite for
+     the one place the typewriter itself still earns its download: the
+     rubber stamps. */
+  --font-display: var(--font-bricolage), var(--font-public-sans), system-ui, sans-serif;
+  --font-sans: var(--font-public-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-type: var(--font-special-elite), "Courier New", Courier, monospace;
-  --font-mono: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas,
-    "Liberation Mono", monospace;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SFMono-Regular", Menlo,
+    Consolas, monospace;
 
   /* Two steps below Tailwind's text-xs (0.75rem). The archive chrome is full
      of docket numbers and column headers that want to sit under 12px; before
@@ -95,17 +104,19 @@
   --tracking-banner: 0.01em;
   --tracking-seal: 0.14em;
 
-  /* Two radii for the whole product: surfaces (cards, panels, thumbnails)
-     and controls (buttons, inputs). Every call site reads one of these, so
-     the geometry can never drift apart. */
-  --radius-card: 0.875rem;
-  --radius-control: 0.625rem;
+  /* A radius scale rather than one value everywhere: surfaces (cards,
+     panels, thumbnails), controls (buttons, inputs), and tags. Small on
+     purpose -- a records office is made of paper and folders, not pills. */
+  --radius-card: 0.5rem;
+  --radius-control: 0.375rem;
+  --radius-tag: 0.25rem;
 
-  /* Layered, low-contrast shadows. `lift` is what a card grows into on
-     hover; `pop` is for things that float over the page (menus, dialogs). */
-  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.06);
-  --shadow-lift: 0 4px 8px -2px rgb(16 24 40 / 0.08), 0 12px 24px -6px rgb(16 24 40 / 0.12);
-  --shadow-pop: 0 12px 32px -8px rgb(16 24 40 / 0.22), 0 2px 6px rgb(16 24 40 / 0.08);
+  /* Two shadows, both quiet. `lift` is what a clickable card shows on hover
+     instead of moving; `pop` is for things that float over the page (menus,
+     dialogs). */
+  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.05);
+  --shadow-lift: 0 2px 8px -2px rgb(16 24 40 / 0.14);
+  --shadow-pop: 0 10px 28px -8px rgb(16 24 40 / 0.24), 0 2px 6px rgb(16 24 40 / 0.08);
 
   /* Named sizes for the two viewport-relative boxes in the product, so the
      media viewer and the report dialog stop carrying raw vh values around. */
@@ -133,7 +144,7 @@
   /* Overridden per department by the /d/[slug] layout. The value here is what
      the platform's own pages and an unconfigured department fall back to:
      the brand blue, carrying white. */
-  --accent: #0061fe;
+  --accent: #0050d8;
   /* Text set ON the accent. The department layout recomputes it alongside
      --accent (lib/tenant/contrast.ts): navy on a light accent, white on a
      dark one. */
@@ -151,7 +162,6 @@ body {
   background-color: var(--color-paper-100);
   color: var(--color-ink-900);
   font-family: var(--font-sans);
-  font-feature-settings: "cv11", "ss01";
   min-height: 100dvh;
 }
 
@@ -219,16 +229,10 @@ input[type="radio"] {
   border-top: 1px solid var(--color-paper-300);
 }
 
-/* The sticky header on every page: a translucent white bar that lets the page
-   show through faintly as it scrolls underneath. The fallback for a browser
-   without backdrop-filter is simply opaque white. */
+/* The sticky header on every page: solid white with a hairline under it. */
 @utility masthead {
-  background: rgb(255 255 255 / 0.96);
+  background: var(--color-paper-50);
   color: var(--color-ink-900);
-  @supports (backdrop-filter: blur(1px)) {
-    background: rgb(255 255 255 / 0.82);
-    backdrop-filter: saturate(1.6) blur(14px);
-  }
 }
 
 /* ===========================================================================
@@ -241,19 +245,14 @@ input[type="radio"] {
   box-shadow: var(--shadow-card);
 }
 
-/* A card that answers the pointer: it rises a little and its shadow deepens.
-   For whole-card links -- a file, a department, a subject -- where the card
-   itself is the thing you click. */
+/* A card that answers the pointer: its edge darkens and its shadow deepens,
+   and nothing moves. For whole-card links -- a file, a department, a
+   subject -- where the card itself is the thing you click. */
 @utility lift {
-  transition: transform 180ms ease-out, box-shadow 180ms ease-out,
-    border-color 180ms ease-out;
+  transition: box-shadow 150ms ease-out, border-color 150ms ease-out;
   &:hover {
-    transform: translateY(-2px);
     box-shadow: var(--shadow-lift);
-    border-color: var(--color-paper-400);
-  }
-  &:active {
-    transform: translateY(0);
+    border-color: var(--color-paper-500);
   }
 }
 
@@ -294,14 +293,14 @@ input[type="radio"] {
   text-transform: uppercase;
 }
 
-/* A pill: a category, a subject, a filter. Colour is the call site's; the
+/* A tag: a subject, a count, a filter. Colour is the call site's; the
    neutral default below is what a chip with no colour class gets. */
 @utility chip {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  border-radius: 9999px;
-  padding: 0.125rem 0.625rem;
+  border-radius: var(--radius-tag);
+  padding: 0.125rem 0.5rem;
   font-size: var(--text-xs);
   line-height: 1.25rem;
   font-weight: 500;
@@ -446,8 +445,6 @@ input[type="radio"] {
 @utility btn-primary {
   background: var(--color-gov-800);
   color: #fff;
-  box-shadow: 0 1px 2px rgb(0 40 120 / 0.2),
-    inset 0 1px 0 rgb(255 255 255 / 0.12);
   &:hover:not(:disabled) {
     background: color-mix(in srgb, var(--color-gov-800) 88%, #000);
   }
@@ -499,8 +496,6 @@ input[type="radio"] {
 @utility btn-accent {
   background: var(--accent);
   color: var(--accent-ink);
-  box-shadow: 0 1px 2px rgb(16 24 40 / 0.18),
-    inset 0 1px 0 rgb(255 255 255 / 0.14);
   &:hover:not(:disabled) {
     background: color-mix(in srgb, var(--accent) 88%, #000);
   }
@@ -564,7 +559,7 @@ input[type="radio"] {
 @utility dropzone {
   background-color: var(--color-paper-50);
   border: 2px dashed var(--color-paper-400);
-  border-radius: 1.25rem;
+  border-radius: var(--radius-card);
   cursor: pointer;
   transition: border-color 150ms ease-out, background-color 150ms ease-out;
   &:hover {
@@ -681,10 +676,6 @@ input[type="radio"] {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
-  }
-  /* A card that jumps rather than glides is worse than one that stays put. */
-  .lift:hover {
-    transform: none;
   }
 }
 
