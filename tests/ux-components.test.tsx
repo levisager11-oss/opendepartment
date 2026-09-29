@@ -348,6 +348,82 @@ describe("upload recovery", () => {
   });
 });
 
+describe("filing several documents at once", () => {
+  const pdf = (name: string) => new File(["%PDF-1.4"], name, { type: "application/pdf" });
+  function addFiles(files: File[]) {
+    fireEvent.change(screen.getByLabelText(tr("upload.dropzone")), { target: { files } });
+  }
+
+  it("files each with its own title and the shared details, then opens the member's own filings", async () => {
+    const inserts = [query({ data: { id: "f1" }, error: null }), query({ data: { id: "f2" }, error: null })];
+    let n = 0;
+    runtime.client.from.mockImplementation(() => inserts[n++]);
+    render(<UploadForm userId="member" subjects={[]} />);
+    addFiles([pdf("minutes.pdf"), pdf("agenda.pdf")]);
+    const second = await screen.findByRole("textbox", { name: translate("en", "upload.titleFor", { name: "agenda.pdf" }) });
+    fireEvent.change(second, { target: { value: "The agenda" } });
+    fireEvent.change(screen.getByLabelText(tr("upload.descriptionAll")), { target: { value: "Both from Tuesday" } });
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: translate("en", "upload.submitMany", { n: 2 }) }));
+    await waitFor(() => expect(runtime.router.push).toHaveBeenCalledWith("/d/demo/vault?sort=new&mine=1"));
+    expect(runtime.storage.upload).toHaveBeenCalledTimes(2);
+    expect(inserts[0].insert.mock.calls[0][0]).toMatchObject({ title: "minutes", description: "Both from Tuesday", category: "EXHIBIT" });
+    expect(inserts[1].insert.mock.calls[0][0]).toMatchObject({ title: "The agenda", description: "Both from Tuesday" });
+  });
+
+  it("keeps what was filed and retries only what was not", async () => {
+    const calls: string[] = [];
+    let insertCount = 0;
+    runtime.client.from.mockImplementation(() => {
+      insertCount += 1;
+      calls.push(`from#${insertCount}`);
+      // 1: first insert ok. 2: second refused by the quota. 3: its read-back
+      // finds nothing. 4: the retry's insert goes through.
+      if (insertCount === 1) return query({ data: { id: "f1" }, error: null });
+      if (insertCount === 2) return query({ error: { code: "P0001", message: "QUOTA_EXCEEDED" } });
+      if (insertCount === 3) return query({ data: null, error: null });
+      return query({ data: { id: "f2" }, error: null });
+    });
+    render(<UploadForm userId="member" subjects={[]} />);
+    addFiles([pdf("one.pdf"), pdf("two.pdf")]);
+    await screen.findByRole("textbox", { name: translate("en", "upload.titleFor", { name: "two.pdf" }) });
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: translate("en", "upload.submitMany", { n: 2 }) }));
+    expect((await screen.findByRole("alert")).textContent).toBe(translate("en", "upload.someFailed", { n: 1, total: 2 }));
+    expect(screen.getByText(tr("upload.errorQuota"))).toBeTruthy();
+    expect(screen.getByRole("link", { name: new RegExp(tr("upload.filed")) }).getAttribute("href")).toBe("/d/demo/file/f1");
+    fireEvent.click(screen.getByRole("button", { name: tr("upload.retryFailed") }));
+    await waitFor(() => expect(runtime.router.push).toHaveBeenCalledWith("/d/demo/vault?sort=new&mine=1"));
+    // The first document was not uploaded or inserted a second time.
+    expect(runtime.storage.upload).toHaveBeenCalledTimes(3);
+    expect(runtime.storage.upload.mock.calls.map((c) => String(c[0]).endsWith("-one.pdf"))).toEqual([true, false, false]);
+  });
+
+  it("takes a pasted image as a file", async () => {
+    render(<UploadForm userId="member" subjects={[]} />);
+    const event = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(event, "clipboardData", { value: { files: [new File(["png"], "image.png", { type: "image/png" })] } });
+    const createObjectURL = vi.fn(() => "blob:preview");
+    const original = URL.createObjectURL;
+    Object.assign(URL, { createObjectURL });
+    try {
+      act(() => { window.dispatchEvent(event); });
+      expect(await screen.findByText("image.png")).toBeTruthy();
+      expect(event.defaultPrevented).toBe(true);
+      expect((screen.getByLabelText(tr("upload.fileTitle")) as HTMLInputElement).value).toBe("image");
+    } finally {
+      Object.assign(URL, { createObjectURL: original });
+    }
+  });
+
+  it("takes at most ten files at once and says so", async () => {
+    render(<UploadForm userId="member" subjects={[]} />);
+    addFiles(Array.from({ length: 11 }, (_, i) => pdf(`doc-${i}.pdf`)));
+    expect((await screen.findByRole("alert")).textContent).toContain(translate("en", "upload.tooMany", { max: 10 }));
+    await waitFor(() => expect(screen.getAllByRole("textbox", { name: /Title for/ })).toHaveLength(10));
+  });
+});
+
 describe("action refusal feedback", () => {
   it("keeps a refused comment while preserving a parallel successful deletion", async () => {
     const refused = deferred();
