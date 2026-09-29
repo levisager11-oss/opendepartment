@@ -434,8 +434,8 @@ Everything below is built and was exercised against a real Supabase project
 the create-a-department flow run end to end on the live deployment).
 
 - Control-plane and tenant schemas, RLS, and the admin RPC surface
-- Slug resolution, per-request memoisation, process-local middleware cache
-- Per-department cookie isolation, dual-realm middleware
+- Slug resolution, per-request memoisation, process-local proxy cache
+- Per-department cookie isolation, dual-realm proxy (`src/proxy.ts`)
 - Branding read from the tenant: name, seal text, accent, docket prefix,
   categories, upload cap. Nothing about any particular subject is in the code
 - Marketing landing, `/directory`, `/legal/terms`, `/legal/privacy`,
@@ -481,7 +481,7 @@ the create-a-department flow run end to end on the live deployment).
 - The storage bucket's `file_size_limit` follows `settings.max_upload_mb`: a
   trigger resizes the bucket when the cap changes, so the settings screen can
   offer the whole range instead of stopping at a number frozen in the schema
-- **A nonce-based CSP.** The policy is built per request in the middleware
+- **A nonce-based CSP.** The policy is built per request in the proxy
   rather than declared in `next.config.ts`, because a header declared there is
   one fixed string and a fixed string cannot carry a nonce — which is why
   `script-src` used to say `'unsafe-inline'`, the one directive an XSS

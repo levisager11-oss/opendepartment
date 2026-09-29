@@ -107,7 +107,7 @@ function controlConfigured() {
   );
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const nonce = btoa(crypto.randomUUID());
   const csp = contentSecurityPolicy(nonce);
 
@@ -144,7 +144,7 @@ async function dispatch(
 ): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
 
-  if (pathname.startsWith("/d/")) return tenantMiddleware(request, headers);
+  if (pathname.startsWith("/d/")) return tenantProxy(request, headers);
   // Pinned departments still need canonical paths and refreshed cookies even
   // when this deployment does not have a control plane.
   if (!controlConfigured()) return NextResponse.next({ request: { headers } });
@@ -152,13 +152,13 @@ async function dispatch(
     CONTROL_PRIVATE.some((p) => pathname.startsWith(p)) &&
     !CONTROL_PUBLIC.some((p) => pathname.startsWith(p))
   ) {
-    return controlMiddleware(request, headers);
+    return controlProxy(request, headers);
   }
   return NextResponse.next({ request: { headers } });
 }
 
 /** Refreshes the visitor's token for one department and gates its pages. */
-async function tenantMiddleware(request: NextRequest, headers: Headers) {
+async function tenantProxy(request: NextRequest, headers: Headers) {
   const segments = request.nextUrl.pathname.split("/").filter(Boolean);
   const slug = segments[1];
   const rest = segments.slice(2);
@@ -177,13 +177,13 @@ async function tenantMiddleware(request: NextRequest, headers: Headers) {
    * A slug is stored lower case and resolve_department() lower-cases what it
    * is asked, so /d/MyDept resolves perfectly well -- and then breaks, because
    * the two halves of the session disagree about where the cookie lives. The
-   * cookie is named and pathed from the slug: this middleware and the browser
+   * cookie is named and pathed from the slug: this proxy and the browser
    * client take it from the URL (`od-MyDept` at `/d/MyDept`), while every
    * server client takes it from the resolved row (`od-mydept` at `/d/mydept`).
    * Cookie paths are matched case-sensitively, so the two never meet.
    *
    * The visible symptom was a redirect loop rather than a mere sign-in
-   * failure: the middleware saw the cookie and bounced /login to /vault, and
+   * failure: the proxy saw the cookie and bounced /login to /vault, and
    * requireMember() did not and bounced /vault back to /login, until the
    * browser gave up.
    *
@@ -246,7 +246,7 @@ async function tenantMiddleware(request: NextRequest, headers: Headers) {
 }
 
 /** Refreshes the OpenDepartment account session. */
-async function controlMiddleware(request: NextRequest, headers: Headers) {
+async function controlProxy(request: NextRequest, headers: Headers) {
   let response = NextResponse.next({ request: { headers } });
 
   const supabase = createServerClient(

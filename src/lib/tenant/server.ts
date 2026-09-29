@@ -32,7 +32,7 @@ export async function createTenantClient(dept: Department) {
             cookieStore.set(name, value, { ...options, path: cfg.path })
           );
         } catch {
-          // Server component: middleware refreshes the session instead.
+          // Server component: the proxy refreshes the session instead.
         }
       },
     },

@@ -13,7 +13,7 @@ import { requestOrigin } from "@/lib/setup/origin";
  * at all, which for an operator meant no way back into the account that is
  * the only thing able to delist or delete their departments.
  *
- * Public in the middleware (CONTROL_PUBLIC lists /account/auth), because the
+ * Public in the proxy (CONTROL_PUBLIC lists /account/auth), because the
  * whole point is that the visitor has no session yet.
  */
 export async function GET(request: NextRequest) {

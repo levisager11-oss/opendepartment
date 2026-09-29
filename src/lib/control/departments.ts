@@ -29,7 +29,7 @@ function anonControl() {
 
 /**
  * Slug -> department. Memoised per request: a single page render resolves the
- * slug in the middleware, the layout and the page, and all three should cost
+ * slug in the proxy, the layout and the page, and all three should cost
  * one round trip.
  *
  * Returns null for an unknown or suspended slug. Suspension is enforced inside

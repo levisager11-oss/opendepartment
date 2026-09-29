@@ -572,7 +572,7 @@ describe("authentication and previews", () => {
     render(<AccountSignOut />);
     fireEvent.click(screen.getByRole("button", { name: tr("nav.signout") }));
     await waitFor(() => expect(runtime.client.auth.signOut).toHaveBeenCalledTimes(1));
-    // Anywhere but /account: the middleware would bounce that to the login
+    // Anywhere but /account: the proxy would bounce that to the login
     // screen, which is a confusing answer to having just signed out.
     expect(runtime.router.push).toHaveBeenCalledWith("/");
   });

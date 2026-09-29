@@ -30,7 +30,7 @@ export async function createControlClient() {
               cookieStore.set(name, value, options)
             );
           } catch {
-            // Server component: middleware refreshes the session instead.
+            // Server component: the proxy refreshes the session instead.
           }
         },
       },

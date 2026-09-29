@@ -54,7 +54,7 @@ export default async function LandingPage() {
   // hand. A JSON-LD block is data rather than code and is never executed, so
   // nothing here would break; browsers differ on whether they refuse the
   // element anyway, and a structured-data block that some of them drop is
-  // worse than useless. The middleware puts the nonce on this header.
+  // worse than useless. The proxy puts the nonce on this header.
   const nonce = (await headers()).get("x-nonce") ?? undefined;
 
   return (
