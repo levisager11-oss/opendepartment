@@ -20,8 +20,9 @@ npm run build:schema  # just the codegen step (see below)
 npm run test:rls      # the SQL security suite (see below)
 ```
 
-No lint script is configured, and `next.config.ts` sets
-`eslint.ignoreDuringBuilds`.
+No lint script is configured. Next 16 removed `next lint` and no longer
+lints during `next build`. `typecheck` runs `next typegen` first, because
+`next-env.d.ts` imports the route types generated under `.next/`.
 
 `npm test` runs Vitest, the SQL security suites and a demo-seed smoke test.
 `npm run test:rls` uses disposable PGlite databases on Node 22, applies the
@@ -141,17 +142,18 @@ Consequences that show up throughout the code:
   [src/lib/tenant/cookies.ts](src/lib/tenant/cookies.ts)). Being signed
   into one grants nothing in the other, and membership in one department
   doesn't attach a token to requests for any other.
-- **[src/middleware.ts](src/middleware.ts)** dispatches on path prefix:
-  `/d/*` → `tenantMiddleware` (resolves the slug, creates a
+- **[src/proxy.ts](src/proxy.ts)** (Next 16's rename of middleware; it runs
+  on the Node.js runtime) dispatches on path prefix:
+  `/d/*` → `tenantProxy` (resolves the slug, creates a
   request-scoped Supabase client scoped to that department's cookie
-  path, gates login); `/account/*` → `controlMiddleware` (gates the
+  path, gates login); `/account/*` → `controlProxy` (gates the
   OpenDepartment account session). Never merge these two code paths.
-- **Slug resolution** happens up to three times per request (middleware,
+- **Slug resolution** happens up to three times per request (proxy,
   layout, page), so it's memoized twice: `resolveDepartment`
   ([src/lib/control/departments.ts](src/lib/control/departments.ts)) uses
   React's `cache()` for per-request dedup; `resolveDepartmentCached`
   ([src/lib/control/cache.ts](src/lib/control/cache.ts)) is a process-local
-  60s TTL map the middleware uses instead (it can't share React's
+  60s TTL map the proxy uses instead (it can't share React's
   per-request cache with the page). Both apply the **same precedence**:
   the control-plane directory is authoritative; `STATIC_DEPARTMENTS` (see
   below) only fills gaps and can never shadow a registered department. If
@@ -256,3 +258,13 @@ docket prefix, categories, upload cap) is hardcoded — it's all read at
 request time from the tenant's own `settings` row via
 [src/lib/tenant/branding.ts](src/lib/tenant/branding.ts). Don't add
 copy or defaults that assume a particular department's content.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

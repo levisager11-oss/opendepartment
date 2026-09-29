@@ -21,7 +21,7 @@ const DOCS: LegalDoc[] = ["terms", "privacy", "imprint"];
  *
  * And the Content Security Policy now carries a per-request nonce. HTML held
  * in a build-time cache would carry whatever nonce that build had, which is
- * not the one in the header the middleware sets, so its scripts would be
+ * not the one in the header the proxy sets, so its scripts would be
  * refused. Everything else in the app was already dynamic; these two pages
  * were the exception.
  */

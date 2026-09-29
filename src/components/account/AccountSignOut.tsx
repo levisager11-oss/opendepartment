@@ -34,7 +34,7 @@ export function AccountSignOut() {
     try {
       const { error } = await createControlBrowserClient().auth.signOut();
       if (error) throw error;
-      // Home rather than /account: the middleware would bounce this straight
+      // Home rather than /account: the proxy would bounce this straight
       // back to the login screen, and being asked to sign in again is a
       // confusing answer to having just signed out.
       router.push("/");

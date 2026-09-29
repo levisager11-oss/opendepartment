@@ -9,7 +9,7 @@
     "prebuild": "npm run build:schema",
     "build": "next build",
     "start": "next start",
-    "typecheck": "npm run build:schema && tsc --noEmit",
+    "typecheck": "npm run build:schema && next typegen && tsc --noEmit",
     "test": "vitest run && npm run test:rls && npm run test:seed",
     "test:unit": "vitest run",
     "test:rls": "node db/test/run.mjs",
@@ -21,7 +21,7 @@
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.48.1",
     "@vercel/analytics": "^2.0.1",
-    "next": "^15.1.6",
+    "next": "^16.3.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

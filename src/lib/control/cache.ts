@@ -10,7 +10,7 @@ const MAX_ENTRIES = 500;
 /**
  * Process-local slug cache.
  *
- * The middleware resolves a slug on every request into a department, and it
+ * The proxy resolves a slug on every request into a department, and it
  * cannot share React's per-request cache with the page that renders
  * afterwards. Without this, every navigation would cost two round trips to the
  * control plane instead of one.
@@ -46,7 +46,7 @@ export async function resolveDepartmentCached(
   const { data, error } = await anon.rpc("resolve_department", { want: key });
 
   // Same precedence as resolveDepartment: the directory wins, pins fill gaps.
-  // The middleware and the page must never disagree about which project a slug
+  // The proxy and the page must never disagree about which project a slug
   // belongs to.
   const value: Department | null =
     error || !data || data.length === 0
