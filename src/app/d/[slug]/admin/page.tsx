@@ -33,10 +33,12 @@ export const metadata = privatePage("Administration");
 
 export default async function AdminPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ tab?: string | string[] }>;
 }) {
-  const { slug } = await params;
+  const [{ slug }, { tab }] = await Promise.all([params, searchParams]);
   const member = await requireDeptAdmin(slug);
   const supabase = await createTenantClient(member.dept);
 
@@ -158,6 +160,7 @@ export default async function AdminPage({
         </div>
       )}
       <AdminPanel
+        initialTab={typeof tab === "string" ? tab : undefined}
         truncated={truncated}
         currentUserId={member.userId}
         files={(files ?? []).map((f) => ({

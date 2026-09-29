@@ -68,7 +68,7 @@ export default async function LandingPage() {
 
       <MarketingHeader />
 
-      <main className="flex-1">
+      <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">
         {/* --- hero ------------------------------------------------------ */}
         <section className="border-b border-paper-400 bg-gov-950 text-gov-100">
           <div className="mx-auto grid max-w-5xl grid-cols-1 gap-10 px-4 py-12 sm:py-20 md:grid-cols-[1fr_auto] md:items-center">

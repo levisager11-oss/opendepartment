@@ -38,7 +38,8 @@ const runtime = vi.hoisted(() => ({
   tenantRpc: vi.fn(),
   tenant: {
     slug: "demo", supabaseUrl: "https://demo.supabase.co",
-    branding: { subjectLabel: "Case", categories: ["EXHIBIT", "MEMO"], maxUploadMb: 25, openJoin: false },
+    branding: { subjectLabel: "Case", categories: ["EXHIBIT", "MEMO"], maxUploadMb: 25, openJoin: false,
+      departmentName: "Demo Files", sealTop: "DEMO FILES" },
     href: (path = "") => `/d/demo${path ? `/${path}` : ""}`,
   },
 }));
@@ -167,7 +168,7 @@ describe("archive filters and pagination", () => {
     window.history.replaceState({}, "", "/d/demo/vault?q=letter&sort=new&subject=case-a&category=MEMO&kind=pdf&mine=1");
     runtime.client.from.mockImplementation(() => query({ data: [], count: 0 }));
     render(<VaultBrowser subjects={[{ id: "case-a", name: "Case A" }]} currentUserId="member" />);
-    expect((screen.getByRole("textbox", { name: tr("vault.search") }) as HTMLInputElement).value).toBe("letter");
+    expect((screen.getByRole("searchbox", { name: tr("vault.search") }) as HTMLInputElement).value).toBe("letter");
     expect((screen.getByRole("combobox", { name: tr("vault.sort") }) as HTMLSelectElement).value).toBe("new");
     expect((screen.getByRole("checkbox") as HTMLInputElement).checked).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: tr("vault.clear") }));
@@ -177,7 +178,7 @@ describe("archive filters and pagination", () => {
       window.history.pushState({}, "", "/d/demo/vault?q=restored&kind=audio");
       window.dispatchEvent(new PopStateEvent("popstate"));
     });
-    expect((screen.getByRole("textbox", { name: tr("vault.search") }) as HTMLInputElement).value).toBe("restored");
+    expect((screen.getByRole("searchbox", { name: tr("vault.search") }) as HTMLInputElement).value).toBe("restored");
     expect((screen.getByRole("combobox", { name: tr("vault.filter.kind") }) as HTMLSelectElement).value).toBe("audio");
   });
 
@@ -341,6 +342,20 @@ describe("action refusal feedback", () => {
     expect(runtime.storage.remove).toHaveBeenCalledWith(["member/exhibit.pdf"]);
     expect(runtime.client.from).not.toHaveBeenCalled();
     expect(runtime.router.refresh).toHaveBeenCalledTimes(1);
+  });
+  it("removes an exhibit's thumbnail along with it when deleting from a report", async () => {
+    // Schema 3 and later answer with jsonb naming both objects. Read as the
+    // bare string it used to be, neither was removed and the tab still said
+    // "Done." -- leaving the reported exhibit readable in storage.
+    runtime.client.rpc.mockResolvedValue({
+      data: { storage_path: "member/exhibit.png", thumb_path: "member/exhibit-thumb.webp",
+        storage_paths: ["member/exhibit.png", "member/exhibit-thumb.webp"] },
+      error: null,
+    });
+    render(<AdminReports reports={[{ ...reports[0], file_id: "file-1" }]} />);
+    fireEvent.click(screen.getByRole("button", { name: tr("admin.reports.deleteFile") }));
+    expect((await screen.findByRole("status")).textContent).toBe(tr("common.done"));
+    expect(runtime.storage.remove).toHaveBeenCalledWith(["member/exhibit.png", "member/exhibit-thumb.webp"]);
   });
   it.each([{ data: [] }, { data: null, error: { message: "permission denied" } }])("keeps a refused report action visible: %j", async (response) => {
     runtime.client.from.mockReturnValue(query(response));
@@ -884,5 +899,86 @@ describe("rejected requests and partial deletion", () => {
     expect((await screen.findByRole("alert")).textContent).toBe(tr("danger.objectsLeft"));
     expect(screen.queryByRole("button", { name: tr("file.delete") })).toBeNull();
     expect(runtime.router.refresh).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("navigation and form guidance", () => {
+  it("offers a signed-out visitor a way to sign in from the header", () => {
+    render(<DeptHeader signedIn={false} username={null} isAdmin={false} />);
+    expect(screen.getByRole("link", { name: tr("nav.signin") }).getAttribute("href")).toBe("/d/demo/login");
+  });
+
+  it("does not print the department's name twice in its own header", () => {
+    // The wizard stamps the name, capitalised, as the seal's top legend.
+    render(<DeptHeader signedIn={false} username={null} isAdmin={false} />);
+    expect(screen.getByText("Demo Files")).toBeTruthy();
+    // The seal draws its legend either way; this is about the text line.
+    expect(screen.queryByText("DEMO FILES", { selector: "span" })).toBeNull();
+  });
+
+  it("keeps a seal legend that says something the name does not", () => {
+    const original = runtime.tenant.branding.sealTop;
+    runtime.tenant.branding.sealTop = "MINISTRY OF STAPLERS";
+    try {
+      render(<DeptHeader signedIn={false} username={null} isAdmin={false} />);
+      expect(screen.getByText("MINISTRY OF STAPLERS", { selector: "span" })).toBeTruthy();
+    } finally {
+      runtime.tenant.branding.sealTop = original;
+    }
+  });
+
+  it("closes the phone menu on Escape", () => {
+    const { container } = render(<DeptHeader signedIn username="Member" isAdmin={false} />);
+    fireEvent.click(screen.getByRole("button", { name: tr("nav.menu") }));
+    expect(container.querySelector("#dept-mobile-menu")).toBeTruthy();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(container.querySelector("#dept-mobile-menu")).toBeNull();
+  });
+
+  it("opens the administration tab named in the address and records the next one there", () => {
+    render(
+      <AdminPanel
+        initialTab="subjects"
+        truncated={{ files: false, reports: false, audit: false }}
+        currentUserId="admin" files={[]} reports={[]} users={[]} invites={[]}
+        subjects={[]} settings={null} audit={[]} totalBytes={0}
+      />
+    );
+    expect(screen.getByRole("tab", { name: tr("admin.tab.subjects") }).getAttribute("aria-selected")).toBe("true");
+    fireEvent.click(screen.getByRole("tab", { name: tr("admin.tab.audit") }));
+    expect(new URLSearchParams(window.location.search).get("tab")).toBe("audit");
+  });
+
+  it("ignores a tab in the address that does not exist", () => {
+    render(
+      <AdminPanel
+        initialTab="nonsense"
+        truncated={{ files: false, reports: false, audit: false }}
+        currentUserId="admin" files={[]} reports={[]} users={[]} invites={[]}
+        subjects={[]} settings={null} audit={[]} totalBytes={0}
+      />
+    );
+    expect(screen.getByRole("tab", { name: tr("admin.tab.files") }).getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("says what an upload still needs instead of only greying out the button", () => {
+    render(<UploadForm userId="member" subjects={[]} />);
+    const all = [tr("upload.needs.file"), tr("upload.needs.title"), tr("upload.needs.accept")].join(", ");
+    expect(screen.getByText(translate("en", "upload.needs", { items: all }))).toBeTruthy();
+    fireEvent.click(screen.getByRole("checkbox"));
+    const rest = [tr("upload.needs.file"), tr("upload.needs.title")].join(", ");
+    expect(screen.getByText(translate("en", "upload.needs", { items: rest }))).toBeTruthy();
+  });
+
+  it("files a case note with Ctrl+Enter", async () => {
+    const insert = query({ data: { id: "c1", file_id: "file-1", author_id: "member", body: "Seen it.", created_at: "2026-01-01" }, error: null });
+    runtime.client.from.mockReturnValue(insert);
+    render(<CommentSection fileId="file-1" currentUserId="member" currentUsername="Member" isAdmin={false} initialComments={[]} />);
+    const box = screen.getByRole("textbox");
+    fireEvent.change(box, { target: { value: "Seen it." } });
+    fireEvent.keyDown(box, { key: "Enter", ctrlKey: true });
+    expect(await screen.findByText("Seen it.")).toBeTruthy();
+    expect(insert.insert).toHaveBeenCalledWith({ file_id: "file-1", author_id: "member", body: "Seen it." });
+    expect((box as HTMLTextAreaElement).value).toBe("");
   });
 });

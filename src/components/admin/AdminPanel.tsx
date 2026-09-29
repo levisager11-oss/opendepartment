@@ -45,7 +45,12 @@ const TABS: Array<{ id: Tab; key: TranslationKey }> = [
 /** Supabase free tier gives 1 GB of object storage. */
 const STORAGE_QUOTA = 1024 * 1024 * 1024;
 
+function isTab(value: string | undefined): value is Tab {
+  return TABS.some((entry) => entry.id === value);
+}
+
 export function AdminPanel({
+  initialTab,
   truncated,
   currentUserId,
   files,
@@ -57,6 +62,8 @@ export function AdminPanel({
   audit,
   totalBytes,
 }: {
+  /** From ?tab= on the address. Anything that is not a tab is ignored. */
+  initialTab?: string;
   /** Lists that came back at their query limit -- see the admin page. */
   truncated: { files: boolean; reports: boolean; audit: boolean };
   currentUserId: string;
@@ -71,7 +78,23 @@ export function AdminPanel({
 }) {
   const { t } = useI18n();
   const openReports = reports.filter((r) => r.status === "open").length;
-  const [tab, setTab] = useState<Tab>(openReports > 0 ? "reports" : "files");
+  const [tab, setTabState] = useState<Tab>(
+    isTab(initialTab) ? initialTab : openReports > 0 ? "reports" : "files"
+  );
+
+  /**
+   * The tab lives in the address as well. Every action on this screen ends in
+   * a refresh, and a reload -- or following a document link and coming back
+   * -- used to drop an administrator from the Invites tab onto Reports.
+   * replaceState, not push: switching tabs is not a navigation anybody wants
+   * to step back through one by one.
+   */
+  function setTab(next: Tab) {
+    setTabState(next);
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", next);
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  }
 
   const usedPercent = Math.min(100, (totalBytes / STORAGE_QUOTA) * 100);
 

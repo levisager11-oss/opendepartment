@@ -80,7 +80,10 @@ export function CommentSection({
   return (
     <section className="mt-8">
       <div className="paper-tab ml-6 inline-block px-4 py-1">
-        <span className="docket text-ink-700 text-2xs">{t("comments.title")}</span>
+        <span className="docket text-ink-700 text-2xs">
+          {t("comments.title")}
+          {comments.length > 0 && <> · {comments.length}</>}
+        </span>
       </div>
 
       <div className="paper p-4 sm:p-5">
@@ -140,6 +143,14 @@ export function CommentSection({
             disabled={busy}
             value={body}
             onChange={(e) => setBody(e.target.value)}
+            onKeyDown={(e) => {
+              // The one multi-line field people type into over and over; the
+              // keyboard way to send it is the one every chat box has taught.
+              if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                e.currentTarget.form?.requestSubmit();
+              }
+            }}
             maxLength={2000}
           />
           {error && (
@@ -150,6 +161,8 @@ export function CommentSection({
           <div className="mt-3 flex items-center justify-between">
             <span className="docket text-3xs text-ink-500">
               {body.length} / 2000
+              {/* Not on a phone, which has no Ctrl key to press. */}
+              <span className="hidden sm:inline"> · {t("comments.shortcut")}</span>
             </span>
             <button
               type="submit"

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Seal } from "@/components/Seal";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { useI18n } from "@/lib/i18n/provider";
@@ -25,6 +25,23 @@ export function DeptHeader({
   const [menuOpen, setMenuOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [signOutFailed, setSignOutFailed] = useState(false);
+
+  // The drawer belongs to the page it was opened on. Following a link inside
+  // it already closed it, but the browser's back button, a link in the page
+  // below, or Escape left it hanging open over whatever came next.
+  const [menuPath, setMenuPath] = useState(pathname);
+  if (menuPath !== pathname) {
+    setMenuPath(pathname);
+    setMenuOpen(false);
+  }
+  useEffect(() => {
+    if (!menuOpen) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setMenuOpen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menuOpen]);
 
   async function signOut() {
     setSigningOut(true);
@@ -53,6 +70,22 @@ export function DeptHeader({
         ...(isAdmin ? [{ href: href("admin"), label: t("nav.admin") }] : []),
       ]
     : [];
+
+  // A visitor who already has an account had no way in from the header: the
+  // front door's buttons are the only route, and every other public page
+  // under a department (legal pages, a join link somebody forwarded) had
+  // none. Left off the two pages that ARE the way in.
+  const onAuthPage =
+    pathname === href("login") || pathname === href("join");
+
+  // The wizard stamps the department's name, in capitals, as the seal's top
+  // legend -- so by default the gold line above the name in this header said
+  // the name a second time. It earns its line only when it says something else.
+  const eyebrow =
+    branding.sealTop.trim().toLowerCase() !==
+    branding.departmentName.trim().toLowerCase()
+      ? branding.sealTop
+      : null;
 
   // The signed-in name is the link to the member's own page, on both layouts.
   // Nothing else in the header is a natural home for it, and a person looking
@@ -84,11 +117,13 @@ export function DeptHeader({
               min-width:auto and would rather push the language toggle off the
               screen than let its text shorten. */}
           <span className="min-w-0 leading-tight">
-            <span
-              className="block truncate font-serif text-2xs font-bold uppercase tracking-seal text-accent"
-            >
-              {branding.sealTop}
-            </span>
+            {eyebrow && (
+              <span
+                className="block truncate font-serif text-2xs font-bold uppercase tracking-seal text-accent"
+              >
+                {eyebrow}
+              </span>
+            )}
             <span className="block truncate font-serif text-base font-black text-white sm:text-lg">
               {branding.departmentName}
             </span>
@@ -123,6 +158,15 @@ export function DeptHeader({
 
         <div className="ml-auto flex shrink-0 items-center gap-3 md:ml-0 md:gap-4">
           <LanguageToggle light />
+
+          {!signedIn && !onAuthPage && (
+            <Link
+              href={href("login")}
+              className="border-l border-white/15 pl-3 text-sm font-semibold text-gov-100/90 underline-offset-2 transition-colors hover:text-white hover:underline md:pl-4"
+            >
+              {t("nav.signin")}
+            </Link>
+          )}
 
           {signedIn && (
             <div className="hidden items-center gap-3 border-l border-white/15 pl-4 md:flex">

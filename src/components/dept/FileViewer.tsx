@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n/provider";
 import { KindIcon } from "@/components/KindIcon";
@@ -86,16 +86,7 @@ export function FileViewer({
 
   if (kind === "image") {
     return (
-      <MediaFrame>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={url}
-          alt={title}
-          decoding="async"
-          onError={() => setBrokenUrl(url)}
-          className="max-h-full max-w-full object-contain"
-        />
-      </MediaFrame>
+      <ImageView url={url} title={title} onError={() => setBrokenUrl(url)} />
     );
   }
 
@@ -227,11 +218,162 @@ function PdfFrame({
   }
 
   return (
-    <iframe
-      src={blobUrl}
-      title={title}
-      className="h-viewer w-full rounded-card border border-paper-400 bg-white shadow-md"
-    />
+    <>
+      <iframe
+        src={blobUrl}
+        title={title}
+        className="h-viewer w-full rounded-card border border-paper-400 bg-white shadow-md"
+      />
+      {/* Phone browsers mostly cannot page through a framed PDF: iOS draws
+          the first page as a picture, Android draws nothing at all. The same
+          blob opened as a page of its own gets the platform's real viewer.
+          It is still the blob typed above, never the storage URL, so this
+          adds no way for an uploader's Content-Type to reach a browser. */}
+      <ViewerActions>
+        <a
+          href={blobUrl}
+          target="_blank"
+          rel="noopener"
+          className="btn btn-sm btn-ghost"
+        >
+          {t("file.openTab")}
+        </a>
+      </ViewerActions>
+    </>
+  );
+}
+
+function ViewerActions({ children }: { children: React.ReactNode }) {
+  return <div className="mt-2 flex justify-end gap-2">{children}</div>;
+}
+
+/**
+ * An image in the reserved frame, with a way to see it larger.
+ *
+ * The frame is 70vh tall and a scanned page shrinks into it until the text is
+ * unreadable, which made "open the image" the first thing anybody wanted and
+ * there was no way to do it short of downloading. The overlay reuses the same
+ * signed URL in an <img> -- deliberately not a link to it: opening a storage
+ * URL as a page would hand the uploader's Content-Type to the browser, which
+ * is the thing the PDF viewer below goes out of its way to avoid. It opens
+ * fitted to the screen; clicking the picture toggles its real size.
+ */
+function ImageView({
+  url,
+  title,
+  onError,
+}: {
+  url: string;
+  title: string;
+  onError: () => void;
+}) {
+  const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+  const [actual, setActual] = useState(false);
+  const opener = useRef<HTMLButtonElement>(null);
+  const closer = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const trigger = opener.current;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closer.current?.focus();
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+      // Two controls, so Tab only has to stay between them.
+      if (e.key === "Tab") {
+        e.preventDefault();
+        closer.current?.focus();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previous;
+      trigger?.focus();
+    };
+  }, [open]);
+
+  return (
+    <>
+      <MediaFrame>
+        <button
+          ref={opener}
+          type="button"
+          onClick={() => {
+            setActual(false);
+            setOpen(true);
+          }}
+          aria-label={t("file.fullSize")}
+          className="flex h-full w-full cursor-zoom-in items-center justify-center"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={url}
+            alt={title}
+            decoding="async"
+            onError={onError}
+            className="max-h-full max-w-full object-contain"
+          />
+        </button>
+      </MediaFrame>
+      <ViewerActions>
+        <button
+          type="button"
+          onClick={() => {
+            setActual(false);
+            setOpen(true);
+          }}
+          className="btn btn-sm btn-ghost"
+        >
+          {t("file.fullSize")}
+        </button>
+      </ViewerActions>
+
+      {open && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={title}
+          className="on-dark fixed inset-0 z-50 overflow-auto bg-black/90"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setOpen(false);
+          }}
+        >
+          <button
+            ref={closer}
+            type="button"
+            onClick={() => setOpen(false)}
+            className="btn btn-sm fixed top-3 right-3 z-10 border-white/30 bg-black/60 text-white hover:bg-black/80"
+          >
+            {t("common.close")}
+          </button>
+          <div
+            // m-auto on the picture rather than justify-center here: a
+            // centred flex item wider than its box overflows on BOTH sides,
+            // and the left half can never be scrolled to.
+            className="flex min-h-full w-max min-w-full p-4 sm:p-8"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setOpen(false);
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={url}
+              alt=""
+              decoding="async"
+              onClick={() => setActual((v) => !v)}
+              className={
+                actual
+                  ? "m-auto max-w-none cursor-zoom-out"
+                  : "m-auto max-h-[calc(100dvh-4rem)] max-w-[calc(100vw-2rem)] cursor-zoom-in object-contain sm:max-w-[calc(100vw-4rem)]"
+              }
+            />
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

@@ -7,6 +7,7 @@ import { VoteButtons } from "@/components/dept/VoteButtons";
 import { CommentSection } from "@/components/dept/CommentSection";
 import { ReportButton } from "@/components/dept/ReportButton";
 import { DeleteFileButton } from "@/components/dept/DeleteFileButton";
+import { VaultBackLink } from "@/components/dept/VaultBackLink";
 import { FileMeta } from "@/components/FileMeta";
 import { T } from "@/components/T";
 import { privatePage } from "@/lib/seo";
@@ -110,12 +111,7 @@ export default async function FilePage({
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 sm:py-8">
-      <Link
-        href={`/d/${slug}/vault`}
-        className="docket mb-4 inline-flex items-center gap-1 hover:text-gov-800 text-2xs text-ink-500"
-      >
-        <span aria-hidden>←</span> <T k="file.back" />
-      </Link>
+      <VaultBackLink />
 
       <div className="paper-tab ml-6 inline-block px-4 py-1">
         <span className="docket text-ink-700 text-2xs">

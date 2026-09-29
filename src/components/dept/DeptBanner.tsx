@@ -47,9 +47,20 @@ export function DeptBanner() {
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="order-2 ml-auto cursor-pointer underline decoration-dotted underline-offset-2 opacity-70 transition-opacity hover:opacity-100 sm:order-3"
+          className="order-2 ml-auto inline-flex cursor-pointer items-center gap-1 underline decoration-dotted underline-offset-2 opacity-70 transition-opacity hover:opacity-100 sm:order-3"
         >
-          {open ? "⌃" : "⌄"} {t("legal.imprint")}
+          {/* A drawn chevron rather than the ⌃ / ⌄ characters, which sat on
+              different baselines in every font and read as stray marks. */}
+          <svg
+            aria-hidden
+            width="10"
+            height="10"
+            viewBox="0 0 10 10"
+            className={`transition-transform ${open ? "rotate-180" : ""}`}
+          >
+            <path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          {t("legal.imprint")}
         </button>
       </div>
 

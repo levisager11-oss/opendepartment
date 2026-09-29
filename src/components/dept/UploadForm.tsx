@@ -91,6 +91,20 @@ export function UploadForm({
     if (preview) URL.revokeObjectURL(preview);
   }, [preview]);
 
+  // Leaving mid-upload abandons it with no word said -- the tab closes, the
+  // bytes stop, and the document is simply not in the archive. The browser's
+  // own "leave this page?" prompt is the only warning a closing tab can give.
+  useEffect(() => {
+    if (!busy) return;
+    function onBeforeUnload(e: BeforeUnloadEvent) {
+      e.preventDefault();
+      // Still what Safari and older Chromium look for.
+      e.returnValue = "";
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [busy]);
+
   async function chooseFile(next: File | null) {
     if (busy || pendingUpload || pendingFile) return;
     const ticket = ++selectionRequest.current;
@@ -303,6 +317,14 @@ export function UploadForm({
 
   const ready = Boolean(file && title.trim() && accepted && !busy && !preparing);
 
+  // A greyed-out submit button with no reason given sends people hunting up
+  // the page. Named here, beside it, in the order the form asks for them.
+  const missing = [
+    !file && t("upload.needs.file"),
+    !title.trim() && t("upload.needs.title"),
+    !accepted && t("upload.needs.accept"),
+  ].filter((item): item is string => Boolean(item));
+
   return (
     <form onSubmit={submit} className="flex flex-col gap-6">
       <fieldset disabled={busy || Boolean(pendingUpload) || Boolean(pendingFile)} className="contents">
@@ -312,7 +334,14 @@ export function UploadForm({
             e.preventDefault();
             setDragging(true);
           }}
-          onDragLeave={() => setDragging(false)}
+          onDragLeave={(e) => {
+            // Leaving the zone for one of its own children is not leaving it;
+            // treated as if it were, the highlight flickered all the way
+            // across the icon and the label.
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+              setDragging(false);
+            }
+          }}
           onDrop={(e) => {
             e.preventDefault();
             setDragging(false);
@@ -560,6 +589,12 @@ export function UploadForm({
           >
             <div className="h-full w-1/3 animate-indeterminate bg-gov-700" />
           </div>
+        )}
+
+        {!busy && !preparing && missing.length > 0 && !pendingUpload && !pendingFile && (
+          <p className="text-xs text-ink-500">
+            {t("upload.needs", { items: missing.join(", ") })}
+          </p>
         )}
       </div>
     </form>

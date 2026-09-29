@@ -18,15 +18,18 @@ export function FileCard({
   const { branding, href } = useTenant();
 
   return (
-    <article className="animate-fade-up group relative">
+    // A column that stretches, so every card in a grid row is as tall as the
+    // tallest: a row where one card carried a subject line and its
+    // neighbours did not used to end in three different places.
+    <article className="animate-fade-up group relative flex flex-col">
       {/* folder tab */}
-      <div className="paper-tab ml-4 inline-block px-3 py-0.5">
+      <div className="paper-tab ml-4 self-start px-3 py-0.5">
         <span className="docket text-3xs text-ink-700">
           {caseLabel(file.case_number, branding.docketPrefix)}
         </span>
       </div>
 
-      <div className="paper relative flex gap-2.5 p-2.5 transition-shadow group-hover:shadow-md sm:gap-3 sm:p-3">
+      <div className="paper relative flex flex-1 gap-2.5 p-2.5 transition-shadow group-hover:shadow-md sm:gap-3 sm:p-3">
         <VoteButtons
           fileId={file.id}
           initialScore={file.score}
@@ -77,7 +80,11 @@ export function FileCard({
               )}
             </div>
 
-            <h2 className="line-clamp-2 font-serif text-base font-bold text-gov-900 group-hover:underline sm:block sm:truncate">
+            {/* Two lines at every width. Cut to one from sm up, the stapler's
+                "before" and "after" photographs were both "Photograph of the
+                stapler (…" -- the one word that told them apart was the one
+                that went. */}
+            <h2 className="line-clamp-2 font-serif text-base font-bold text-gov-900 group-hover:underline">
               {file.title}
             </h2>
 

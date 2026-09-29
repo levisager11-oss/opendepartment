@@ -3,7 +3,6 @@ import { createClient } from "@supabase/supabase-js";
 import { requireDepartment } from "@/lib/tenant/auth";
 import { Seal } from "@/components/Seal";
 import { T } from "@/components/T";
-import { accentInk } from "@/lib/tenant/contrast";
 
 /**
  * A department's front door, seen by someone who is not signed in.
@@ -83,31 +82,35 @@ export default async function DepartmentFrontDoor({
         {branding.tagline ?? <T k="landing.subtitle" />}
       </p>
 
+      {/* The term is the label and the value is the number, whichever one is
+          drawn larger: a screen reader announces a <dt> as the name of the
+          <dd> after it, so the other way round read out "12: documents on
+          file" as if 12 were the heading. flex-col-reverse keeps the number
+          on top. */}
       <dl className="mx-auto mb-10 grid max-w-lg grid-cols-3 gap-2 sm:mb-12 sm:gap-4">
         {[
           { n: stats.files, label: "landing.stat.files" },
           { n: stats.subjects, label: "landing.stat.subjects" },
           { n: stats.members, label: "landing.stat.members" },
         ].map((s) => (
-          <div key={s.label} className="paper px-2 py-3 sm:px-3 sm:py-4">
-            <dt className="typewriter text-2xl font-bold text-ink-900">{s.n}</dt>
-            <dd className="docket mt-1 text-3xs text-ink-500">
+          <div key={s.label} className="paper flex flex-col-reverse px-2 py-3 sm:px-3 sm:py-4">
+            <dt className="docket mt-1 text-3xs text-ink-500">
               <T k={s.label as never} />
-            </dd>
+            </dt>
+            <dd className="typewriter text-2xl font-bold text-ink-900">{s.n}</dd>
           </div>
         ))}
       </dl>
 
       <div className="flex flex-wrap items-center justify-center gap-4">
-        <Link
-          href={`/d/${slug}/login`}
-          className="px-6 py-3 font-bold"
-          style={{
-            backgroundColor: branding.accent,
-            color: accentInk(branding.accent),
-          }}
-        >
-          <T k="landing.cta" />
+        {/* Said as what it does. It used to read "Request access", and a
+            member coming back to sign in had to guess that this was the way
+            in -- while somebody who really was asking for access was sent to
+            a sign-in form. The link beside it is the way to join.
+            btn-accent reads the same --accent the layout sets, and brings
+            the hover and pressed states an inline style could not. */}
+        <Link href={`/d/${slug}/login`} className="btn btn-lg btn-accent">
+          <T k="nav.signin" />
         </Link>
         {/* A public archive says so on the door. Sending someone who needs no
             code to a link that reads "I have an invite code" is how a public

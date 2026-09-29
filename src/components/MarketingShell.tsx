@@ -50,6 +50,15 @@ export function MarketingHeader() {
             >
               <T k="od.directory" />
             </Link>
+            {/* A returning operator's way back to their departments used to
+                be the last link in the footer. md rather than sm: at 640px
+                the row has no room left for it and the button would wrap. */}
+            <Link
+              href="/account"
+              className="hidden text-sm text-gov-100/80 transition-colors hover:text-white md:block"
+            >
+              <T k="account.title" />
+            </Link>
           </div>
         </div>
         {/* Kept outside that wrapper so it is this element that wraps. DOM
@@ -77,6 +86,14 @@ export function MarketingFooter() {
         <span className="font-serif text-sm font-bold text-white">
           <T k="od.name" />
         </span>
+        {/* The header hides this link below sm, so without it here a phone
+            had no route to the directory from any page but the landing hero. */}
+        <Link
+          href="/directory"
+          className="py-1 transition-colors hover:text-white sm:py-0"
+        >
+          <T k="od.directory" />
+        </Link>
         <Link
           href="/legal/terms"
           className="py-1 transition-colors hover:text-white sm:py-0"
@@ -122,7 +139,7 @@ export function MarketingShell({
   return (
     <>
       <MarketingHeader />
-      <main className="flex-1">
+      <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">
         <div className={`mx-auto px-4 py-10 sm:py-12 ${wide ? "max-w-5xl" : "max-w-3xl"}`}>
           {children}
         </div>

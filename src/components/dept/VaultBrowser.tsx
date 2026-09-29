@@ -5,6 +5,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n/provider";
 import { useTenant, useTenantClient } from "@/lib/tenant/context";
 import { FileCard } from "./FileCard";
+import { SkeletonCardGrid } from "@/components/Skeleton";
+import { lastVaultKey } from "@/lib/tenant/vault-return";
 import {
   SIGNED_URL_TTL,
   STORAGE_BUCKET,
@@ -57,6 +59,12 @@ const SORTS: Record<SortKey, { column: string; ascending: boolean }> = {
 };
 
 const KINDS: FileKind[] = ["image", "pdf", "video", "audio"];
+const KIND_KEYS = {
+  image: "vault.kind.image",
+  pdf: "vault.kind.pdf",
+  video: "vault.kind.video",
+  audio: "vault.kind.audio",
+} as const;
 
 export function VaultBrowser({
   subjects,
@@ -68,7 +76,7 @@ export function VaultBrowser({
   initialSubjectId?: string;
 }) {
   const { t, plural } = useI18n();
-  const { branding, href } = useTenant();
+  const { branding, href, slug } = useTenant();
   const supabase = useTenantClient();
 
   const [search, setSearch] = useState("");
@@ -128,7 +136,15 @@ export function VaultBrowser({
       else url.searchParams.delete(key);
     }
     window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
-  }, [filtersReady, debounced, sort, subjectId, category, kind, mineOnly]);
+    // Remembered for the exhibit page's "back" link, which is rendered on the
+    // server and cannot see this tab's filters. Without it, opening one
+    // result and going back by the link dropped every filter on the way.
+    try {
+      sessionStorage.setItem(lastVaultKey(slug), url.search);
+    } catch {
+      // Private mode or storage disabled: the link falls back to the bare vault.
+    }
+  }, [filtersReady, debounced, sort, subjectId, category, kind, mineOnly, slug]);
 
   // Changing two filters quickly leaves two queries in flight, and they do not
   // have to come back in the order they were sent. Every load claims a ticket
@@ -309,6 +325,7 @@ export function VaultBrowser({
               <path d="M20 20l-4-4" strokeLinecap="round" />
             </svg>
             <input
+              type="search"
               className="field field-icon"
               placeholder={t("vault.search")}
               value={search}
@@ -374,7 +391,7 @@ export function VaultBrowser({
               </option>
               {KINDS.map((k) => (
                 <option key={k} value={k}>
-                  {k.toUpperCase()}
+                  {t(KIND_KEYS[k as keyof typeof KIND_KEYS])}
                 </option>
               ))}
             </select>
@@ -405,9 +422,13 @@ export function VaultBrowser({
       </div>
 
       {loading && files.length === 0 ? (
-        <p className="typewriter py-16 text-center text-ink-500">
-          {t("vault.loading")}
-        </p>
+        // The same placeholder cards the route's loading.tsx showed a moment
+        // earlier. Swapping them for a line of text and then for real cards
+        // made the grid collapse and regrow on every first visit and filter.
+        <div aria-busy>
+          <p role="status" className="sr-only">{t("vault.loading")}</p>
+          <SkeletonCardGrid />
+        </div>
       ) : error && files.length === 0 ? (
         <div className="paper px-6 py-10 text-center">
           <p className="text-ink-700">{t("common.error")}</p>
@@ -425,6 +446,18 @@ export function VaultBrowser({
           <p className="mt-5 text-ink-500">
             {hasFilters ? t("vault.empty") : t("vault.emptyAll")}
           </p>
+          {/* Each empty state offers its own way out: a filtered view that
+              matches nothing clears the filters, an empty archive asks for
+              its first document. */}
+          {hasFilters ? (
+            <button type="button" onClick={clearFilters} className="btn btn-ghost mt-6">
+              {t("vault.clear")}
+            </button>
+          ) : (
+            <Link href={href("upload")} className="btn btn-primary mt-6">
+              {t("vault.firstUpload")}
+            </Link>
+          )}
         </div>
       ) : (
         <>

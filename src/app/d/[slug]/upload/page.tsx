@@ -25,7 +25,9 @@ export default async function UploadPage({
   const supabase = await createTenantClient(member.dept);
   const { data: subjects, error } = await supabase
     .from("subjects")
-    .select("id, name")
+    // The description is what the form shows on hover over a subject chip.
+    // Selecting only the name left every one of those tooltips empty.
+    .select("id, name, description")
     .order("name");
   if (error) throw new Error("Could not load subjects.");
 

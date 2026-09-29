@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n/provider";
 import { useTenant, useTenantClient } from "@/lib/tenant/context";
 import type { TranslationKey } from "@/lib/i18n/dictionary";
-import { STORAGE_BUCKET } from "@/lib/tenant/types";
+import { deletedObjectPaths, STORAGE_BUCKET } from "@/lib/tenant/types";
 import type { AdminReport } from "./types";
 
 const REASON_KEYS: Record<string, TranslationKey> = {
@@ -73,8 +73,8 @@ export function AdminReports({ reports }: { reports: AdminReport[] }) {
 
     try {
       // delete_file() re-checks admin-or-owner inside the tenant's database and
-      // returns the storage path, so no service-role key is involved.
-      const { data: path, error } = await supabase.rpc("delete_file", {
+      // hands back the storage paths, so no service-role key is involved.
+      const { data, error } = await supabase.rpc("delete_file", {
         target: report.file_id,
         why: `report:${report.id}`,
       });
@@ -84,10 +84,14 @@ export function AdminReports({ reports }: { reports: AdminReport[] }) {
       }
       setDeletedFiles((prev) => new Set(prev).add(report.file_id!));
 
+      // Both objects where there are two. From schema 3 the function returns
+      // jsonb naming the original and its thumbnail; reading it as the bare
+      // string it used to be removed neither and still reported success.
+      const paths = deletedObjectPaths(data);
       let storageFailed = false;
-      if (typeof path === "string" && path) {
+      if (paths.length) {
         try {
-          const result = await supabase.storage.from(STORAGE_BUCKET).remove([path]);
+          const result = await supabase.storage.from(STORAGE_BUCKET).remove(paths);
           storageFailed = Boolean(result.error);
         } catch {
           storageFailed = true;
@@ -117,7 +121,7 @@ export function AdminReports({ reports }: { reports: AdminReport[] }) {
           onChange={(e) => setShowResolved(e.target.checked)}
           className="accent-gov-800"
         />
-        {t("admin.tab.reports")} — {t("vault.filter.all")}
+        {t("admin.reports.showClosed")}
       </label>
 
       {visible.length === 0 ? (
