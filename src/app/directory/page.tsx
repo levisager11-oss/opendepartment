@@ -33,7 +33,6 @@ export default async function DirectoryPage() {
 
       {departments.length === 0 ? (
         <div className="paper p-12 text-center">
-          <Seal size={70} className="mx-auto mb-5 opacity-60" idPrefix="dir" />
           <p className="mb-6 text-sm text-ink-500">
             <T k="od.directoryEmpty" />
           </p>

@@ -2,7 +2,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createControlClient, CONTROL_CONFIGURED } from "@/lib/control/client";
 import { MarketingShell } from "@/components/MarketingShell";
-import { Seal } from "@/components/Seal";
 import { T } from "@/components/T";
 import { DepartmentRow } from "@/components/account/DepartmentRow";
 import { AccountSignOut } from "@/components/account/AccountSignOut";
@@ -65,7 +64,6 @@ export default async function AccountPage() {
 
       {!departments || departments.length === 0 ? (
         <div className="paper p-10 text-center">
-          <Seal size={70} className="mx-auto mb-5 opacity-40" idPrefix="acct" />
           <p className="text-sm text-ink-500">
             <T k="account.none" />
           </p>

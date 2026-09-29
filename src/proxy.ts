@@ -79,6 +79,15 @@ const CONTROL_PUBLIC = ["/account/login", "/account/auth"];
 const SUPABASE_CLOUD = "https://*.supabase.co https://*.supabase.in";
 
 /**
+ * React uses eval() in development to rebuild server error stacks in the
+ * browser, and without it every page in `next dev` logged a CSP error and
+ * lost those stacks. Next's own CSP guide adds 'unsafe-eval' for development
+ * only; neither React nor Next uses eval in a production build, so a
+ * production policy never carries it (tests/proxy.test.ts holds that line).
+ */
+const DEV_EVAL = process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : "";
+
+/**
  * Where the browser may reach a Supabase project: the cloud, plus every
  * self-hosted server this deployment was configured with -- a pinned
  * department's own (lib/control/dev.ts), and the control plane's when that is
@@ -105,7 +114,7 @@ function contentSecurityPolicy(nonce: string): string {
     : [`upgrade-insecure-requests`];
   return [
     `default-src 'self'`,
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${DEV_EVAL}`,
     `style-src 'self' 'unsafe-inline'`,
     `img-src 'self' data: blob: ${SUPABASE}`,
     `media-src 'self' blob: ${SUPABASE}`,

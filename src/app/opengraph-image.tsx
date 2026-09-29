@@ -19,8 +19,13 @@ const INK = "#1c1b1f";
  * reads better anyway.
  */
 export default async function Image() {
+  // The site's own two faces, as static files: Satori (the renderer behind
+  // ImageResponse) cannot read the variable fonts next/font serves the pages.
   const fontDir = join(process.cwd(), "src/assets/fonts");
-  const sourceSans = await readFile(join(fontDir, "SourceSans3-Bold.ttf"));
+  const [bricolage, publicSans] = await Promise.all([
+    readFile(join(fontDir, "BricolageGrotesque-ExtraBold.ttf")),
+    readFile(join(fontDir, "PublicSans-SemiBold.ttf")),
+  ]);
 
   return new ImageResponse(
     (
@@ -30,9 +35,8 @@ export default async function Image() {
           height: "100%",
           display: "flex",
           flexDirection: "column",
-          background:
-            "radial-gradient(60% 70% at 85% 15%, #dce8ff 0%, #ffffff 70%)",
-          fontFamily: "Source Sans 3",
+          background: "#ffffff",
+          fontFamily: "Public Sans",
         }}
       >
         <div
@@ -55,17 +59,18 @@ export default async function Image() {
                 <circle cx="16" cy="17.25" r="3.1" fill="none" stroke={BLUE} strokeWidth="1.5" />
                 <circle cx="16" cy="17.25" r="1.1" fill={BLUE} />
               </svg>
-              <div style={{ display: "flex", marginLeft: 18, fontSize: 34, fontWeight: 700, color: INK }}>
+              <div style={{ display: "flex", marginLeft: 18, fontFamily: "Bricolage Grotesque", fontSize: 34, fontWeight: 800, color: INK }}>
                 OpenDepartment
               </div>
             </div>
             <div
               style={{
                 display: "flex",
+                fontFamily: "Bricolage Grotesque",
                 fontSize: 74,
-                fontWeight: 700,
+                fontWeight: 800,
                 lineHeight: 1.02,
-                letterSpacing: -1.5,
+                letterSpacing: -2,
                 color: INK,
                 marginBottom: 28,
               }}
@@ -76,7 +81,7 @@ export default async function Image() {
               style={{
                 display: "flex",
                 fontSize: 28,
-                fontWeight: 700,
+                fontWeight: 600,
                 lineHeight: 1.4,
                 color: "#5c5a60",
               }}
@@ -135,7 +140,8 @@ export default async function Image() {
     {
       ...size,
       fonts: [
-        { name: "Source Sans 3", data: sourceSans, weight: 700, style: "normal" },
+        { name: "Bricolage Grotesque", data: bricolage, weight: 800, style: "normal" },
+        { name: "Public Sans", data: publicSans, weight: 600, style: "normal" },
       ],
     }
   );

@@ -12,8 +12,8 @@
  * through safeAccent(), so it is always `#rrggbb`.
  */
 
-/** The seal's navy, and the dark ink choice for text set on the accent. */
-export const MASTHEAD_NAVY = "#0b1c33";
+/** The palette's darkest navy (`--color-gov-950`): the dark ink for text set on the accent. */
+export const MASTHEAD_NAVY = "#0b1a33";
 
 function channel(value: number): number {
   const c = value / 255;

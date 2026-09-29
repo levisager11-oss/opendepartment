@@ -26,6 +26,18 @@ it("forwards refreshed cookies to server rendering and the browser", async () =>
   expect(response.cookies.get("od-pinned")?.value).toBe("refreshed");
   expect(response.headers.get("content-security-policy")).toContain("'strict-dynamic'");
 });
+it.each([
+  ["production", false],
+  ["development", true],
+] as const)("allows eval in a %s policy: %s", async (mode, allowed) => {
+  // Read when the module loads, so each mode gets a fresh copy of it.
+  vi.stubEnv("NODE_ENV", mode);
+  vi.resetModules();
+  const fresh = await import("@/proxy");
+  const response = await fresh.proxy(new NextRequest("https://archive.test/d/pinned/vault"));
+  const scriptSrc = response.headers.get("content-security-policy")!.split("; ").find((d) => d.startsWith("script-src"));
+  expect(scriptSrc?.includes("'unsafe-eval'")).toBe(allowed);
+});
 it("preserves refreshed cookies when redirecting a signed-in visitor", async () => {
   const response = await proxy(new NextRequest("https://archive.test/d/pinned/login"));
   expect(response.headers.get("location")).toBe("https://archive.test/d/pinned/vault");

@@ -157,6 +157,9 @@ export default async function RootLayout({
     <html
       lang={locale}
       data-theme={theme}
+      // globals.css scrolls smoothly for in-page anchors; this tells Next 16
+      // to switch that off for route changes, so navigating stays instant.
+      data-scroll-behavior="smooth"
       className={`${publicSans.variable} ${bricolage.variable} ${plexMono.variable} ${specialElite.variable}`}
     >
       <body className="flex min-h-dvh flex-col">
@@ -168,7 +171,12 @@ export default async function RootLayout({
               would miss most of the people reading anything. */}
           <CookieNotice />
         </I18nProvider>
-        <Analytics />
+        {/* Only where Vercel serves it. Everywhere else -- a self-hosted
+            deployment, `next start` on a laptop -- /_vercel/insights/script.js
+            does not exist, and the tag cost every page a 404 and two console
+            errors for analytics that could never have been collected. VERCEL
+            is set by the platform itself on its builds and functions. */}
+        {process.env.VERCEL === "1" && <Analytics />}
       </body>
     </html>
   );
