@@ -9,31 +9,30 @@ import { absolute } from "@/lib/seo";
 export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const now = new Date();
-
+  // No lastModified on these. The only honest value would be "whenever this
+  // page's copy last changed", which nothing records; stamping them with the
+  // time of generation told crawlers every page changed every hour, which is
+  // the kind of signal search engines learn to stop trusting for the whole
+  // file.
   const staticRoutes: MetadataRoute.Sitemap = [
-    { url: absolute("/"), lastModified: now, changeFrequency: "monthly", priority: 1 },
+    { url: absolute("/"), changeFrequency: "monthly", priority: 1 },
     {
       url: absolute("/directory"),
-      lastModified: now,
       changeFrequency: "daily",
       priority: 0.8,
     },
     {
       url: absolute("/legal/terms"),
-      lastModified: now,
       changeFrequency: "yearly",
       priority: 0.3,
     },
     {
       url: absolute("/legal/privacy"),
-      lastModified: now,
       changeFrequency: "yearly",
       priority: 0.3,
     },
     {
       url: absolute("/legal/imprint"),
-      lastModified: now,
       changeFrequency: "yearly",
       priority: 0.3,
     },

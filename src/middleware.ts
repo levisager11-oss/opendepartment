@@ -84,10 +84,13 @@ function contentSecurityPolicy(nonce: string): string {
     `style-src 'self' 'unsafe-inline'`,
     `img-src 'self' data: blob: ${SUPABASE}`,
     `media-src 'self' blob: ${SUPABASE}`,
-    // No <object> anywhere any more: the document viewer is a sandboxed
-    // iframe, so this can be the value that stops plugin documents outright.
+    // No <object> anywhere: the document viewer frames a blob it typed
+    // itself (see FileViewer), so this can stop plugin documents outright.
     `object-src 'none'`,
-    `frame-src 'self' ${SUPABASE}`,
+    // blob: and nothing remote. A PDF is fetched and re-wrapped as an
+    // application/pdf blob before it is framed, so no storage URL is ever
+    // loaded into a frame with whatever Content-Type its uploader chose.
+    `frame-src 'self' blob:`,
     `connect-src 'self' ${SUPABASE}`,
     `font-src 'self' data:`,
     `form-action 'self'`,
@@ -119,8 +122,21 @@ export async function middleware(request: NextRequest) {
   // Every path out of here gets the policy, redirects included: one missed
   // branch is one unprotected page, and there are five of them below.
   response.headers.set("content-security-policy", csp);
+
+  // The same address answers in English or German depending on the language
+  // cookie and Accept-Language (lib/i18n/detect.ts), and signed-in pages
+  // depend on the session cookie. Saying so keeps a shared cache from handing
+  // one reader's page to the next. The generated files below say the same
+  // thing to everybody and stay cacheable as one copy.
+  if (!LOCALE_INVARIANT.some((p) => request.nextUrl.pathname.startsWith(p))) {
+    response.headers.append("vary", "Cookie, Accept-Language");
+  }
   return response;
 }
+
+const LOCALE_INVARIANT = [
+  "/api/", "/robots.txt", "/sitemap.xml", "/opengraph-image", "/icon",
+];
 
 async function dispatch(
   request: NextRequest,

@@ -35,7 +35,7 @@ const OG_IMAGE = {
   url: absolute("/opengraph-image"),
   width: 1200,
   height: 630,
-  alt: `${SITE_NAME} -- run your own files.`,
+  alt: `${SITE_NAME} · run your own files.`,
 };
 
 /**

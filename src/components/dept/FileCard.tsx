@@ -14,7 +14,7 @@ export function FileCard({
   file: CaseFile;
   thumbnail?: string | null;
 }) {
-  const { t, formatDate } = useI18n();
+  const { plural, formatDate } = useI18n();
   const { branding, href } = useTenant();
 
   return (
@@ -77,9 +77,9 @@ export function FileCard({
               )}
             </div>
 
-            <h3 className="line-clamp-2 font-serif text-base font-bold text-gov-900 group-hover:underline sm:block sm:truncate">
+            <h2 className="line-clamp-2 font-serif text-base font-bold text-gov-900 group-hover:underline sm:block sm:truncate">
               {file.title}
-            </h3>
+            </h2>
 
             {file.description && (
               <p className="mt-0.5 line-clamp-2 text-sm leading-snug text-ink-500">
@@ -92,12 +92,8 @@ export function FileCard({
                 {file.owner_username ?? "—"}
               </span>
               <span>{formatDate(file.created_at)}</span>
-              <span>
-                {file.view_count} {t("file.views")}
-              </span>
-              <span>
-                {file.comment_count} {t("file.comments")}
-              </span>
+              <span>{plural("file.viewCount", file.view_count)}</span>
+              <span>{plural("file.commentCount", file.comment_count)}</span>
               <span>{formatBytes(file.size_bytes)}</span>
             </div>
           </div>

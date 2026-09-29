@@ -235,6 +235,75 @@ select odtest.equals('banned member cannot inflate a view counter',
   $$select view_count::text from public.files
      where id = 'aaaaaaaa-0000-0000-0000-000000000001'$$, '0');
 
+-- ---------------------------------------------------------------------------
+--  4a. A banned member cannot erase what they left behind.
+--
+--  leave_department() refuses a banned member, so that whatever the ban was
+--  about stays for the administrators to read. Three direct paths still let
+--  them do it anyway: deleting their comments, deleting their stored objects
+--  out from under the exhibit rows, and unlinking their exhibits' subjects.
+-- ---------------------------------------------------------------------------
+insert into public.comments (id, file_id, author_id, body) values
+  ('cccccccc-0000-0000-0000-000000000033',
+   'aaaaaaaa-0000-0000-0000-000000000001',
+   '33333333-3333-3333-3333-333333333333', 'Said before the ban');
+insert into storage.objects (bucket_id, name) values
+  ('department-files', '33333333-3333-3333-3333-333333333333/two.png');
+insert into public.subjects (id, name) values
+  ('dddddddd-0000-0000-0000-000000000033', 'Ban fixture');
+insert into public.file_subjects (file_id, subject_id) values
+  ('aaaaaaaa-0000-0000-0000-000000000002', 'dddddddd-0000-0000-0000-000000000033');
+
+select odtest.as_user('33333333-3333-3333-3333-333333333333');
+
+select odtest.touches_nothing('banned member cannot delete their comments',
+  $$delete from public.comments where author_id = auth.uid()$$);
+
+-- No WHERE clause is the case that matters: a DELETE that reads no column
+-- needs no SELECT right, so the read policies that hide everything from a
+-- banned member are not consulted and only the DELETE policy stands between
+-- them and the table. PostgREST sends exactly this for an unfiltered delete.
+select odtest.touches_nothing('banned member cannot bulk-delete their comments',
+  $$delete from public.comments$$);
+
+select odtest.touches_nothing('banned member cannot bulk-delete their stored objects',
+  $$delete from storage.objects$$);
+
+select odtest.touches_nothing('banned member cannot bulk-unlink subjects',
+  $$delete from public.file_subjects$$);
+
+select odtest.touches_nothing('banned member cannot delete their stored objects',
+  $$delete from storage.objects
+     where name like '33333333-3333-3333-3333-333333333333/%'$$);
+
+select odtest.touches_nothing('banned member cannot unlink their exhibit subjects',
+  $$delete from public.file_subjects
+     where file_id = 'aaaaaaaa-0000-0000-0000-000000000002'$$);
+
+select odtest.denied('banned member cannot link new subjects to their exhibit',
+  $$insert into public.file_subjects (file_id, subject_id)
+    values ('aaaaaaaa-0000-0000-0000-000000000002',
+            'dddddddd-0000-0000-0000-000000000033')$$);
+
+select odtest.as_owner();
+
+select odtest.equals('what the banned member left behind is all still there',
+  $$select (select count(*) from public.comments
+             where id = 'cccccccc-0000-0000-0000-000000000033')::text
+         || (select count(*) from storage.objects
+             where name = '33333333-3333-3333-3333-333333333333/two.png')::text
+         || (select count(*) from public.file_subjects
+             where subject_id = 'dddddddd-0000-0000-0000-000000000033')::text$$,
+  '111');
+
+-- Leave the shared fixtures as later sections expect them.
+delete from public.file_subjects
+ where subject_id = 'dddddddd-0000-0000-0000-000000000033';
+delete from public.subjects where id = 'dddddddd-0000-0000-0000-000000000033';
+delete from storage.objects
+ where name = '33333333-3333-3333-3333-333333333333/two.png';
+delete from public.comments where id = 'cccccccc-0000-0000-0000-000000000033';
+
 -- ===========================================================================
 --  4b. A BANNED ADMINISTRATOR
 --

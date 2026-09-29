@@ -75,11 +75,17 @@ export function DeptLeaveForm({ username }: { username: string | null }) {
       const paths = result.storage_paths ?? [];
       let failed = false;
       for (let i = 0; i < paths.length; i += 100) {
+        const batch = paths.slice(i, i + 100);
         try {
-          const { error: storageError } = await supabase.storage
+          const { data: gone, error: storageError } = await supabase.storage
             .from(STORAGE_BUCKET)
-            .remove(paths.slice(i, i + 100));
-          if (storageError) failed = true;
+            .remove(batch);
+          // A removal the storage policies refuse is not an error: it is a
+          // DELETE that matched nothing, and it comes back as success with a
+          // short list. Counting is the only way to tell.
+          if (storageError || (Array.isArray(gone) && gone.length < batch.length)) {
+            failed = true;
+          }
         } catch {
           failed = true;
         }

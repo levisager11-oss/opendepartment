@@ -37,3 +37,11 @@ it("preserves cookies and intended destination on signed-out redirects", async (
   expect(response.headers.get("location")).toContain("/d/pinned/login?next=");
   expect(response.cookies.get("od-pinned")?.value).toBe("refreshed");
 });
+
+it("tells shared caches that a page depends on language and session", async () => {
+  const page = await middleware(new NextRequest("https://archive.test/legal/terms"));
+  expect(page.headers.get("vary")).toContain("Accept-Language");
+  expect(page.headers.get("vary")).toContain("Cookie");
+  const sitemap = await middleware(new NextRequest("https://archive.test/sitemap.xml"));
+  expect(sitemap.headers.get("vary") ?? "").not.toContain("Accept-Language");
+});

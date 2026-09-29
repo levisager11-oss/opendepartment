@@ -85,6 +85,9 @@ export function VaultBrowser({
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  // Which page the failed request was for. A failed "load more" must retry
+  // that page and keep the cards already on screen, not start over.
+  const [failedPage, setFailedPage] = useState(0);
   const [filtersReady, setFiltersReady] = useState(false);
 
   // Read after hydration so the server and first client render agree. Native
@@ -241,7 +244,10 @@ export function VaultBrowser({
           }
         }
       } catch {
-        if (!stale()) setError(true);
+        if (!stale()) {
+          setError(true);
+          setFailedPage(pageIndex);
+        }
       } finally {
         if (!stale()) setLoading(false);
       }
@@ -402,7 +408,7 @@ export function VaultBrowser({
         <p className="typewriter py-16 text-center text-ink-500">
           {t("vault.loading")}
         </p>
-      ) : error ? (
+      ) : error && files.length === 0 ? (
         <div className="paper px-6 py-10 text-center">
           <p className="text-ink-700">{t("common.error")}</p>
           <button
@@ -433,7 +439,21 @@ export function VaultBrowser({
             ))}
           </div>
 
-          {files.length < total && (
+          {error && (
+            <div className="mt-8 text-center">
+              <p role="alert" className="text-sm text-ink-700">{t("common.error")}</p>
+              <button
+                type="button"
+                onClick={() => load(failedPage, failedPage === 0)}
+                disabled={loading}
+                className="btn btn-ghost mt-3"
+              >
+                {t("common.retry")}
+              </button>
+            </div>
+          )}
+
+          {!error && files.length < total && (
             <div className="mt-8 text-center">
               <button
                 type="button"

@@ -248,12 +248,72 @@ select odtest.allowed('a repeated report is accepted quietly',
   $$select public.report_department('first-dept', 'impersonation',
       'Saying it again.', 'someone@example.test')$$);
 
+-- Each call in its own handler: once the queue is full the function says so
+-- by raising, and one refusal must not undo the reports before it.
 do $flood$ begin
   for i in 1..60 loop
-    perform public.report_department('first-dept', 'spam', 'flood ' || i,
-                                     'flood' || i || '@example.test');
+    begin
+      perform public.report_department('first-dept', 'spam', 'flood ' || i,
+                                       'flood' || i || '@example.test');
+    exception when raise_exception then null;
+    end;
   end loop;
 end $flood$;
+
+-- A full queue used to swallow the report and thank the reporter for it. The
+-- person who needs this form most -- somebody arriving after an owner packed
+-- the queue with junk about their own department -- was told it had worked.
+select odtest.denied('a full queue tells the reporter instead of dropping them',
+  $$select public.report_department('first-dept', 'illegal',
+      'This one is real.', 'real@example.test')$$);
+
+-- Two departments of their own, so the limits below are not confused with
+-- the full queue above. Fixture work, done as the owner.
+select odtest.as_owner();
+insert into public.departments (slug, operator_id, supabase_url, anon_key, display_name)
+values ('abuse-one', 'aaaa1111-0000-0000-0000-000000000001',
+        'https://abuseoneaaaa.supabase.co', 'k', 'Abuse One'),
+       ('abuse-two', 'aaaa1111-0000-0000-0000-000000000001',
+        'https://abusetwoaaaa.supabase.co', 'k', 'Abuse Two');
+select odtest.as_anon();
+
+-- One sender, however many addresses they type in. PostgREST hands the
+-- request's headers to the database in this setting; the client address is
+-- the only thing a script cannot vary for free.
+select set_config('request.headers',
+  '{"x-forwarded-for": "203.0.113.7, 10.0.0.1"}', false);
+do $sender$ begin
+  for i in 1..5 loop
+    perform public.report_department('abuse-one', 'spam', 'from one sender ' || i,
+                                     'rotating' || i || '@example.test');
+  end loop;
+end $sender$;
+select odtest.denied('one sender cannot keep filing reports',
+  $$select public.report_department('abuse-one', 'spam', 'sixth', 'rotating6@example.test')$$);
+select set_config('request.headers',
+  '{"x-forwarded-for": "198.51.100.9"}', false);
+select odtest.allowed('a different sender is not held back by the first one',
+  $$select public.report_department('abuse-one', 'illegal', 'Somebody else', null)$$);
+
+-- The same limit for a contact address, across whichever addresses it
+-- arrives from.
+do $contact$ begin
+  for i in 1..5 loop
+    perform set_config('request.headers',
+      json_build_object('x-forwarded-for', '192.0.2.' || i)::text, false);
+    perform public.report_department('abuse-two', 'spam', 'contact ' || i,
+                                     'same-person@example.test');
+  end loop;
+end $contact$;
+select set_config('request.headers',
+  '{"x-forwarded-for": "192.0.2.99"}', false);
+select odtest.denied('one contact address cannot keep filing reports',
+  $$select public.report_department('abuse-two', 'illegal', 'again',
+      'Same-Person@example.test')$$);
+select set_config('request.headers', '', false);
+
+select odtest.denied('the throttle is not readable either',
+  $$select count(*) from public.abuse_throttle$$);
 
 select odtest.as_owner();
 
@@ -264,6 +324,10 @@ select odtest.equals('one person saying it twice is one report',
 select odtest.equals('a departments open queue is bounded',
   $$select (count(*) <= 25)::text from public.abuse_reports
      where slug = 'first-dept' and status = 'open'$$, 'true');
+
+select odtest.equals('the throttle keeps a digest of the address, never the address',
+  $$select count(*)::text from public.abuse_throttle
+     where sender like '%203.0.113.7%'$$, '0');
 
 select odtest.as_anon();
 

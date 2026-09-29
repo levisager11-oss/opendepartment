@@ -132,7 +132,11 @@ department.
 2. Run [`db/control-plane.sql`](db/control-plane.sql) in its SQL editor.
 3. Copy `.env.example` to `.env.local` and fill in the two
    `NEXT_PUBLIC_CONTROL_*` values.
-4. `npm install && npm run dev`
+4. In that project's Authentication → URL Configuration, add
+   `https://YOUR-DEPLOYMENT/account/auth/callback` to the redirect URLs. The
+   operator's confirmation and password-reset mails land there; without it
+   Supabase falls back to the Site URL and the reset link does nothing.
+5. `npm install && npm run dev`
 
 The live deployment's control plane is the Supabase project
 `OpenDepartment-Test` (`flqyqpxqfkjvsrzvngbg`). It holds nothing but the

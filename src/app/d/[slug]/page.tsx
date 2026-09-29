@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { requireDepartment } from "@/lib/tenant/auth";
 import { Seal } from "@/components/Seal";
 import { T } from "@/components/T";
+import { accentInk } from "@/lib/tenant/contrast";
 
 /**
  * A department's front door, seen by someone who is not signed in.
@@ -100,8 +101,11 @@ export default async function DepartmentFrontDoor({
       <div className="flex flex-wrap items-center justify-center gap-4">
         <Link
           href={`/d/${slug}/login`}
-          className="px-6 py-3 font-bold text-gov-950"
-          style={{ backgroundColor: branding.accent }}
+          className="px-6 py-3 font-bold"
+          style={{
+            backgroundColor: branding.accent,
+            color: accentInk(branding.accent),
+          }}
         >
           <T k="landing.cta" />
         </Link>

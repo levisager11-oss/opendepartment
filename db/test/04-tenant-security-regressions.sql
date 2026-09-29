@@ -189,6 +189,8 @@ values ('f1000000-0000-0000-0000-000000000010','a1000000-0000-0000-0000-00000000
   'Leaver exhibit','a1000000-0000-0000-0000-000000000010/leaving.png','leaving.png','image/png',10,'image');
 insert into public.comments (file_id,author_id,body) values
   ('f1000000-0000-0000-0000-000000000003','a1000000-0000-0000-0000-000000000010','A parting word');
+insert into storage.objects (bucket_id,name) values
+  ('department-files','a1000000-0000-0000-0000-000000000010/leaving.png');
 
 select odtest.as_anon();
 select odtest.denied('a signed-out caller cannot reach leave_department',
@@ -207,6 +209,21 @@ select odtest.equals('leaving hands back the storage paths it did not delete',
   $$select public.leave_department('auditleaver') -> 'storage_paths' ->> 0$$,
   'a1000000-0000-0000-0000-000000000010/leaving.png');
 
+-- The paths are handed back for the caller to remove, and the caller is by now
+-- a signed-in account with no profile. The Storage API removes by name, which
+-- is a DELETE with a WHERE clause -- so the READ policy applies as well as the
+-- delete one, and a read policy that asked for an active member matched
+-- nothing here. The removal "succeeded", the form signed them out, and every
+-- document they had just erased stayed in the bucket for any member to list.
+select odtest.allowed('the departed member can remove what they were handed back',
+  $$delete from storage.objects
+     where bucket_id = 'department-files'
+       and name = any(array['a1000000-0000-0000-0000-000000000010/leaving.png'])$$);
+select odtest.touches_nothing('the departed member still cannot remove somebody elses object',
+  $$delete from storage.objects
+     where bucket_id = 'department-files'
+       and name like 'a1000000-0000-0000-0000-000000000002/%'$$);
+
 select odtest.as_owner();
 select odtest.equals('leaving removes the profile',
   $$select count(*)::text from public.profiles where id='a1000000-0000-0000-0000-000000000010'$$,'0');
@@ -216,6 +233,9 @@ select odtest.equals('leaving removes the documents that were filed',
   $$select count(*)::text from public.files where owner_id='a1000000-0000-0000-0000-000000000010'$$,'0');
 select odtest.equals('leaving removes the comments that were written',
   $$select count(*)::text from public.comments where author_id='a1000000-0000-0000-0000-000000000010'$$,'0');
+select odtest.equals('leaving leaves nothing of theirs in the bucket',
+  $$select count(*)::text from storage.objects
+     where name like 'a1000000-0000-0000-0000-000000000010/%'$$,'0');
 select odtest.equals('leaving removes the account itself',
   $$select count(*)::text from auth.users where id='a1000000-0000-0000-0000-000000000010'$$,'0');
 select odtest.equals('the audit trail outlives the member who left',
@@ -478,7 +498,7 @@ select odtest.as_owner();
 select odtest.equals('applying the schema records exactly one version row',
   $$select count(*)::text from public.schema_version$$,'1');
 select odtest.equals('the recorded version matches the stamp at the end of the file',
-  $$select version::text from public.schema_version where id$$,'4');
+  $$select version::text from public.schema_version where id$$,'5');
 select odtest.equals('re-running the file does not accumulate version rows',
   $$select count(*)::text from public.schema_version$$,'1');
 
@@ -486,7 +506,7 @@ select odtest.as_anon();
 select odtest.denied('a signed-out caller cannot read the version table directly',
   $$select * from public.schema_version$$);
 select odtest.equals('the front door still reports the version without a session',
-  $$select schema_version::text from public.department_identity()$$,'4');
+  $$select schema_version::text from public.department_identity()$$,'5');
 
 select odtest.as_user('a1000000-0000-0000-0000-000000000002');
 select odtest.denied('a member cannot read the version table directly',
@@ -500,7 +520,7 @@ select odtest.denied('an administrator cannot delete the version row',
   $$delete from public.schema_version where id$$);
 select odtest.as_owner();
 select odtest.equals('the version survives every attempt to rewrite it',
-  $$select version::text from public.schema_version where id$$,'4');
+  $$select version::text from public.schema_version where id$$,'5');
 
 select odtest.as_owner();
 \o

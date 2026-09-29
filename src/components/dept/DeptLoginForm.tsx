@@ -146,7 +146,12 @@ export function DeptLoginForm({
         // once, and it costs an e-mail round trip to a department somebody has
         // not joined yet. DeptPasswordForm has always asked twice; this is the
         // screen where getting it wrong is most expensive.
-        if (password !== repeat) {
+        //
+        // Only while the repeat field is on screen, though. Revealing the
+        // password hides it -- the reader can see what they typed, which is
+        // the job the second field was doing -- and comparing against a field
+        // nobody can see refused every signup that pressed "Show" first.
+        if (!reveal && password !== repeat) {
           setError(t("auth.passwordMismatch"));
           setBusy(false);
           return;

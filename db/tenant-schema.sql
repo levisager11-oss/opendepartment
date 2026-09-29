@@ -564,6 +564,16 @@ returns boolean language sql stable security definer set search_path = public as
   select coalesce((select not is_banned from public.profiles where id = auth.uid()), false);
 $fn$;
 
+-- Not the negation of is_active_member(). That one is false for a caller with
+-- no profile at all -- which is what a member who has just left is, holding a
+-- token that outlives their row -- and this one is true only for somebody the
+-- administrators actually banned. The storage policies need the difference:
+-- the first may clear out their own folder, the second may not.
+create or replace function public.is_banned()
+returns boolean language sql stable security definer set search_path = public as $fn$
+  select coalesce((select is_banned from public.profiles where id = auth.uid()), false);
+$fn$;
+
 -- ---------------------------------------------------------------------------
 -- New-user hook. Runs for e-mail/password AND OAuth signups, because both
 -- INSERT into auth.users. Rejecting here cannot be bypassed from the client.
@@ -1589,9 +1599,15 @@ drop policy if exists comments_insert_own on public.comments;
 create policy comments_insert_own on public.comments
   for insert to authenticated with check (author_id = auth.uid() and public.is_active_member());
 
+-- is_active_member() on the author's half for the same reason
+-- leave_department() refuses a banned member: whatever the ban was about stays
+-- for the administrators to read. The read policy above does not cover this
+-- by itself -- a DELETE with no WHERE clause reads no column, needs no SELECT
+-- right, and so is checked against this policy alone.
 drop policy if exists comments_delete on public.comments;
 create policy comments_delete on public.comments
-  for delete to authenticated using (author_id = auth.uid() or public.is_admin());
+  for delete to authenticated
+  using ((author_id = auth.uid() and public.is_active_member()) or public.is_admin());
 
 -- REPORTS
 drop policy if exists reports_insert on public.reports;
@@ -1705,17 +1721,39 @@ create policy "dept upload own folder" on storage.objects
     and public.is_active_member()
   );
 
+-- Members read the whole bucket. The second half is for the one caller who is
+-- not a member and still has objects here: somebody who has just run
+-- leave_department(), whose profile is gone and who has been handed their
+-- storage paths to remove. The Storage API removes by name -- a DELETE with a
+-- WHERE clause -- and Postgres applies this SELECT policy to that as well as
+-- the DELETE policy below, so without it the removal matched nothing, reported
+-- success, and left everything they had just erased readable by every member.
+-- Their own folder only, and never for a banned member.
 drop policy if exists "dept read members" on storage.objects;
 create policy "dept read members" on storage.objects
   for select to authenticated
-  using (bucket_id = 'department-files' and public.is_active_member());
+  using (
+    bucket_id = 'department-files'
+    and (
+      public.is_active_member()
+      or ((storage.foldername(name))[1] = auth.uid()::text and not public.is_banned())
+    )
+  );
 
+-- Never a banned member, like the comment policy above: their exhibit rows
+-- are kept, and deleting the objects under them would leave the
+-- administrators with records of documents nobody can open any more. A member
+-- who has LEFT has no profile, is not banned, and must still be able to clear
+-- their own folder -- see the read policy above.
 drop policy if exists "dept delete own or admin" on storage.objects;
 create policy "dept delete own or admin" on storage.objects
   for delete to authenticated
   using (
     bucket_id = 'department-files'
-    and ((storage.foldername(name))[1] = auth.uid()::text or public.is_admin())
+    and (
+      ((storage.foldername(name))[1] = auth.uid()::text and not public.is_banned())
+      or public.is_admin()
+    )
   );
 
 -- ===========================================================================
@@ -1732,7 +1770,7 @@ create policy "dept delete own or admin" on storage.objects
 --  reads the number out of the statement below and refuses to build without
 --  it, so the app and this file cannot drift apart.
 -- ===========================================================================
-insert into public.schema_version (id, version) values (true, 4)
+insert into public.schema_version (id, version) values (true, 5)
 on conflict (id) do update
   set version = excluded.version, applied_at = now();
 

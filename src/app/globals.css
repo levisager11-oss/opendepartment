@@ -109,6 +109,10 @@
   /* Overridden per department by the /d/[slug] layout. The value here is only
      what the marketing pages and an unconfigured department fall back to. */
   --accent: #c9a227;
+  /* Text set ON the accent. The department layout recomputes it alongside
+     --accent (lib/tenant/contrast.ts): navy on a light accent, white on a
+     dark one. */
+  --accent-ink: var(--color-gov-950);
 }
 
 html {
@@ -420,7 +424,7 @@ body {
    --color-gold-* literal. */
 @utility btn-accent {
   background: var(--accent);
-  color: var(--color-gov-950);
+  color: var(--accent-ink);
   border-color: color-mix(in srgb, var(--accent) 82%, #000);
   &:hover:not(:disabled) {
     background: color-mix(in srgb, var(--accent) 88%, #fff);

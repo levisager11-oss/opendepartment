@@ -36,6 +36,7 @@ export const dictionary = {
     "nav.signedInAs": "Signed in as",
     "nav.language": "Language",
     "nav.home": "Home",
+    "nav.menu": "Menu",
     "common.and": "and",
     "setup.tooMany":
       "You have reached the maximum of 3 departments for one account. Remove one under Your departments first.",
@@ -117,6 +118,10 @@ export const dictionary = {
     "abuse.slugRequired": "Please say which department this is about.",
     "abuse.unknownSlug":
       "No department resolves at that address. Check the spelling, or paste the link.",
+    "abuse.queueFull":
+      "This department already has as many open reports as the queue holds, so this one was not stored. Please write to the platform directly instead; the address is in the legal notice.",
+    "abuse.rateLimited":
+      "You have sent several reports in a short time. Wait an hour and try again, or write to the platform directly; the address is in the legal notice.",
     "abuse.sent": "Report received",
     "abuse.sentBody":
       "Somebody will read it. If you left an address we may come back to you; either way the department is not told who filed this.",
@@ -143,6 +148,8 @@ export const dictionary = {
     "settings.sealBottom": "Around the bottom",
     "settings.accent": "Accent colour",
     "settings.accentInvalid": "Use a six-digit hex colour, like #b8860b.",
+    "settings.accentLowContrast":
+      "This colour is hard to read on the dark header, where it colours the top line of the seal and your username. A lighter shade will read better.",
     "settings.categories": "Categories",
     "settings.categoriesHint":
       "One per line, in the order they should appear. Existing documents keep the category they were filed under even if you remove it here.",
@@ -432,6 +439,10 @@ export const dictionary = {
     // --- OpenDepartment account -----------------------------------------
     "account.title": "Your departments",
     "account.none": "You have not created a department yet.",
+    "account.resetSent":
+      "If that address has an OpenDepartment account, a reset link is on its way.",
+    "account.linkInvalid":
+      "That link could not be used here. It may have expired or been opened in another browser. If you just confirmed your address, sign in below.",
     "account.signIn": "Sign in to OpenDepartment",
     "account.signInBody":
       "This account only manages your department listings. It is separate from your membership inside any department.",
@@ -547,6 +558,9 @@ export const dictionary = {
     "auth.invalidCredentials": "E-mail address or password is incorrect.",
     "auth.passwordTooShort": "Password must be at least 8 characters.",
     "auth.genericError": "Authentication failed. Please try again.",
+    "auth.emailNotConfirmed":
+      "Confirm your e-mail address first. The link is in your inbox.",
+    "auth.rateLimited": "Too many attempts. Wait a few minutes and try again.",
     "auth.working": "Verifying...",
 
     // --- setting a new password after a reset link ----------------------
@@ -628,6 +642,10 @@ export const dictionary = {
     "file.submittedOn": "Filed on",
     "file.views": "views",
     "file.comments": "comments",
+    "file.viewCount_one": "{n} view",
+    "file.viewCount_other": "{n} views",
+    "file.commentCount_one": "{n} comment",
+    "file.commentCount_other": "{n} comments",
     "file.size": "Size",
     "file.type": "Type",
     "file.subjects": "Subjects",
@@ -825,6 +843,7 @@ export const dictionary = {
     "nav.signedInAs": "Angemeldet als",
     "nav.language": "Sprache",
     "nav.home": "Startseite",
+    "nav.menu": "Menü",
     "common.and": "und",
     "setup.tooMany":
       "Sie haben das Maximum von 3 Departementen pro Konto erreicht. Entfernen Sie zuerst eines unter «Ihre Departemente».",
@@ -906,6 +925,10 @@ export const dictionary = {
     "abuse.slugRequired": "Bitte geben Sie an, um welches Departement es geht.",
     "abuse.unknownSlug":
       "Unter dieser Adresse gibt es kein Departement. Bitte Schreibweise prüfen oder den Link einfügen.",
+    "abuse.queueFull":
+      "Zu diesem Departement sind bereits so viele offene Meldungen eingegangen, wie die Warteschlange fasst. Diese Meldung wurde deshalb nicht gespeichert. Bitte schreiben Sie der Plattform direkt; die Adresse steht im Impressum.",
+    "abuse.rateLimited":
+      "Sie haben in kurzer Zeit mehrere Meldungen gesendet. Warten Sie eine Stunde und versuchen Sie es erneut, oder schreiben Sie der Plattform direkt; die Adresse steht im Impressum.",
     "abuse.sent": "Meldung erhalten",
     "abuse.sentBody":
       "Jemand wird sie lesen. Wenn Sie eine Adresse hinterlassen haben, melden wir uns unter Umständen; dem Departement wird in keinem Fall mitgeteilt, wer die Meldung gemacht hat.",
@@ -933,6 +956,8 @@ export const dictionary = {
     "settings.accent": "Akzentfarbe",
     "settings.accentInvalid":
       "Verwenden Sie eine sechsstellige Hex-Farbe, etwa #b8860b.",
+    "settings.accentLowContrast":
+      "Diese Farbe ist auf der dunklen Kopfzeile schwer lesbar, wo sie die obere Siegelinschrift und Ihren Benutzernamen einfärbt. Ein hellerer Ton ist besser lesbar.",
     "settings.categories": "Kategorien",
     "settings.categoriesHint":
       "Eine pro Zeile, in der gewünschten Reihenfolge. Bestehende Dokumente behalten ihre Kategorie, auch wenn Sie sie hier entfernen.",
@@ -1224,6 +1249,10 @@ export const dictionary = {
     // --- OpenDepartment-Konto -------------------------------------------
     "account.title": "Ihre Departemente",
     "account.none": "Sie haben noch kein Departement erstellt.",
+    "account.resetSent":
+      "Falls zu dieser Adresse ein OpenDepartment-Konto gehört, ist ein Link zum Zurücksetzen unterwegs.",
+    "account.linkInvalid":
+      "Dieser Link konnte hier nicht verwendet werden. Er ist möglicherweise abgelaufen oder wurde in einem anderen Browser geöffnet. Falls Sie eben Ihre Adresse bestätigt haben, melden Sie sich unten an.",
     "account.signIn": "Bei OpenDepartment anmelden",
     "account.signInBody":
       "Dieses Konto verwaltet nur Ihre Departements-Einträge. Es ist von Ihrer Mitgliedschaft innerhalb eines Departements getrennt.",
@@ -1333,6 +1362,9 @@ export const dictionary = {
     "auth.passwordTooShort": "Das Passwort muss mindestens 8 Zeichen haben.",
     "auth.genericError":
       "Die Authentifizierung ist fehlgeschlagen. Bitte erneut versuchen.",
+    "auth.emailNotConfirmed":
+      "Bestätigen Sie zuerst Ihre E-Mail-Adresse. Der Link ist in Ihrem Posteingang.",
+    "auth.rateLimited": "Zu viele Versuche. Warten Sie ein paar Minuten und versuchen Sie es erneut.",
     "auth.working": "Wird geprüft...",
 
     // --- neues Passwort nach einem Reset-Link ---------------------------
@@ -1415,6 +1447,10 @@ export const dictionary = {
     "file.submittedOn": "Eingereicht am",
     "file.views": "Aufrufe",
     "file.comments": "Notizen",
+    "file.viewCount_one": "{n} Aufruf",
+    "file.viewCount_other": "{n} Aufrufe",
+    "file.commentCount_one": "{n} Notiz",
+    "file.commentCount_other": "{n} Notizen",
     "file.size": "Grösse",
     "file.type": "Typ",
     "file.subjects": "Betreffe",

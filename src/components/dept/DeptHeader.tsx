@@ -30,9 +30,12 @@ export function DeptHeader({
     setSigningOut(true);
     setSignOutFailed(false);
     // Scoped to this department's cookie only: signing out of one archive
-    // leaves your membership in every other one alone.
+    // leaves your membership in every other one alone. And to this browser
+    // only: Supabase's default scope is "global", which revokes the member's
+    // sessions for this department on every device they use -- not what a
+    // button in the header of one tab says it will do.
     try {
-      const { error } = await supabase.auth.signOut();
+      const { error } = await supabase.auth.signOut({ scope: "local" });
       if (error) throw error;
       router.push(href());
       router.refresh();
@@ -105,6 +108,7 @@ export function DeptHeader({
               <Link
                 key={link.href}
                 href={link.href}
+                aria-current={active ? "page" : undefined}
                 className={`rounded-card px-3 py-2 text-sm font-semibold transition-colors ${
                   active
                     ? "bg-white/15 text-white"
@@ -151,7 +155,8 @@ export function DeptHeader({
               type="button"
               onClick={() => setMenuOpen((v) => !v)}
               aria-expanded={menuOpen}
-              aria-label="Menu"
+              aria-controls="dept-mobile-menu"
+              aria-label={t("nav.menu")}
               // -mr-2 buys the 24px glyph a 40px tap target without moving it
               // off the right margin. This button only ever renders below md.
               className="-mr-2 cursor-pointer p-2 text-white md:hidden"
@@ -172,7 +177,7 @@ export function DeptHeader({
       </div>
 
       {menuOpen && signedIn && (
-        <div className="border-t border-white/10 bg-gov-950 md:hidden">
+        <div id="dept-mobile-menu" className="border-t border-white/10 bg-gov-950 md:hidden">
           <nav className="mx-auto flex max-w-7xl flex-col px-4 py-2">
             {links.map((link) => {
               const active =

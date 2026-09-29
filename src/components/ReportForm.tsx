@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { Spinner } from "@/components/Spinner";
 import { useI18n } from "@/lib/i18n/provider";
@@ -66,17 +67,24 @@ export function ReportForm({ presetSlug }: { presetSlug?: string }) {
     setBusy(false);
 
     if (rpcError) {
+      const m = rpcError.message;
       setError(
-        rpcError.message.includes("NO_SUCH_DEPARTMENT")
+        m.includes("NO_SUCH_DEPARTMENT")
           ? t("abuse.unknownSlug")
-          : t("common.error")
+          : m.includes("QUEUE_FULL")
+            ? t("abuse.queueFull")
+            : m.includes("RATE_LIMITED")
+              ? t("abuse.rateLimited")
+              : t("common.error")
       );
       return;
     }
 
-    // Deliberately the same outcome whether the report was filed, was a
-    // duplicate, or landed on a department whose queue is already full: none
-    // of those are things an anonymous caller should be able to tell apart.
+    // Deliberately the same outcome whether the report was filed or was a
+    // duplicate: whether somebody else already said this is not something an
+    // anonymous caller should be able to ask. A FULL queue is different and
+    // says so above -- a reporter thanked for a report nobody stored is the
+    // one outcome this form must not produce.
     setSent(true);
   }
 
@@ -165,6 +173,14 @@ export function ReportForm({ presetSlug }: { presetSlug?: string }) {
       {error && (
         <p role="alert" className="notice notice-error">
           {error}
+          {(error === t("abuse.queueFull") || error === t("abuse.rateLimited")) && (
+            <>
+              {" "}
+              <Link href="/legal/imprint" className="underline underline-offset-2">
+                {t("legal.imprint")}
+              </Link>
+            </>
+          )}
         </p>
       )}
 
