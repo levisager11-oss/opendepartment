@@ -66,6 +66,7 @@ export function DeptHeader({
   const links = signedIn
     ? [
         { href: href("vault"), label: t("nav.vault") },
+        { href: href("subjects"), label: t("nav.subjects") },
         { href: href("upload"), label: t("nav.upload") },
         ...(isAdmin ? [{ href: href("admin"), label: t("nav.admin") }] : []),
       ]
@@ -135,7 +136,10 @@ export function DeptHeader({
           </span>
         </Link>
 
-        <nav className="ml-auto hidden items-center gap-1 md:flex">
+        {/* lg, not md: four links, the language toggle and the signed-in name
+            need about 950px. Switched at 768px the name shrank to "Th…" and
+            every link broke over two lines until 1024. */}
+        <nav className="ml-auto hidden items-center gap-1 lg:flex">
           {links.map((link) => {
             const active =
               pathname === link.href || pathname.startsWith(link.href + "/");
@@ -144,7 +148,7 @@ export function DeptHeader({
                 key={link.href}
                 href={link.href}
                 aria-current={active ? "page" : undefined}
-                className={`rounded-card px-3 py-2 text-sm font-semibold transition-colors ${
+                className={`rounded-card px-3 py-2 text-sm font-semibold whitespace-nowrap transition-colors ${
                   active
                     ? "bg-white/15 text-white"
                     : "text-gov-100/80 hover:bg-white/10 hover:text-white"
@@ -156,7 +160,7 @@ export function DeptHeader({
           })}
         </nav>
 
-        <div className="ml-auto flex shrink-0 items-center gap-3 md:ml-0 md:gap-4">
+        <div className="ml-auto flex shrink-0 items-center gap-3 lg:ml-0 lg:gap-4">
           <LanguageToggle light />
 
           {!signedIn && !onAuthPage && (
@@ -169,7 +173,7 @@ export function DeptHeader({
           )}
 
           {signedIn && (
-            <div className="hidden items-center gap-3 border-l border-white/15 pl-4 md:flex">
+            <div className="hidden items-center gap-3 border-l border-white/15 pl-4 lg:flex">
               <Link
                 href={href("account")}
                 className="text-right leading-tight transition-opacity hover:opacity-80"
@@ -202,8 +206,8 @@ export function DeptHeader({
               aria-controls="dept-mobile-menu"
               aria-label={t("nav.menu")}
               // -mr-2 buys the 24px glyph a 40px tap target without moving it
-              // off the right margin. This button only ever renders below md.
-              className="-mr-2 cursor-pointer p-2 text-white md:hidden"
+              // off the right margin. This button only ever renders below lg.
+              className="-mr-2 cursor-pointer p-2 text-white lg:hidden"
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
                 <path
@@ -221,7 +225,7 @@ export function DeptHeader({
       </div>
 
       {menuOpen && signedIn && (
-        <div id="dept-mobile-menu" className="border-t border-white/10 bg-gov-950 md:hidden">
+        <div id="dept-mobile-menu" className="border-t border-white/10 bg-gov-950 lg:hidden">
           <nav className="mx-auto flex max-w-7xl flex-col px-4 py-2">
             {links.map((link) => {
               const active =

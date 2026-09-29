@@ -24,6 +24,7 @@ import { DeleteFileButton } from "@/components/dept/DeleteFileButton";
 import { AccountSignOut } from "@/components/account/AccountSignOut";
 import { DeptLeaveForm } from "@/components/dept/DeptLeaveForm";
 import { ReportForm } from "@/components/ReportForm";
+import { SubjectIndex } from "@/components/dept/SubjectIndex";
 
 const runtime = vi.hoisted(() => ({
   query: "",
@@ -1013,5 +1014,22 @@ describe("navigation and form guidance", () => {
     expect(await screen.findByText("Seen it.")).toBeTruthy();
     expect(insert.insert).toHaveBeenCalledWith({ file_id: "file-1", author_id: "member", body: "Seen it." });
     expect((box as HTMLTextAreaElement).value).toBe("");
+  });
+
+  it("lists each subject as a way into the vault filtered to it", () => {
+    render(<SubjectIndex isAdmin={false} subjects={[
+      { id: "case-a", name: "Case A", description: "The first one", count: 3, latest: "2026-01-02" },
+      { id: "case b", name: "Case B", description: null, count: 0, latest: null },
+    ]} />);
+    expect(screen.getByRole("link", { name: /Case A/ }).getAttribute("href")).toBe("/d/demo/vault?subject=case-a");
+    // An id is a UUID in practice, but the link must not depend on that.
+    expect(screen.getByRole("link", { name: /Case B/ }).getAttribute("href")).toBe("/d/demo/vault?subject=case%20b");
+    expect(screen.getByText(tr("subjects.noDescription"))).toBeTruthy();
+    expect(screen.queryByRole("link", { name: tr("subjects.manage") })).toBeNull();
+  });
+
+  it("points an administrator with no subjects at where they are made", () => {
+    render(<SubjectIndex isAdmin subjects={[]} />);
+    expect(screen.getByRole("link", { name: tr("subjects.manage") }).getAttribute("href")).toBe("/d/demo/admin?tab=subjects");
   });
 });
