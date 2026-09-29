@@ -3,15 +3,16 @@
  *
  * The accent is chosen by an administrator and can be anything from a pale
  * gold to a near-black navy, and it is used two ways: as a background with
- * text on it (the front door's call to action, `btn-accent`) and as text on
- * the dark masthead. A fixed dark ink was right for the default gold and
- * unreadable on the navy an administrator is equally entitled to pick.
+ * text on it (`btn-accent`, the member's initial in the header) and as the
+ * ring, legend and scales of the seal, drawn on the seal's own navy face. A
+ * fixed dark ink was right for the default gold and unreadable on the navy an
+ * administrator is equally entitled to pick.
  *
  * WCAG 2 relative luminance and contrast ratio; the input has already been
  * through safeAccent(), so it is always `#rrggbb`.
  */
 
-/** The masthead's own navy (`--color-gov-950`), and the dark ink choice. */
+/** The seal's navy, and the dark ink choice for text set on the accent. */
 export const MASTHEAD_NAVY = "#0b1c33";
 
 function channel(value: number): number {

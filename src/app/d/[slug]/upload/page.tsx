@@ -37,7 +37,7 @@ export default async function UploadPage({
         <span className="docket text-2xs text-ink-500">
           <T k="upload.subtitle" />
         </span>
-        <h1 className="font-serif text-2xl font-black break-words text-gov-900 sm:text-3xl">
+        <h1 className="font-display text-3xl font-extrabold tracking-tight break-words text-ink-900 sm:text-4xl">
           <T k="upload.title" />
         </h1>
       </div>

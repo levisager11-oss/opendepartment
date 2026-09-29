@@ -59,6 +59,15 @@ type Draft = {
   founderClaimed?: boolean;
 };
 
+/** The five steps, in order, as the progress bar names them. */
+const STEP_LABELS = [
+  "setup.step1",
+  "setup.step2",
+  "setup.step3",
+  "email.step",
+  "setup.step4",
+] as const satisfies readonly TranslationKey[];
+
 export function SetupWizard({
   schemaSql,
   origin,
@@ -702,13 +711,38 @@ export function SetupWizard({
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 sm:py-10">
-      <h1 className="mb-1 font-serif text-2xl font-black break-words text-ink-900 sm:text-3xl">
+      <h1 className="mb-1 font-display text-2xl font-extrabold tracking-tight break-words text-ink-900 sm:text-3xl">
         {t("setup.title")}
       </h1>
       {bootstrapNotice && <p role="alert" className="notice notice-error mb-4">{bootstrapNotice}</p>}
       {!bootstrapHash && !founderClaimed && !bootstrapNotice && <p role="status">{t("setup.bootstrapPreparing")}</p>}
       {step < 6 && (
-        <p className="docket mb-8 text-2xs text-ink-500">{t("setup.step", { n: step, total: 5 })}</p>
+        <div className="mt-3 mb-8">
+          <p className="mb-3 text-sm text-ink-500">
+            {t("setup.step", { n: step, total: 5 })} ·{" "}
+            <span className="font-semibold text-ink-900">{t(STEP_LABELS[step - 1])}</span>
+          </p>
+          {/* The same fact as the line above, drawn: decoration for sighted
+              readers, and hidden from everybody else so it is not said twice. */}
+          <ol aria-hidden className="grid grid-cols-5 gap-1.5">
+            {STEP_LABELS.map((key, i) => (
+              <li key={key} className="min-w-0">
+                <span
+                  className={`block h-1.5 rounded-full transition-colors ${
+                    i + 1 <= step ? "bg-gov-800" : "bg-paper-300"
+                  }`}
+                />
+                <span
+                  className={`mt-2 hidden truncate text-xs sm:block ${
+                    i + 1 === step ? "font-semibold text-ink-900" : "text-ink-500"
+                  }`}
+                >
+                  {t(key)}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </div>
       )}
 
       {/* ---------------------------------------------------------------- */}
@@ -726,7 +760,7 @@ export function SetupWizard({
             <label htmlFor="setup-slug" className="mb-1 block text-sm font-semibold text-ink-900">
               {t("setup.slug")}
             </label>
-            <div className="flex items-center border border-paper-400 bg-white">
+            <div className="flex items-center rounded-control border border-paper-400 bg-paper-50 transition-colors focus-within:border-gov-800 focus-within:ring-4 focus-within:ring-gov-800/15">
               {/*
                 The origin is 20-odd characters of prefix in front of a field
                 the user has to actually read while typing. On a phone it left
@@ -811,7 +845,10 @@ export function SetupWizard({
               {t("setup.visibility")}
             </legend>
             {(["unlisted", "public"] as const).map((v) => (
-              <label key={v} className="mb-2 flex items-start gap-2 text-sm">
+              <label
+                key={v}
+                className="mb-2 flex cursor-pointer items-start gap-3 rounded-card border border-paper-300 p-4 text-sm transition-colors hover:border-paper-400 has-checked:border-gov-800 has-checked:bg-gov-50"
+              >
                 <input
                     type="radio"
                     name="setup-visibility"
@@ -820,7 +857,7 @@ export function SetupWizard({
                   className="mt-1"
                 />
                 <span>
-                  <span className="text-ink-700">
+                  <span className="font-semibold text-ink-900">
                     {t(v === "unlisted" ? "setup.unlisted" : "setup.public")}
                   </span>
                   <span className="mt-0.5 block text-xs text-ink-500">
@@ -896,7 +933,7 @@ export function SetupWizard({
               the only one that works when the deployment has no OAuth app, and
               because some people would simply rather not authorise anything. */}
           {oauth?.available && (
-            <div className="border-l-4 border-stamp-green bg-stamp-green/5 p-4">
+            <div className="rounded-control border border-stamp-green/25 bg-stamp-green/5 p-4">
               <p className="mb-1 text-sm font-bold text-ink-900">
                 {t("setup.autoTitle")}
               </p>
@@ -1062,7 +1099,7 @@ export function SetupWizard({
           confirmation and nobody can tell why. */}
       {step === 4 && (
         <div className="paper space-y-5 p-5 sm:p-6">
-          <div className="border-l-4 border-stamp-red bg-stamp-red/5 p-4">
+          <div className="rounded-control border border-stamp-red/25 bg-stamp-red/5 p-4">
             <p className="mb-1 text-sm font-bold text-ink-900">
               {t("email.why")}
             </p>
@@ -1177,7 +1214,7 @@ export function SetupWizard({
           />
 
           {authAutoConfigured ? (
-            <div className="border-l-4 border-stamp-green bg-stamp-green/5 p-3">
+            <div className="rounded-control border border-stamp-green/25 bg-stamp-green/5 p-3">
               <p className="text-xs leading-relaxed text-ink-700">
                 {t("setup.autoConfigured")}
               </p>
@@ -1213,7 +1250,7 @@ export function SetupWizard({
               a disabled button with no explanation is the worst possible way
               to end a five-step wizard. */}
           {!CONTROL_READY && (
-            <div className="border-l-4 border-stamp-red bg-stamp-red/5 p-4">
+            <div className="rounded-control border border-stamp-red/25 bg-stamp-red/5 p-4">
               <p className="mb-1 text-sm font-bold text-ink-900">
                 {t("setup.noControlPlane")}
               </p>
@@ -1238,7 +1275,7 @@ export function SetupWizard({
           )}
 
           {error && (
-            <p role="alert" className="border border-stamp-red bg-stamp-red/5 p-3 text-sm text-stamp-red">
+            <p role="alert" className="notice notice-error">
               {error}
             </p>
           )}

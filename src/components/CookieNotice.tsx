@@ -72,7 +72,7 @@ export function CookieNotice() {
     >
       <div className="paper mx-auto flex max-w-3xl flex-col gap-3 p-4 shadow-lg sm:flex-row sm:items-center sm:gap-5">
         <div className="min-w-0 flex-1">
-          <p className="font-serif text-sm font-bold text-ink-900">
+          <p className="font-display text-sm font-bold text-ink-900">
             {t("cookies.title")}
           </p>
           <p className="mt-1 max-w-prose text-xs leading-relaxed text-ink-700">

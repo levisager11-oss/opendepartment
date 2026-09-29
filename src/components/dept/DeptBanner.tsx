@@ -7,7 +7,7 @@ import { useTenant } from "@/lib/tenant/context";
 
 /**
  * The strip above everything, imitating the "official website" banner of a
- * government site -- with the parody label made unmissable, which is both the
+ * modern government site -- with the parody label made unmissable, which is both the
  * joke and the honest thing to do.
  *
  * On OpenDepartment it carries a second job: saying plainly that this archive
@@ -39,7 +39,7 @@ export function DeptBanner() {
           {t("gov.parody")}
         </span>
 
-        <span className="order-3 w-full opacity-80 sm:order-2 sm:w-auto">
+        <span className="order-3 w-full text-ink-500 sm:order-2 sm:w-auto">
           {t("gov.official", { name: branding.departmentName })}
         </span>
 
@@ -47,7 +47,7 @@ export function DeptBanner() {
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="order-2 ml-auto inline-flex cursor-pointer items-center gap-1 underline decoration-dotted underline-offset-2 opacity-70 transition-opacity hover:opacity-100 sm:order-3"
+          className="order-2 ml-auto inline-flex cursor-pointer items-center gap-1 rounded-control text-ink-500 underline decoration-dotted underline-offset-2 transition-colors hover:text-ink-900 sm:order-3"
         >
           {/* A drawn chevron rather than the ⌃ / ⌄ characters, which sat on
               different baselines in every font and read as stray marks. */}
@@ -65,12 +65,12 @@ export function DeptBanner() {
       </div>
 
       {open && (
-        <div className="border-t border-white/10 bg-black/25">
-          <div className="mx-auto max-w-7xl space-y-2 px-4 py-2 text-2xs leading-relaxed opacity-85">
+        <div className="border-t border-paper-300 bg-paper-100">
+          <div className="mx-auto max-w-7xl space-y-2 px-4 py-3 text-xs leading-relaxed text-ink-700">
             <p>{t("gov.disclaimer")}</p>
             <p>
               {t("dept.hostedNotice", { name: branding.departmentName })}{" "}
-              <Link href="/" className="underline underline-offset-2">
+              <Link href="/" className="underline underline-offset-2 hover:text-ink-900">
                 OpenDepartment
               </Link>
               .

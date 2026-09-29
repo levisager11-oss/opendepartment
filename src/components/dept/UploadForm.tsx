@@ -588,9 +588,13 @@ export function UploadForm({
           ) : (
             <>
               <svg
-                className={`mx-auto text-ink-400 ${items.length ? "mb-1" : "mb-3"}`}
-                width={items.length ? 24 : 34}
-                height={items.length ? 24 : 34}
+                className={`mx-auto ${
+                  items.length
+                    ? "mb-1 text-ink-400"
+                    : "mb-4 box-content rounded-full bg-gov-100 p-4 text-gov-800"
+                }`}
+                width={items.length ? 24 : 30}
+                height={items.length ? 24 : 30}
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -603,7 +607,7 @@ export function UploadForm({
               <label
                 htmlFor="upload-file"
                 onClick={(e) => e.stopPropagation()}
-                className="cursor-pointer font-semibold text-ink-700"
+                className="cursor-pointer text-base font-semibold text-ink-900"
               >
                 {items.length ? t("upload.dropzoneMore") : t("upload.dropzone")}
               </label>
@@ -752,11 +756,7 @@ export function UploadForm({
                           onClick={() => toggleSubject(s.id)}
                           aria-pressed={on}
                           title={s.description ?? undefined}
-                          className={`typewriter cursor-pointer rounded-card border px-2.5 py-1 text-xs transition-colors ${
-                            on
-                              ? "border-gov-800 bg-gov-800 text-white"
-                              : "border-paper-400 bg-paper-100 text-ink-700 hover:border-gov-600"
-                          }`}
+                          className="chip chip-toggle"
                         >
                           {on && <span aria-hidden>✓ </span>}
                           {s.name}

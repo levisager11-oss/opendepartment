@@ -13,6 +13,9 @@ export const dictionary = {
     "common.done": "Done.",
     "common.actionFailed": "The action could not be completed. Please try again.",
     "vault.more": "Load more documents",
+    "vault.view": "View",
+    "vault.view.grid": "Grid",
+    "vault.view.list": "List",
     "upload.savedNeedsSubjects": "Your document was uploaded, but its subjects could not be saved. Retry to finish filing the same document.",
     "upload.retrySubjects": "Retry saving subjects",
     "upload.openSavedFile": "Open the uploaded document",
@@ -197,7 +200,7 @@ export const dictionary = {
     "settings.accent": "Accent colour",
     "settings.accentInvalid": "Use a six-digit hex colour, like #b8860b.",
     "settings.accentLowContrast":
-      "This colour is hard to read on the dark header, where it colours the top line of the seal and your username. A lighter shade will read better.",
+      "This colour is hard to read on the seal's dark face, where it draws the ring, the lettering and the scales. A lighter shade will read better.",
     "settings.categories": "Categories",
     "settings.categoriesHint":
       "One per line, in the order they should appear. Existing documents keep the category they were filed under even if you remove it here.",
@@ -315,8 +318,9 @@ export const dictionary = {
     // --- OpenDepartment marketing --------------------------------------
     "od.name": "OpenDepartment",
     "od.tagline": "Run your own files.",
+    "od.headline": "The official archive of your group chat.",
     "od.hero":
-      "Build a mock government archive for your class, your team or your group chat. Members upload exhibits, vote on them and argue in the comments. You decide who gets in.",
+      "Give your class, your team or your friends a records office of their own. Upload photos, PDFs, video and audio, vote on what matters and argue in the comments. You decide who gets in.",
     "od.yourData": "Your database, not ours",
     "od.yourDataBody":
       "Every department stores its files, members and comments in a Supabase project you own. Uploads go directly there. OpenDepartment uses your member session to render pages; it holds no permanent tenant administrator key.",
@@ -329,11 +333,52 @@ export const dictionary = {
     "od.create": "Create a department",
     "od.browse": "Browse public departments",
     "od.needSupabase":
-      "You will need a free Supabase account. Setup takes about five minutes.",
+      "Free. You will need a Supabase project, hosted or on your own server. Setup takes about five minutes.",
     "od.directory": "Public departments",
     "od.directoryEmpty": "No department has made itself public yet.",
     "od.directoryNote":
       "These are archives whose owners chose to be listed. Most departments are not here: they are unlisted, and joining one needs an invite code from whoever runs it.",
+    "od.directoryOpen": "Open",
+    "od.footerBlurb":
+      "A private archive for groups that keep receipts. Every department runs on a database its own administrators control.",
+    "od.footerProduct": "Product",
+    "od.footerLegal": "Legal",
+    "od.mock.dept": "The Staff Room Files",
+    "od.mock.file1": "The missing stapler, exhibit A",
+    "od.mock.file2": "Minutes: the coffee machine inquiry",
+    "od.mock.file3": "Voice memo: who ate the cake?",
+    "od.mock.file4": "Whiteboard, Tuesday 14:02",
+    "od.mock.commentBy": "agent_marple commented",
+    "od.mock.comment": "The timestamp on exhibit A does not match the minutes.",
+    "od.feat.title": "Everything a records office needs",
+    "od.feat.subtitle":
+      "Built for the things groups actually collect: screenshots, scans, voice notes and the occasional blurry photo of a whiteboard.",
+    "od.feat.upload": "Upload anything",
+    "od.feat.uploadBody":
+      "Drag in photos, PDFs, video and audio, several at a time, or paste a screenshot straight from the clipboard.",
+    "od.feat.vote": "Vote and discuss",
+    "od.feat.voteBody":
+      "Every exhibit gets a score and its own comment thread. Sort by top, newest or most discussed.",
+    "od.feat.find": "Find it again",
+    "od.feat.findBody":
+      "Full-text search, subjects, categories and filters. Every file gets its own docket number.",
+    "od.feat.members": "You decide who gets in",
+    "od.feat.membersBody":
+      "Invite codes with limits and expiry dates, or open the doors to anyone. Moderate, ban and review reports.",
+    "od.hosting.title": "Your data lives where you say",
+    "od.hosting.subtitle":
+      "OpenDepartment never stores your files. Each department runs on its own Supabase project, and you choose where that project runs.",
+    "od.hosting.cloud": "Supabase Cloud",
+    "od.hosting.cloudBody":
+      "Create a free project at supabase.com and connect it here. The setup wizard walks you through every step, and your department can be listed in the public directory if you want it to be.",
+    "od.hosting.self": "Your own server",
+    "od.hosting.selfBody":
+      "Prefer to keep everything in-house? Run Supabase yourself and deploy your own copy of OpenDepartment next to it.",
+    "od.hosting.self1": "Supabase in Docker, on hardware you control",
+    "od.hosting.self2": "Your own OpenDepartment deployment, pointed at it with one setting",
+    "od.hosting.self3": "No directory, no account, and nothing passing through our servers",
+    "od.stepsTitle": "Up and running in five steps",
+    "od.closing": "Open your department today.",
 
     // --- setup wizard ---------------------------------------------------
     // --- one-click setup (only when this deployment registered an OAuth app)
@@ -869,6 +914,9 @@ export const dictionary = {
     "common.done": "Erledigt.",
     "common.actionFailed": "Die Aktion konnte nicht abgeschlossen werden. Bitte versuchen Sie es erneut.",
     "vault.more": "Weitere Dokumente laden",
+    "vault.view": "Ansicht",
+    "vault.view.grid": "Kacheln",
+    "vault.view.list": "Liste",
     "upload.savedNeedsSubjects": "Ihr Dokument wurde hochgeladen, aber die zugehörigen Akten konnten nicht gespeichert werden. Versuchen Sie es erneut, um dasselbe Dokument fertig abzulegen.",
     "upload.retrySubjects": "Akten erneut speichern",
     "upload.openSavedFile": "Hochgeladenes Dokument öffnen",
@@ -1054,7 +1102,7 @@ export const dictionary = {
     "settings.accentInvalid":
       "Verwenden Sie eine sechsstellige Hex-Farbe, etwa #b8860b.",
     "settings.accentLowContrast":
-      "Diese Farbe ist auf der dunklen Kopfzeile schwer lesbar, wo sie die obere Siegelinschrift und Ihren Benutzernamen einfärbt. Ein hellerer Ton ist besser lesbar.",
+      "Diese Farbe ist auf dem dunklen Grund des Siegels schwer lesbar, wo sie Ring, Inschrift und Waage zeichnet. Ein hellerer Ton ist besser lesbar.",
     "settings.categories": "Kategorien",
     "settings.categoriesHint":
       "Eine pro Zeile, in der gewünschten Reihenfolge. Bestehende Dokumente behalten ihre Kategorie, auch wenn Sie sie hier entfernen.",
@@ -1174,8 +1222,9 @@ export const dictionary = {
     // --- OpenDepartment marketing --------------------------------------
     "od.name": "OpenDepartment",
     "od.tagline": "Führen Sie Ihre eigenen Akten.",
+    "od.headline": "Das offizielle Archiv Ihres Gruppenchats.",
     "od.hero":
-      "Erstellen Sie ein fiktives Behördenarchiv für Ihre Klasse, Ihr Team oder Ihren Gruppenchat. Mitglieder laden Beweismittel hoch, stimmen darüber ab und diskutieren in den Kommentaren. Sie bestimmen, wer hineinkommt.",
+      "Geben Sie Ihrer Klasse, Ihrem Team oder Ihren Freunden ein eigenes Aktenamt. Laden Sie Fotos, PDFs, Videos und Audio hoch, stimmen Sie ab und diskutieren Sie in den Kommentaren. Sie bestimmen, wer hineinkommt.",
     "od.yourData": "Ihre Datenbank, nicht unsere",
     "od.yourDataBody":
       "Jedes Departement speichert Dateien, Mitglieder und Kommentare in Ihrem eigenen Supabase-Projekt. Uploads gehen direkt dorthin. OpenDepartment verwendet Ihre Mitgliedssitzung zur Seitendarstellung und hält keinen dauerhaften Administrator-Schlüssel für Ihr Projekt.",
@@ -1188,11 +1237,52 @@ export const dictionary = {
     "od.create": "Departement erstellen",
     "od.browse": "Öffentliche Departemente ansehen",
     "od.needSupabase":
-      "Sie benötigen ein kostenloses Supabase-Konto. Die Einrichtung dauert etwa fünf Minuten.",
+      "Kostenlos. Sie brauchen ein Supabase-Projekt, gehostet oder auf Ihrem eigenen Server. Die Einrichtung dauert etwa fünf Minuten.",
     "od.directory": "Öffentliche Departemente",
     "od.directoryEmpty": "Noch kein Departement hat sich öffentlich gelistet.",
     "od.directoryNote":
       "Dies sind Archive, deren Administration eine Listung gewählt hat. Die meisten Departemente stehen nicht hier: Sie sind nicht gelistet, und für den Beitritt braucht es einen Einladungscode der verantwortlichen Stelle.",
+    "od.directoryOpen": "Öffnen",
+    "od.footerBlurb":
+      "Ein privates Archiv für Gruppen, die alles festhalten. Jedes Departement läuft auf einer Datenbank, die seine eigene Administration kontrolliert.",
+    "od.footerProduct": "Produkt",
+    "od.footerLegal": "Rechtliches",
+    "od.mock.dept": "Die Lehrerzimmer-Akten",
+    "od.mock.file1": "Der verschwundene Hefter, Beweisstück A",
+    "od.mock.file2": "Protokoll: Die Kaffeemaschinen-Untersuchung",
+    "od.mock.file3": "Sprachmemo: Wer hat den Kuchen gegessen?",
+    "od.mock.file4": "Wandtafel, Dienstag 14:02",
+    "od.mock.commentBy": "agent_marple hat kommentiert",
+    "od.mock.comment": "Der Zeitstempel auf Beweisstück A passt nicht zum Protokoll.",
+    "od.feat.title": "Alles, was ein Aktenamt braucht",
+    "od.feat.subtitle":
+      "Gemacht für das, was Gruppen wirklich sammeln: Screenshots, Scans, Sprachnachrichten und das eine oder andere verwackelte Foto der Wandtafel.",
+    "od.feat.upload": "Alles hochladen",
+    "od.feat.uploadBody":
+      "Ziehen Sie Fotos, PDFs, Videos und Audio hinein, gerne mehrere auf einmal, oder fügen Sie einen Screenshot direkt aus der Zwischenablage ein.",
+    "od.feat.vote": "Abstimmen und diskutieren",
+    "od.feat.voteBody":
+      "Jedes Beweisstück bekommt eine Wertung und einen eigenen Kommentarverlauf. Sortieren nach Top, Neueste oder Meistdiskutiert.",
+    "od.feat.find": "Wiederfinden",
+    "od.feat.findBody":
+      "Volltextsuche, Betreffe, Kategorien und Filter. Jede Datei bekommt ihr eigenes Aktenzeichen.",
+    "od.feat.members": "Sie bestimmen, wer hineinkommt",
+    "od.feat.membersBody":
+      "Einladungscodes mit Limit und Ablaufdatum, oder offene Türen für alle. Moderieren, sperren und Meldungen prüfen.",
+    "od.hosting.title": "Ihre Daten liegen, wo Sie wollen",
+    "od.hosting.subtitle":
+      "OpenDepartment speichert Ihre Dateien nie. Jedes Departement läuft auf seinem eigenen Supabase-Projekt, und Sie wählen, wo dieses Projekt läuft.",
+    "od.hosting.cloud": "Supabase Cloud",
+    "od.hosting.cloudBody":
+      "Erstellen Sie ein kostenloses Projekt auf supabase.com und verbinden Sie es hier. Der Einrichtungsassistent führt Sie durch jeden Schritt, und Ihr Departement kann auf Wunsch im öffentlichen Verzeichnis erscheinen.",
+    "od.hosting.self": "Ihr eigener Server",
+    "od.hosting.selfBody":
+      "Lieber alles im eigenen Haus? Betreiben Sie Supabase selbst und stellen Sie Ihre eigene Kopie von OpenDepartment daneben.",
+    "od.hosting.self1": "Supabase in Docker, auf Hardware, die Sie kontrollieren",
+    "od.hosting.self2": "Ihre eigene OpenDepartment-Installation, mit einer Einstellung darauf ausgerichtet",
+    "od.hosting.self3": "Kein Verzeichnis, kein Konto, und nichts läuft über unsere Server",
+    "od.stepsTitle": "In fünf Schritten startklar",
+    "od.closing": "Eröffnen Sie heute Ihr Departement.",
 
     // --- setup wizard ---------------------------------------------------
     // --- Ein-Klick-Einrichtung (nur mit registrierter OAuth-App) ---------

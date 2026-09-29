@@ -2,7 +2,8 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { SetupWizard } from "@/components/setup/SetupWizard";
 import { TENANT_SCHEMA_SQL } from "@/lib/tenant/schema-sql.generated";
-import { Seal } from "@/components/Seal";
+import { Wordmark } from "@/components/Logo";
+import { LanguageToggle } from "@/components/LanguageToggle";
 import { T } from "@/components/T";
 import { privatePage } from "@/lib/seo";
 import { requestOrigin } from "@/lib/setup/origin";
@@ -27,14 +28,16 @@ export default async function NewDepartmentPage() {
 
   return (
     <>
-      <header className="masthead gov-rule">
+      {/* A header with nothing to click but the way home: somebody halfway
+          through setting up a department should not be one tap from leaving. */}
+      <header className="masthead gov-rule sticky top-0 z-40">
         <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3">
-          <Link href="/" className="flex items-center gap-3">
-            <Seal size={38} idPrefix="new-hdr" />
-            <span className="font-serif text-base font-black text-white">
-              <T k="od.name" />
-            </span>
+          <Link href="/" className="min-w-0 rounded-control">
+            <Wordmark name={<T k="od.name" />} />
           </Link>
+          <div className="ml-auto">
+            <LanguageToggle />
+          </div>
         </div>
       </header>
 

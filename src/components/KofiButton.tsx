@@ -36,7 +36,7 @@ export function KofiButton({ className = "" }: { className?: string }) {
         href={`https://ko-fi.com/${KOFI_ID}`}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-block px-4 py-2 text-sm font-bold text-gov-950 transition-opacity hover:opacity-90"
+        className="inline-block rounded-control px-4 py-2 text-sm font-bold text-gov-950 transition-opacity hover:opacity-90"
         style={{ backgroundColor: KOFI_COLOR }}
       >
         ☕ Support me on Ko-fi

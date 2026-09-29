@@ -43,7 +43,7 @@ export default async function AccountPage() {
   return (
     <MarketingShell wide>
       <div className="mb-2 flex flex-wrap items-center gap-4">
-        <h1 className="font-serif text-2xl font-black break-words text-ink-900 sm:text-3xl">
+        <h1 className="font-display text-2xl font-extrabold tracking-tight break-words text-ink-900 sm:text-3xl">
           <T k="account.title" />
         </h1>
         <Link

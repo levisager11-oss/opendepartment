@@ -14,6 +14,17 @@ export type SubjectSummary = {
   latest: string | null;
 };
 
+const FOLDER = "M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z";
+
+/** Folders in a few colours, so a row of them is not a row of one grey box. */
+const FOLDER_TINTS = [
+  "bg-gov-100 text-gov-800",
+  "bg-amber-100 text-amber-700",
+  "bg-emerald-100 text-emerald-700",
+  "bg-violet-100 text-violet-700",
+  "bg-rose-100 text-rose-700",
+];
+
 /**
  * The subject register: every subject as a card that opens the vault filtered
  * to it. Until this existed the only way to see what subjects there were was
@@ -31,21 +42,26 @@ export function SubjectIndex({
   const { branding, href } = useTenant();
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 sm:py-8">
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:py-10">
       <div className="mb-6">
         <span className="docket text-2xs text-ink-500">
           {branding.subjectLabel.toUpperCase()} INDEX
         </span>
-        <h1 className="font-serif text-2xl font-black break-words text-gov-900 sm:text-3xl">
+        <h1 className="font-display text-3xl font-extrabold tracking-tight break-words text-ink-900 sm:text-4xl">
           {t("subjects.title")}
         </h1>
-        <p className="typewriter mt-1 text-sm text-ink-500">
+        <p className="mt-1.5 text-sm text-ink-500">
           {plural("subjects.count", subjects.length)}
         </p>
       </div>
 
       {subjects.length === 0 ? (
         <div className="paper px-6 py-16 text-center">
+          <span className="mx-auto mb-5 flex size-16 items-center justify-center rounded-2xl bg-gov-100 text-gov-800">
+            <svg aria-hidden width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
+              <path d={FOLDER} />
+            </svg>
+          </span>
           <span className="stamp stamp-red text-sm">NO RECORDS</span>
           <p className="mt-5 text-ink-500">{t("subjects.empty")}</p>
           {isAdmin && (
@@ -55,16 +71,21 @@ export function SubjectIndex({
           )}
         </div>
       ) : (
-        <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {subjects.map((subject) => (
+        <ul className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {subjects.map((subject, i) => (
             <li key={subject.id} className="flex">
               <Link
                 href={`${href("vault")}?subject=${encodeURIComponent(subject.id)}`}
-                className={`paper group flex w-full flex-col p-4 transition-shadow hover:shadow-md sm:p-5 ${
+                className={`paper lift group flex w-full flex-col p-5 ${
                   subject.count === 0 ? "opacity-70" : ""
                 }`}
               >
-                <h2 className="font-serif text-lg font-bold break-words text-gov-900 group-hover:underline">
+                <span className={`mb-4 flex size-11 items-center justify-center rounded-xl ${FOLDER_TINTS[i % FOLDER_TINTS.length]}`}>
+                  <svg aria-hidden width="22" height="22" viewBox="0 0 24 24" fill="currentColor" fillOpacity="0.18" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
+                    <path d={FOLDER} />
+                  </svg>
+                </span>
+                <h2 className="text-base font-semibold break-words text-ink-900 group-hover:text-gov-800">
                   {subject.name}
                 </h2>
                 {subject.description ? (
@@ -74,8 +95,8 @@ export function SubjectIndex({
                 ) : (
                   <p className="mt-1 text-sm text-ink-400">{t("subjects.noDescription")}</p>
                 )}
-                <p className="docket mt-auto flex flex-wrap gap-x-3 gap-y-1 pt-4 text-3xs text-ink-500">
-                  <span className="text-gov-800">{plural("vault.count", subject.count)}</span>
+                <p className="mt-auto flex flex-wrap gap-x-3 gap-y-1 pt-4 text-xs text-ink-500">
+                  <span className="font-medium text-ink-700">{plural("vault.count", subject.count)}</span>
                   {subject.latest && (
                     <span>{t("subjects.latest", { date: formatDate(subject.latest) })}</span>
                   )}
@@ -90,7 +111,7 @@ export function SubjectIndex({
         <p className="mt-6 text-sm">
           <Link
             href={`${href("admin")}?tab=subjects`}
-            className="text-gov-800 underline underline-offset-2 hover:text-gov-600"
+            className="font-medium text-gov-800 hover:underline"
           >
             {t("subjects.manage")}
           </Link>

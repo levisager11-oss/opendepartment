@@ -35,7 +35,7 @@ function MediaFrame({
 }) {
   return (
     <div
-      className={`flex h-viewer items-center justify-center overflow-hidden rounded-card border border-paper-400 shadow-md print:h-auto print:border-0 print:shadow-none ${
+      className={`flex h-viewer items-center justify-center overflow-hidden rounded-control print:h-auto ${
         dark ? "bg-black" : "bg-white"
       }`}
     >
@@ -222,7 +222,7 @@ function PdfFrame({
       <iframe
         src={blobUrl}
         title={title}
-        className="h-viewer w-full rounded-card border border-paper-400 bg-white shadow-md"
+        className="h-viewer w-full rounded-control border border-paper-300 bg-white"
       />
       {/* Phone browsers mostly cannot page through a framed PDF: iOS draws
           the first page as a picture, Android draws nothing at all. The same
@@ -345,7 +345,7 @@ function ImageView({
             ref={closer}
             type="button"
             onClick={() => setOpen(false)}
-            className="btn btn-sm fixed top-3 right-3 z-10 border-white/30 bg-black/60 text-white hover:bg-black/80"
+            className="btn btn-sm btn-on-dark fixed top-3 right-3 z-10"
           >
             {t("common.close")}
           </button>
@@ -379,7 +379,7 @@ function ImageView({
 
 function Placeholder({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-56 flex-col items-center justify-center rounded-card border border-dashed border-paper-400 bg-paper-100 p-8 text-center">
+    <div className="flex min-h-56 flex-col items-center justify-center rounded-control border border-dashed border-paper-400 bg-paper-50 p-8 text-center">
       {children}
     </div>
   );

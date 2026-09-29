@@ -206,11 +206,7 @@ export function EditFileDetails({
                     onClick={() => toggle(s.id)}
                     aria-pressed={on}
                     title={s.description ?? undefined}
-                    className={`typewriter cursor-pointer rounded-card border px-2.5 py-1 text-xs transition-colors ${
-                      on
-                        ? "border-gov-800 bg-gov-800 text-white"
-                        : "border-paper-400 bg-paper-100 text-ink-700 hover:border-gov-600"
-                    }`}
+                    className="chip chip-toggle"
                   >
                     {on && <span aria-hidden>✓ </span>}
                     {s.name}

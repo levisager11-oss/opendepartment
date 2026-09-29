@@ -990,6 +990,8 @@ describe("rejected requests and partial deletion", () => {
     else runtime.client.auth.signOut.mockResolvedValueOnce({ error: { message: "offline" } });
     runtime.client.auth.signOut.mockResolvedValueOnce({ error: null });
     render(<DeptHeader signedIn username="Member" isAdmin={false} />);
+    // Sign-out lives in the account menu, which opens from the member's name.
+    fireEvent.click(screen.getByRole("button", { name: `${tr("nav.signedInAs")} Member` }));
     fireEvent.click(screen.getByRole("button", { name: tr("nav.signout") }));
     expect((await screen.findByRole("alert")).textContent).toBe(tr("common.actionFailed"));
     expect(runtime.router.push).not.toHaveBeenCalled();
@@ -1000,6 +1002,7 @@ describe("rejected requests and partial deletion", () => {
   it("signs a member out of this browser only, not every device they use", async () => {
     runtime.client.auth.signOut.mockResolvedValue({ error: null });
     render(<DeptHeader signedIn username="Member" isAdmin={false} />);
+    fireEvent.click(screen.getByRole("button", { name: `${tr("nav.signedInAs")} Member` }));
     fireEvent.click(screen.getByRole("button", { name: tr("nav.signout") }));
     await waitFor(() => expect(runtime.client.auth.signOut).toHaveBeenCalledWith({ scope: "local" }));
   });

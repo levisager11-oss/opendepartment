@@ -39,7 +39,7 @@ export default async function JoinPage({
           accent={branding.accent}
           idPrefix="join"
         />
-        <h1 className="font-serif text-2xl font-black break-words text-ink-900">
+        <h1 className="font-display text-2xl font-extrabold tracking-tight break-words text-ink-900">
           <T k="invite.title" vars={{ name: branding.departmentName }} />
         </h1>
       </div>

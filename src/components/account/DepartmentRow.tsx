@@ -389,7 +389,7 @@ export function DepartmentRow({
 
     return (
       <li className="paper p-4">
-        <p className="font-serif text-base font-bold text-ink-900">{name}</p>
+        <p className="font-display text-base font-bold text-ink-900">{name}</p>
 
         <p
           role="status"
@@ -422,7 +422,7 @@ export function DepartmentRow({
 
         {stillThere && ref && (
           <div className="paper paper-flag-red mt-3 p-4">
-            <p className="font-serif text-sm font-bold text-ink-900">
+            <p className="font-display text-sm font-bold text-ink-900">
               {t("delete.manualTitle")}
             </p>
             <p className="mt-1 text-sm leading-relaxed text-ink-700">
@@ -465,7 +465,7 @@ export function DepartmentRow({
     <li className="paper p-4">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <div className="w-full min-w-0 sm:flex-1">
-          <p className="font-serif text-base font-bold text-ink-900">
+          <p className="font-display text-base font-bold text-ink-900">
             {name}
             {dept.status === "suspended" && (
               <span className="stamp stamp-red ml-3 stamp-sm">
@@ -540,7 +540,7 @@ export function DepartmentRow({
 
       {panel && (
         <div className="paper paper-flag-red mt-4 p-4">
-          <p className="font-serif text-base font-bold text-ink-900">
+          <p className="font-display text-base font-bold text-ink-900">
             {t("delete.title")}
           </p>
           <p className="mt-1 text-sm leading-relaxed text-ink-700">

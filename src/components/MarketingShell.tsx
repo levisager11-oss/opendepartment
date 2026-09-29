@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Seal } from "@/components/Seal";
+import { Wordmark } from "@/components/Logo";
 import { T } from "@/components/T";
 import { LanguageToggle } from "@/components/LanguageToggle";
 
@@ -17,54 +17,46 @@ import { LanguageToggle } from "@/components/LanguageToggle";
  */
 export function MarketingHeader() {
   return (
-    <header className="masthead gov-rule">
+    <header className="masthead gov-rule sticky top-0 z-40">
       {/*
         `flex-wrap` is load-bearing below sm and inert above it. The wordmark,
         the language toggle and the call to action want about 465px between
         them -- "Departement erstellen" alone is 169px -- so on a 375px screen
         one of the three had to give. Wrapping is the option that hides
         nothing: the CTA drops to its own full-width row and everything stays
-        reachable. From sm up the row has the space it always had and nothing
-        wraps, so the desktop masthead is byte-for-byte the old one.
+        reachable. From sm up the row has the space and nothing wraps.
       */}
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-4 px-4 py-3">
-        {/* Wordmark and toggle are wrapped together in a flex-1 row of their
-            own so they stay on one line at every width. Left as three loose
-            siblings they wrapped independently, and below about 345px the
-            toggle broke onto a line by itself -- a row containing nothing but
-            "DE | EN". Being flex-1 the wrapper fills whatever the button
-            leaves, which on a wide screen is the same place `ml-auto` used to
-            put the group. */}
-        <div className="flex min-w-0 flex-1 items-center gap-4">
-          <Link href="/" className="flex min-w-0 items-center gap-3">
-            <Seal size={40} className="shrink-0" idPrefix="mk-hdr" />
-            <span className="truncate font-serif text-lg font-black text-white">
-              <T k="od.name" />
-            </span>
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3">
+        {/* Wordmark, links and toggle share one flex-1 row so they stay on one
+            line at every width; left as loose siblings they wrapped
+            independently, and below about 345px the toggle broke onto a line
+            by itself. */}
+        <div className="flex min-w-0 flex-1 items-center gap-6">
+          <Link href="/" className="min-w-0 rounded-control">
+            <Wordmark name={<T k="od.name" />} />
           </Link>
-          <div className="ml-auto flex shrink-0 items-center gap-4">
-            <LanguageToggle light />
+          <nav className="hidden items-center gap-1 text-sm font-medium text-ink-700 md:flex">
             <Link
               href="/directory"
-              className="hidden text-sm text-gov-100/80 transition-colors hover:text-white sm:block"
+              className="rounded-control px-3 py-2 transition-colors hover:bg-paper-200 hover:text-ink-900"
             >
               <T k="od.directory" />
             </Link>
             {/* A returning operator's way back to their departments used to
-                be the last link in the footer. md rather than sm: at 640px
-                the row has no room left for it and the button would wrap. */}
+                be the last link in the footer. */}
             <Link
               href="/account"
-              className="hidden text-sm text-gov-100/80 transition-colors hover:text-white md:block"
+              className="rounded-control px-3 py-2 transition-colors hover:bg-paper-200 hover:text-ink-900"
             >
               <T k="account.title" />
             </Link>
+          </nav>
+          <div className="ml-auto shrink-0">
+            <LanguageToggle />
           </div>
         </div>
-        {/* Kept outside that wrapper so it is this element that wraps. DOM
-            order is unchanged, so the desktop row still reads toggle,
-            directory, button. */}
-        <Link href="/new" className="btn btn-accent w-full sm:w-auto">
+        {/* Kept outside that wrapper so it is this element that wraps. */}
+        <Link href="/new" className="btn btn-primary w-full sm:w-auto">
           <T k="od.create" />
         </Link>
       </div>
@@ -72,58 +64,75 @@ export function MarketingHeader() {
   );
 }
 
+const FOOTER_LINK =
+  "inline-block py-1 text-ink-500 transition-colors hover:text-ink-900 sm:py-0.5";
+
 export function MarketingFooter() {
   return (
-    <footer className="gov-rule-top bg-gov-950 text-gov-100">
-      {/*
-        A single wrapping row on a phone came apart into ragged half-empty
-        lines, with `ml-auto` flinging whichever link landed last across to
-        the right margin. Below sm it is a plain left-aligned stack instead --
-        one link per line, each with room to be tapped. Every rule that shapes
-        the desktop row is restored at sm, `ml-auto` included.
-      */}
-      <div className="mx-auto flex max-w-7xl flex-col items-start gap-2 px-4 py-8 text-xs text-gov-100/60 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6 sm:gap-y-2">
-        <span className="font-serif text-sm font-bold text-white">
-          <T k="od.name" />
-        </span>
-        {/* The header hides this link below sm, so without it here a phone
-            had no route to the directory from any page but the landing hero. */}
-        <Link
-          href="/directory"
-          className="py-1 transition-colors hover:text-white sm:py-0"
-        >
-          <T k="od.directory" />
-        </Link>
-        <Link
-          href="/legal/terms"
-          className="py-1 transition-colors hover:text-white sm:py-0"
-        >
-          <T k="legal.terms" />
-        </Link>
-        <Link
-          href="/legal/privacy"
-          className="py-1 transition-colors hover:text-white sm:py-0"
-        >
-          <T k="legal.privacy" />
-        </Link>
-        <Link
-          href="/legal/imprint"
-          className="py-1 transition-colors hover:text-white sm:py-0"
-        >
-          <T k="legal.imprint" />
-        </Link>
-        <Link
-          href="/report"
-          className="py-1 transition-colors hover:text-white sm:py-0"
-        >
-          <T k="abuse.link" />
-        </Link>
-        <Link
-          href="/account"
-          className="py-1 transition-colors hover:text-white sm:ml-auto sm:py-0"
-        >
-          <T k="account.title" />
-        </Link>
+    <footer className="gov-rule-top bg-paper-50">
+      <div className="mx-auto grid max-w-7xl grid-cols-2 gap-8 px-4 py-12 text-sm sm:grid-cols-4">
+        <div className="col-span-2">
+          <Link href="/" className="inline-block rounded-control">
+            <Wordmark size={28} name={<T k="od.name" />} />
+          </Link>
+          <p className="mt-3 max-w-xs text-sm leading-relaxed text-ink-500">
+            <T k="od.footerBlurb" />
+          </p>
+        </div>
+
+        <nav aria-labelledby="footer-product">
+          <p id="footer-product" className="mb-3 font-semibold text-ink-900">
+            <T k="od.footerProduct" />
+          </p>
+          <ul className="space-y-1.5">
+            <li>
+              <Link href="/new" className={FOOTER_LINK}>
+                <T k="od.create" />
+              </Link>
+            </li>
+            {/* The header hides this link below md, so without it here a
+                phone had no route to the directory from any page but the
+                landing hero. */}
+            <li>
+              <Link href="/directory" className={FOOTER_LINK}>
+                <T k="od.directory" />
+              </Link>
+            </li>
+            <li>
+              <Link href="/account" className={FOOTER_LINK}>
+                <T k="account.title" />
+              </Link>
+            </li>
+          </ul>
+        </nav>
+
+        <nav aria-labelledby="footer-legal">
+          <p id="footer-legal" className="mb-3 font-semibold text-ink-900">
+            <T k="od.footerLegal" />
+          </p>
+          <ul className="space-y-1.5">
+            <li>
+              <Link href="/legal/terms" className={FOOTER_LINK}>
+                <T k="legal.terms" />
+              </Link>
+            </li>
+            <li>
+              <Link href="/legal/privacy" className={FOOTER_LINK}>
+                <T k="legal.privacy" />
+              </Link>
+            </li>
+            <li>
+              <Link href="/legal/imprint" className={FOOTER_LINK}>
+                <T k="legal.imprint" />
+              </Link>
+            </li>
+            <li>
+              <Link href="/report" className={FOOTER_LINK}>
+                <T k="abuse.link" />
+              </Link>
+            </li>
+          </ul>
+        </nav>
       </div>
     </footer>
   );
@@ -140,7 +149,7 @@ export function MarketingShell({
     <>
       <MarketingHeader />
       <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">
-        <div className={`mx-auto px-4 py-10 sm:py-12 ${wide ? "max-w-5xl" : "max-w-3xl"}`}>
+        <div className={`mx-auto px-4 py-10 sm:py-14 ${wide ? "max-w-5xl" : "max-w-3xl"}`}>
           {children}
         </div>
       </main>

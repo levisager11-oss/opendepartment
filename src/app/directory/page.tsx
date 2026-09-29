@@ -9,7 +9,7 @@ import { pageMetadata } from "@/lib/seo";
 export const metadata: Metadata = pageMetadata({
   title: "Public departments",
   description:
-    "Browse the parody document archives whose owners chose to be listed. "
+    "Browse the archives whose owners chose to be listed. "
     + "Most OpenDepartment departments are unlisted and reachable only by invitation.",
   path: "/directory",
 });
@@ -24,16 +24,16 @@ export default async function DirectoryPage() {
 
   return (
     <MarketingShell wide>
-      <h1 className="mb-2 font-serif text-2xl font-black break-words text-ink-900 sm:text-3xl">
+      <h1 className="mb-2 font-display text-2xl font-extrabold tracking-tight break-words text-ink-900 sm:text-3xl">
         <T k="od.directory" />
       </h1>
-      <p className="mb-10 max-w-prose text-sm leading-relaxed text-ink-500">
+      <p className="mb-10 max-w-prose text-base leading-relaxed text-ink-500">
         <T k="od.directoryNote" />
       </p>
 
       {departments.length === 0 ? (
-        <div className="paper p-10 text-center">
-          <Seal size={70} className="mx-auto mb-5 opacity-40" idPrefix="dir" />
+        <div className="paper p-12 text-center">
+          <Seal size={70} className="mx-auto mb-5 opacity-60" idPrefix="dir" />
           <p className="mb-6 text-sm text-ink-500">
             <T k="od.directoryEmpty" />
           </p>
@@ -50,7 +50,7 @@ export default async function DirectoryPage() {
             <li key={dept.slug}>
               <Link
                 href={`/d/${dept.slug}`}
-                className="paper flex h-full items-start gap-4 p-5 transition-shadow hover:shadow-lg"
+                className="paper lift group flex h-full items-start gap-4 p-5"
               >
                 <Seal
                   size={44}
@@ -59,7 +59,7 @@ export default async function DirectoryPage() {
                   idPrefix={`dir-${dept.slug}`}
                 />
                 <span className="min-w-0">
-                  <span className="block font-serif text-base font-bold text-ink-900">
+                  <span className="block text-base font-semibold text-ink-900 group-hover:text-gov-800">
                     {dept.display_name}
                   </span>
                   {dept.tagline && (
@@ -67,7 +67,7 @@ export default async function DirectoryPage() {
                       {dept.tagline}
                     </span>
                   )}
-                  <span className="docket mt-2 block text-3xs text-ink-500">
+                  <span className="mt-2 block font-mono text-2xs text-ink-400">
                     /d/{dept.slug}
                   </span>
                 </span>

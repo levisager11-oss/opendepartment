@@ -97,7 +97,7 @@ export function StaffReports() {
   return (
     <section className="mt-10">
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <h2 className="font-serif text-xl font-black text-ink-900">
+        <h2 className="font-display text-xl font-extrabold tracking-tight text-ink-900">
           {t("staff.title")}
         </h2>
         <label className="label sr-only" htmlFor="staff-status">

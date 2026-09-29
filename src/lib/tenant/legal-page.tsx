@@ -73,7 +73,7 @@ export async function DeptLegalPage({
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 sm:py-10">
       <article className="paper p-5 sm:p-8">
-        <h1 className="mb-1 font-serif text-2xl font-black break-words text-ink-900 sm:text-3xl">
+        <h1 className="mb-1 font-display text-2xl font-extrabold tracking-tight break-words text-ink-900 sm:text-3xl">
           {title}
         </h1>
         <p className="docket mb-8 text-2xs text-ink-500">{updated}</p>
@@ -81,7 +81,7 @@ export async function DeptLegalPage({
         <div className="space-y-7">
           {sections.map((section) => (
             <section key={section.heading}>
-              <h2 className="mb-2 font-serif text-lg font-bold text-ink-900">
+              <h2 className="mb-2 font-display text-lg font-bold text-ink-900">
                 {section.heading}
               </h2>
               {section.body.map((paragraph, i) => (

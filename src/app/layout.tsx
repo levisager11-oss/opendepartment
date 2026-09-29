@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Merriweather, Source_Sans_3, Special_Elite } from "next/font/google";
+import { Bricolage_Grotesque, Inter, Special_Elite } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { I18nProvider } from "@/lib/i18n/provider";
@@ -9,26 +9,25 @@ import { detectLocale } from "@/lib/i18n/detect";
 import { SITE_NAME, SITE_URL } from "@/lib/seo";
 
 /**
- * Three families, and the third earns its place: Special Elite is the
- * typewriter register the whole parody rests on -- dockets, stamps, usernames.
- * It ships one weight over the latin subset and only ever sets short strings.
+ * Three families. Inter sets everything a person reads or types; Bricolage
+ * Grotesque sets the headlines, and is the one place the product is allowed a
+ * bit of character; Special Elite is kept for the rubber stamps, the last
+ * piece of typewriter the parody still leans on. It ships one weight over the
+ * latin subset and only ever sets short strings.
  *
- * The weight lists are the payload, and they are pruned to what actually
- * renders. Merriweather is used at 900 for page titles and 700 for card
- * headings and never at 400, so 400 is not requested; every `font-serif` call
- * site in the app carries an explicit bold or black.
+ * Inter and Bricolage are variable fonts, so leaving `weight` out fetches one
+ * file each that covers every weight the app uses -- naming weights would
+ * fetch one static file per weight instead.
  */
-const merriweather = Merriweather({
+const inter = Inter({
   subsets: ["latin"],
-  weight: ["700", "900"],
-  variable: "--font-merriweather",
+  variable: "--font-inter",
   display: "swap",
 });
 
-const sourceSans = Source_Sans_3({
+const bricolage = Bricolage_Grotesque({
   subsets: ["latin"],
-  weight: ["400", "600", "700"],
-  variable: "--font-source-sans",
+  variable: "--font-bricolage",
   display: "swap",
 });
 
@@ -40,9 +39,10 @@ const specialElite = Special_Elite({
 });
 
 const DESCRIPTION =
-  "Run your own parody document archive. Members upload exhibits, vote and " +
-  "argue in the comments, stored in a Supabase project you own, not ours. " +
-  "Free, invite-only by default, about five minutes to set up.";
+  "Run your own private archive, dressed up as a records office. Members " +
+  "upload files, vote and argue in the comments, stored in a Supabase project " +
+  "you own, hosted or on your own server. Free, invite-only by default, " +
+  "about five minutes to set up.";
 
 /**
  * Site-wide metadata. Two things here are load-bearing:
@@ -67,9 +67,10 @@ export const metadata: Metadata = {
   applicationName: SITE_NAME,
   keywords: [
     "parody document archive",
-    "mock government archive",
+    "private file archive",
     "self-hosted file archive",
     "Supabase",
+    "self-hosted Supabase",
     "classroom roleplay",
     "declassified document generator",
   ],
@@ -101,7 +102,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0b1c33",
+  themeColor: "#ffffff",
   width: "device-width",
   initialScale: 1,
 };
@@ -123,7 +124,7 @@ export default async function RootLayout({
   return (
     <html
       lang={locale}
-      className={`${merriweather.variable} ${sourceSans.variable} ${specialElite.variable}`}
+      className={`${inter.variable} ${bricolage.variable} ${specialElite.variable}`}
     >
       <body className="flex min-h-dvh flex-col">
         <I18nProvider initialLocale={locale}>

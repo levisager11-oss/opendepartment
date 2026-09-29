@@ -4,7 +4,11 @@ import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n/provider";
 import type { Locale } from "@/lib/i18n/dictionary";
 
-export function LanguageToggle({ light = false }: { light?: boolean }) {
+/**
+ * A two-way segmented control. Every header it sits in is light now, so it no
+ * longer has a variant for a dark one.
+ */
+export function LanguageToggle() {
   const { locale, setLocale, t } = useI18n();
   const router = useRouter();
 
@@ -15,40 +19,28 @@ export function LanguageToggle({ light = false }: { light?: boolean }) {
     router.refresh();
   }
 
-  const base = light
-    ? "text-gov-100/70 hover:text-white"
-    : "text-ink-500 hover:text-gov-800";
-  const active = light ? "text-white font-bold" : "text-gov-800 font-bold";
-
   return (
     <div
-      className="flex items-center gap-1 text-xs tracking-wider"
+      className="flex items-center rounded-full border border-paper-300 bg-paper-100 p-0.5 text-xs font-semibold"
       role="group"
       aria-label={t("nav.language")}
     >
-      {(["de", "en"] as Locale[]).map((code, i) => (
-        <span key={code} className="flex items-center gap-1">
-          {i > 0 && (
-            <span className={light ? "text-gov-100/30" : "text-paper-400"}>
-              |
-            </span>
-          )}
-          {/* The label is two characters wide, which on a phone is a 15x16px
-              target -- under half of what a thumb can reliably hit. The
-              padding below only exists under sm and is reset at the
-              breakpoint, so the desktop toggle keeps its original tight
-              metrics. */}
-          <button
-            type="button"
-            onClick={() => pick(code)}
-            aria-current={locale === code ? "true" : undefined}
-            className={`cursor-pointer px-1.5 py-2 uppercase transition-colors sm:px-0 sm:py-0 ${
-              locale === code ? active : base
-            }`}
-          >
-            {code}
-          </button>
-        </span>
+      {(["de", "en"] as Locale[]).map((code) => (
+        // Each half is at least 28x32 -- two uppercase letters alone were a
+        // 15x16px target, under half of what a thumb can reliably hit.
+        <button
+          key={code}
+          type="button"
+          onClick={() => pick(code)}
+          aria-current={locale === code ? "true" : undefined}
+          className={`min-w-8 cursor-pointer rounded-full px-2 py-1.5 uppercase transition-colors sm:py-1 ${
+            locale === code
+              ? "bg-paper-50 text-ink-900 shadow-sm"
+              : "text-ink-500 hover:text-ink-900"
+          }`}
+        >
+          {code}
+        </button>
       ))}
     </div>
   );

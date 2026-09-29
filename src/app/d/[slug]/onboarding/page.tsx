@@ -24,7 +24,7 @@ export default async function OnboardingPage({
 
   return (
     <div className="mx-auto max-w-md px-4 py-10 sm:py-16">
-      <h1 className="mb-2 font-serif text-2xl font-black break-words text-ink-900">
+      <h1 className="mb-2 font-display text-2xl font-extrabold tracking-tight break-words text-ink-900">
         <T k="onboarding.title" />
       </h1>
       <p className="mb-8 text-sm leading-relaxed text-ink-700">

@@ -14,11 +14,14 @@ export function VoteButtons({
   initialScore,
   initialVote = 0,
   size = "md",
+  layout = "column",
 }: {
   fileId: string;
   initialScore: number;
   initialVote?: number;
   size?: "sm" | "md";
+  /** A column beside a document, or a pill in a card's footer row. */
+  layout?: "column" | "row";
 }) {
   const { t } = useI18n();
   const supabase = useTenantClient();
@@ -67,7 +70,11 @@ export function VoteButtons({
 
   return (
     <div
-      className="flex flex-col items-center gap-0.5 select-none"
+      className={`flex items-center select-none ${
+        layout === "row"
+          ? "gap-0.5 rounded-full border border-paper-300 bg-paper-50 px-0.5"
+          : "flex-col gap-0.5"
+      }`}
       title={failed ? t("common.error") : undefined}
     >
       <button
@@ -80,7 +87,7 @@ export function VoteButtons({
         disabled={pending}
         aria-label={t("vote.up")}
         aria-pressed={vote === 1}
-        className={`${pad} cursor-pointer rounded-card transition-colors ${
+        className={`${pad} cursor-pointer rounded-full transition-colors ${
           vote === 1
             ? "text-stamp-green"
             : "text-ink-400 hover:bg-paper-200 hover:text-stamp-green"
@@ -98,7 +105,7 @@ export function VoteButtons({
       </button>
 
       <span
-        className={`typewriter tabular-nums ${
+        className={`min-w-6 text-center font-semibold tabular-nums ${
           size === "sm" ? "text-sm" : "text-base"
         } ${
           score > 0
@@ -121,7 +128,7 @@ export function VoteButtons({
         disabled={pending}
         aria-label={t("vote.down")}
         aria-pressed={vote === -1}
-        className={`${pad} cursor-pointer rounded-card transition-colors ${
+        className={`${pad} cursor-pointer rounded-full transition-colors ${
           vote === -1
             ? "text-stamp-red"
             : "text-ink-400 hover:bg-paper-200 hover:text-stamp-red"

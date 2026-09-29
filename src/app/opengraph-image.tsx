@@ -7,21 +7,20 @@ export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
 const GOLD = "#c9a227";
-const GOLD_LIGHT = "#e8cf7a";
+const BLUE = "#0061fe";
+const INK = "#1c1b1f";
 
 /**
- * Shares the site's own hero layout (masthead gold rule, seal, wordmark,
- * tagline) rather than inventing separate share-card art. Curved ring text
- * and the beading ring from the real Seal component are left out: Satori
- * (the renderer behind ImageResponse) has no textPath support, and at social
- * -card scale the plain scale-and-star mark reads better anyway.
+ * Shares the landing page's own hero rather than inventing separate share-card
+ * art: the logo, the headline, one line of what it is, and the seal a
+ * department wears. Curved ring text and the beading ring from the real Seal
+ * component are left out: Satori (the renderer behind ImageResponse) has no
+ * textPath support, and at social-card scale the plain scale-and-star mark
+ * reads better anyway.
  */
 export default async function Image() {
   const fontDir = join(process.cwd(), "src/assets/fonts");
-  const [merriweather, sourceSans] = await Promise.all([
-    readFile(join(fontDir, "Merriweather-Black.ttf")),
-    readFile(join(fontDir, "SourceSans3-Bold.ttf")),
-  ]);
+  const sourceSans = await readFile(join(fontDir, "SourceSans3-Bold.ttf"));
 
   return new ImageResponse(
     (
@@ -31,11 +30,11 @@ export default async function Image() {
           height: "100%",
           display: "flex",
           flexDirection: "column",
-          background: "linear-gradient(135deg, #14335c 0%, #0b1c33 62%)",
+          background:
+            "radial-gradient(60% 70% at 85% 15%, #dce8ff 0%, #ffffff 70%)",
+          fontFamily: "Source Sans 3",
         }}
       >
-        <div style={{ display: "flex", height: 8, background: GOLD }} />
-
         <div
           style={{
             flex: 1,
@@ -45,56 +44,48 @@ export default async function Image() {
             padding: "0 88px",
           }}
         >
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              maxWidth: 640,
-            }}
-          >
+          <div style={{ display: "flex", flexDirection: "column", maxWidth: 680 }}>
+            <div style={{ display: "flex", alignItems: "center", marginBottom: 44 }}>
+              <svg width="56" height="56" viewBox="0 0 32 32">
+                <rect width="32" height="32" rx="8" fill={BLUE} />
+                <path
+                  d="M7.5 11a1.5 1.5 0 0 1 1.5-1.5h4.6l2 2H23a1.5 1.5 0 0 1 1.5 1.5v8.5A1.5 1.5 0 0 1 23 23H9a1.5 1.5 0 0 1-1.5-1.5z"
+                  fill="#ffffff"
+                />
+                <circle cx="16" cy="17.25" r="3.1" fill="none" stroke={BLUE} strokeWidth="1.5" />
+                <circle cx="16" cy="17.25" r="1.1" fill={BLUE} />
+              </svg>
+              <div style={{ display: "flex", marginLeft: 18, fontSize: 34, fontWeight: 700, color: INK }}>
+                OpenDepartment
+              </div>
+            </div>
             <div
               style={{
                 display: "flex",
-                fontFamily: "Source Sans 3",
-                fontSize: 22,
+                fontSize: 74,
                 fontWeight: 700,
-                letterSpacing: 5,
-                textTransform: "uppercase",
-                color: GOLD_LIGHT,
-                marginBottom: 20,
+                lineHeight: 1.02,
+                letterSpacing: -1.5,
+                color: INK,
+                marginBottom: 28,
               }}
             >
-              Run your own files.
+              The official archive of your group chat.
             </div>
             <div
               style={{
                 display: "flex",
-                fontFamily: "Merriweather",
-                fontSize: 68,
-                fontWeight: 900,
-                lineHeight: 1.05,
-                color: "#ffffff",
-                marginBottom: 26,
+                fontSize: 28,
+                fontWeight: 700,
+                lineHeight: 1.4,
+                color: "#5c5a60",
               }}
             >
-              OpenDepartment
-            </div>
-            <div
-              style={{
-                display: "flex",
-                fontFamily: "Source Sans 3",
-                fontSize: 27,
-                fontWeight: 600,
-                lineHeight: 1.45,
-                color: "rgba(223,232,243,0.78)",
-              }}
-            >
-              Build a mock government archive for your class, your team or
-              your group chat.
+              Private, invite-only, and stored in a Supabase project you own.
             </div>
           </div>
 
-          <svg width="300" height="300" viewBox="0 0 200 200">
+          <svg width="280" height="280" viewBox="0 0 200 200">
             <circle cx="100" cy="100" r="97" fill="#0d2547" />
             <circle
               cx="100"
@@ -138,13 +129,12 @@ export default async function Image() {
           </svg>
         </div>
 
-        <div style={{ display: "flex", height: 6, background: GOLD }} />
+        <div style={{ display: "flex", height: 10, background: BLUE }} />
       </div>
     ),
     {
       ...size,
       fonts: [
-        { name: "Merriweather", data: merriweather, weight: 900, style: "normal" },
         { name: "Source Sans 3", data: sourceSans, weight: 700, style: "normal" },
       ],
     }

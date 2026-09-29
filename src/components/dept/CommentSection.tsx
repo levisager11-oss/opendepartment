@@ -80,17 +80,16 @@ export function CommentSection({
   return (
     // Printed, a file with no notes should not end on an empty "no notes"
     // panel; with notes, they are part of the case file.
-    <section className={`mt-8 ${comments.length === 0 ? "print:hidden" : ""}`}>
-      <div className="paper-tab ml-6 inline-block px-4 py-1">
-        <span className="docket text-ink-700 text-2xs">
+    <section className={comments.length === 0 ? "print:hidden" : ""}>
+      <div className="paper p-4 sm:p-6">
+        <h2 className="mb-4 flex items-center gap-2 font-display text-lg font-bold text-ink-900">
           {t("comments.title")}
-          {comments.length > 0 && <> · {comments.length}</>}
-        </span>
-      </div>
-
-      <div className="paper p-4 sm:p-5">
+          {comments.length > 0 && (
+            <span className="chip text-xs">{comments.length}</span>
+          )}
+        </h2>
         {comments.length === 0 ? (
-          <p className="typewriter py-6 text-center text-sm text-ink-400">
+          <p className="rounded-control bg-paper-100 py-6 text-center text-sm text-ink-500">
             {t("comments.empty")}
           </p>
         ) : (
@@ -98,9 +97,18 @@ export function CommentSection({
             {comments.map((comment) => {
               const mine = comment.author_id === currentUserId;
               return (
-                <li key={comment.id} className="animate-fade-up py-4 first:pt-0">
+                <li key={comment.id} className="animate-fade-up flex gap-3 py-4 first:pt-0">
+                  <span
+                    aria-hidden
+                    className={`flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                      mine ? "bg-accent text-accent-ink" : "bg-paper-200 text-ink-700"
+                    }`}
+                  >
+                    {(comment.author_username ?? "?").charAt(0).toUpperCase()}
+                  </span>
+                  <div className="min-w-0 flex-1">
                   <div className="mb-1 flex flex-wrap items-baseline gap-x-3">
-                    <span className="typewriter text-sm font-bold text-gov-800">
+                    <span className="text-sm font-semibold text-ink-900">
                       {comment.author_username ?? "—"}
                       {mine && (
                         <span className="ml-1 text-ink-400">
@@ -108,7 +116,7 @@ export function CommentSection({
                         </span>
                       )}
                     </span>
-                    <span className="docket text-3xs text-ink-500">
+                    <span className="text-xs text-ink-500">
                       {formatDate(comment.created_at)}
                     </span>
 
@@ -122,7 +130,7 @@ export function CommentSection({
                             remove(comment.id);
                           }
                         }}
-                        className="ml-auto cursor-pointer text-xs text-ink-400 underline hover:text-stamp-red print:hidden"
+                        className="ml-auto cursor-pointer rounded-control text-xs text-ink-500 hover:text-stamp-red hover:underline print:hidden"
                       >
                         {t("comments.delete")}
                       </button>
@@ -131,6 +139,7 @@ export function CommentSection({
                   <p className="text-sm leading-relaxed whitespace-pre-wrap text-ink-900">
                     {comment.body}
                   </p>
+                  </div>
                 </li>
               );
             })}
@@ -161,7 +170,7 @@ export function CommentSection({
             </p>
           )}
           <div className="mt-3 flex items-center justify-between">
-            <span className="docket text-3xs text-ink-500">
+            <span className="text-xs text-ink-500 tabular-nums">
               {body.length} / 2000
               {/* Not on a phone, which has no Ctrl key to press. */}
               <span className="hidden sm:inline"> · {t("comments.shortcut")}</span>

@@ -30,7 +30,7 @@ export default async function ControlUpdatePasswordPage() {
   return (
     <MarketingShell>
       <div className="mx-auto max-w-md">
-        <h1 className="mb-6 font-serif text-2xl font-black break-words text-ink-900">
+        <h1 className="mb-6 font-display text-2xl font-extrabold tracking-tight break-words text-ink-900">
           <T k={user ? "auth.updateTitle" : "auth.linkExpired"} />
         </h1>
         <div className="paper p-5 sm:p-6">
