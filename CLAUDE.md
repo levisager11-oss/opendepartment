@@ -276,6 +276,14 @@ request time from the tenant's own `settings` row via
 [src/lib/tenant/branding.ts](src/lib/tenant/branding.ts). Don't add
 copy or defaults that assume a particular department's content.
 
+**Colours come from tokens, and there are two themes.** `globals.css` re-values
+every token for the dark theme (system by default, `od_theme` cookie to
+override, always light in print), so a literal colour in a component is one
+that stays put when everything around it flips. Text on a filled colour uses
+`text-on-fill`, never `text-white`: the dark theme lightens its fills and needs
+dark ink on them. The dark token list is written twice (media query and
+attribute); `tests/theme.test.tsx` fails if the two copies drift.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know

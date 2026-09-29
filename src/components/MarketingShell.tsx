@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Wordmark } from "@/components/Logo";
 import { T } from "@/components/T";
 import { LanguageToggle } from "@/components/LanguageToggle";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 /**
  * Header and footer for OpenDepartment's own pages.
@@ -78,6 +79,9 @@ export function MarketingFooter() {
           <p className="mt-3 max-w-xs text-sm leading-relaxed text-ink-500">
             <T k="od.footerBlurb" />
           </p>
+          <div className="mt-5">
+            <ThemeToggle />
+          </div>
         </div>
 
         <nav aria-labelledby="footer-product">

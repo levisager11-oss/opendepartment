@@ -231,7 +231,7 @@ export function AdminPanel({
               >
                 {t(entry.key)}
                 {badge && (
-                  <span className="ml-2 rounded-full bg-stamp-red px-1.5 py-0.5 text-3xs font-bold text-white">
+                  <span className="ml-2 rounded-full bg-stamp-red px-1.5 py-0.5 text-3xs font-bold text-on-fill">
                     {badge}
                   </span>
                 )}

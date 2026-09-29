@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Seal } from "@/components/Seal";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { useI18n } from "@/lib/i18n/provider";
 import { useTenant } from "@/lib/tenant/context";
 
@@ -75,8 +76,11 @@ export function DeptFooter() {
           >
             {t("gov.parody")}
           </span>
-          <span>
+          <span className="min-w-0 truncate">
             {new Date().getFullYear()} · {branding.sealTop}
+          </span>
+          <span className="ml-auto shrink-0 normal-case tracking-normal">
+            <ThemeToggle />
           </span>
         </div>
       </div>

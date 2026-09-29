@@ -26,8 +26,11 @@ const FILES: Array<{ title: TranslationKey; thumb: Thumb; docket: string; score:
   { title: "od.mock.file4", thumb: "whiteboard", docket: "SR-0036", score: 7, category: "SURVEILLANCE" },
 ];
 
+/** Ink on the paper itself, which stays paper-coloured in either theme. */
 const INK = "#3b3a3f";
 const RULE = "#cfcbc2";
+/** The surface around the paper follows the theme. */
+const DESK = "var(--color-paper-200)";
 
 function Page({ kind }: { kind: Thumb }) {
   if (kind === "audio") {
@@ -35,11 +38,11 @@ function Page({ kind }: { kind: Thumb }) {
     const bars = [6, 14, 22, 12, 30, 18, 26, 10, 20, 34, 16, 24, 8, 28, 14, 20, 10, 18, 6];
     return (
       <svg viewBox="0 0 160 100" className="h-full w-full">
-        <rect width="160" height="100" fill="#f7f6f3" />
+        <rect width="160" height="100" fill="var(--color-paper-100)" />
         {bars.map((h, i) => (
-          <rect key={i} x={17 + i * 7} y={50 - h / 2} width="3" height={h} rx="1" fill={INK} opacity="0.7" />
+          <rect key={i} x={17 + i * 7} y={50 - h / 2} width="3" height={h} rx="1" fill="var(--color-ink-700)" opacity="0.7" />
         ))}
-        <text x="17" y="86" fontFamily="monospace" fontSize="8" fill={INK} opacity="0.6">00:31</text>
+        <text x="17" y="86" fontFamily="monospace" fontSize="8" fill="var(--color-ink-500)">00:31</text>
       </svg>
     );
   }
@@ -47,7 +50,7 @@ function Page({ kind }: { kind: Thumb }) {
     // A photo of a whiteboard: a frame, and marker nobody can read.
     return (
       <svg viewBox="0 0 160 100" className="h-full w-full">
-        <rect width="160" height="100" fill="#e9e7e1" />
+        <rect width="160" height="100" fill={DESK} />
         <rect x="14" y="12" width="132" height="76" fill="#ffffff" stroke="#b9b5ad" strokeWidth="3" />
         <path d="M28 34c10-8 20 6 30-2s18 4 26-3" fill="none" stroke="#1c4fc4" strokeWidth="2.2" strokeLinecap="round" />
         <path d="M30 52h40M30 62h28" stroke="#1c4fc4" strokeWidth="2.2" strokeLinecap="round" />
@@ -60,7 +63,7 @@ function Page({ kind }: { kind: Thumb }) {
   const lines = [22, 30, 38, 46, 54, 62, 70];
   return (
     <svg viewBox="0 0 160 100" className="h-full w-full">
-      <rect width="160" height="100" fill="#efede8" />
+      <rect width="160" height="100" fill={DESK} />
       <rect x="30" y="8" width="100" height="96" fill="#ffffff" stroke={RULE} />
       {lines.map((y, i) => {
         const redacted = kind === "minutes" && i === 3;

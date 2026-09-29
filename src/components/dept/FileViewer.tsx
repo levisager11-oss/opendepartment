@@ -36,7 +36,7 @@ function MediaFrame({
   return (
     <div
       className={`flex h-viewer items-center justify-center overflow-hidden rounded-control print:h-auto ${
-        dark ? "bg-black" : "bg-white"
+        dark ? "bg-black" : "bg-paper-50"
       }`}
     >
       {children}

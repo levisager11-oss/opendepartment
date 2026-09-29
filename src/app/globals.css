@@ -69,6 +69,11 @@
   --color-stamp-green: #16794a;
   --color-redact: #16130f;
 
+  /* Text set on a filled colour -- the action blue, a red or green badge.
+     White on the light theme's deep fills; the dark theme lightens its fills
+     and this turns to near-black with them (see DARK THEME below). */
+  --color-on-fill: #ffffff;
+
   /* --- focus --- */
   --color-ring: #0050d8;
   --color-ring-on-dark: #9cc0ff;
@@ -149,6 +154,100 @@
      --accent (lib/tenant/contrast.ts): navy on a light accent, white on a
      dark one. */
   --accent-ink: #ffffff;
+}
+
+/* ===========================================================================
+   DARK THEME
+
+   The same tokens, re-valued. Warm charcoal rather than black, so the page is
+   the paper palette with the lights down rather than a different product;
+   surfaces get lighter as they come forward (page, card, hover), because a
+   shadow does not read on a dark page; text is off-white, never pure white.
+
+   One rule covers every filled colour: in the dark, fills lighten and carry
+   dark ink (--color-on-fill). A deep blue button with white text works on
+   paper and turns muddy on charcoal, and the same blue as link text would
+   fail contrast -- so the one blue is lightened once, for both jobs.
+
+   What is deliberately absent is the dark-mode template: no neon, no glow
+   behind content, no purple.
+
+   It follows the system unless the reader chose (data-theme on <html>, set
+   on the server from the od_theme cookie; see lib/theme.ts). The token list
+   is written twice because one half answers a media query and the other an
+   attribute, and plain CSS has no way to share a block between them. Both are
+   screen-only: a printout is always on white.
+   =========================================================================== */
+@media screen {
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --color-paper-50: #1f1e1b;
+    --color-paper-100: #161513;
+    --color-paper-200: #292825;
+    --color-paper-300: #34322e;
+    --color-paper-400: #4a4742;
+    --color-paper-500: #6e6a63;
+    --color-ink-900: #ecebe6;
+    --color-ink-700: #d0cec7;
+    --color-ink-500: #a9a69e;
+    --color-ink-400: #8f8c85;
+    --color-gov-900: #d6e3f8;
+    --color-gov-800: #7aa7f8;
+    --color-gov-700: #94b8f9;
+    --color-gov-600: #a9c5fa;
+    --color-gov-100: #1d2b45;
+    --color-gov-50: #18223a;
+    --color-gold-600: #d4b23a;
+    --color-gold-700: #e3c76a;
+    --color-stamp-red: #f07a73;
+    --color-stamp-blue: #86a6f0;
+    --color-stamp-green: #5cc28c;
+    --color-redact: #050404;
+    --color-on-fill: #151413;
+    --color-ring: #7aa7f8;
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-lift: 0 2px 10px -2px rgb(0 0 0 / 0.7);
+    --shadow-pop: 0 12px 32px -8px rgb(0 0 0 / 0.8), 0 0 0 1px var(--color-paper-300);
+    /* The platform's own accent, where no department has set one. */
+    --accent: #7aa7f8;
+    --accent-ink: #151413;
+  }
+}
+
+@media screen and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --color-paper-50: #1f1e1b;
+    --color-paper-100: #161513;
+    --color-paper-200: #292825;
+    --color-paper-300: #34322e;
+    --color-paper-400: #4a4742;
+    --color-paper-500: #6e6a63;
+    --color-ink-900: #ecebe6;
+    --color-ink-700: #d0cec7;
+    --color-ink-500: #a9a69e;
+    --color-ink-400: #8f8c85;
+    --color-gov-900: #d6e3f8;
+    --color-gov-800: #7aa7f8;
+    --color-gov-700: #94b8f9;
+    --color-gov-600: #a9c5fa;
+    --color-gov-100: #1d2b45;
+    --color-gov-50: #18223a;
+    --color-gold-600: #d4b23a;
+    --color-gold-700: #e3c76a;
+    --color-stamp-red: #f07a73;
+    --color-stamp-blue: #86a6f0;
+    --color-stamp-green: #5cc28c;
+    --color-redact: #050404;
+    --color-on-fill: #151413;
+    --color-ring: #7aa7f8;
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-lift: 0 2px 10px -2px rgb(0 0 0 / 0.7);
+    --shadow-pop: 0 12px 32px -8px rgb(0 0 0 / 0.8), 0 0 0 1px var(--color-paper-300);
+    /* The platform's own accent, where no department has set one. */
+    --accent: #7aa7f8;
+    --accent-ink: #151413;
+  }
 }
 
 html {
@@ -379,6 +478,9 @@ input[type="radio"] {
   background: var(--color-redact);
   color: transparent;
   border-radius: 3px;
+  /* Invisible on paper; on a dark page it is what keeps a black bar from
+     disappearing into the background. */
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-ink-900) 14%, transparent);
   transition: background 180ms ease-out, color 180ms ease-out;
   cursor: help;
   user-select: none;
@@ -444,7 +546,7 @@ input[type="radio"] {
 
 @utility btn-primary {
   background: var(--color-gov-800);
-  color: #fff;
+  color: var(--color-on-fill);
   &:hover:not(:disabled) {
     background: color-mix(in srgb, var(--color-gov-800) 88%, #000);
   }
@@ -468,14 +570,14 @@ input[type="radio"] {
   color: var(--color-stamp-red);
   border-color: color-mix(in srgb, var(--color-stamp-red) 35%, transparent);
   &:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--color-stamp-red) 6%, #fff);
+    background: color-mix(in srgb, var(--color-stamp-red) 8%, var(--color-paper-50));
     border-color: var(--color-stamp-red);
   }
 }
 
 @utility btn-danger {
   background: var(--color-stamp-red);
-  color: #fff;
+  color: var(--color-on-fill);
   &:hover:not(:disabled) {
     background: color-mix(in srgb, var(--color-stamp-red) 86%, #000);
   }
@@ -590,12 +692,12 @@ input[type="radio"] {
 
 @utility notice-error {
   color: var(--color-stamp-red);
-  background: color-mix(in srgb, var(--color-stamp-red) 6%, #fff);
+  background: color-mix(in srgb, var(--color-stamp-red) 8%, var(--color-paper-50));
 }
 
 @utility notice-ok {
   color: var(--color-stamp-green);
-  background: color-mix(in srgb, var(--color-stamp-green) 6%, #fff);
+  background: color-mix(in srgb, var(--color-stamp-green) 8%, var(--color-paper-50));
 }
 
 /* ===========================================================================

@@ -143,7 +143,7 @@ export function AdminFiles({ files }: { files: AdminFile[] }) {
                 </td>
                 <td className="px-3 py-2 tabular-nums">
                   {file.report_count > 0 ? (
-                    <span className="rounded-full bg-stamp-red px-1.5 py-0.5 text-2xs font-bold text-white">
+                    <span className="rounded-full bg-stamp-red px-1.5 py-0.5 text-2xs font-bold text-on-fill">
                       {file.report_count}
                     </span>
                   ) : (

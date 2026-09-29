@@ -5,7 +5,9 @@ import "./globals.css";
 import { I18nProvider } from "@/lib/i18n/provider";
 import { CookieNotice } from "@/components/CookieNotice";
 import { SkipLink } from "@/components/SkipLink";
+import { cookies } from "next/headers";
 import { detectLocale } from "@/lib/i18n/detect";
+import { THEME_COOKIE, themeAttribute } from "@/lib/theme";
 import { SITE_NAME, SITE_URL } from "@/lib/seo";
 
 /**
@@ -114,11 +116,27 @@ export const metadata: Metadata = {
   verification: { google: "SaTamI2kIpo5f0OCzfcUgvO0unoBJtge3sSRhG_iZnA" },
 };
 
-export const viewport: Viewport = {
-  themeColor: "#ffffff",
-  width: "device-width",
-  initialScale: 1,
-};
+/**
+ * The browser's own chrome follows the page: the reader's explicit choice if
+ * the cookie holds one, otherwise whatever the system prefers. Every page
+ * already reads cookies (the language does), so this costs no static page.
+ */
+export async function generateViewport(): Promise<Viewport> {
+  const theme = themeAttribute((await cookies()).get(THEME_COOKIE)?.value);
+  return {
+    themeColor: theme
+      ? THEME_COLOR[theme]
+      : [
+          { media: "(prefers-color-scheme: light)", color: THEME_COLOR.light },
+          { media: "(prefers-color-scheme: dark)", color: THEME_COLOR.dark },
+        ],
+    width: "device-width",
+    initialScale: 1,
+  };
+}
+
+/** The header's surface in each theme (--color-paper-50). */
+const THEME_COLOR = { light: "#ffffff", dark: "#1f1e1b" } as const;
 
 /**
  * The root layout deliberately renders no header, no footer and no session.
@@ -133,10 +151,12 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const locale = await detectLocale();
+  const theme = themeAttribute((await cookies()).get(THEME_COOKIE)?.value);
 
   return (
     <html
       lang={locale}
+      data-theme={theme}
       className={`${publicSans.variable} ${bricolage.variable} ${plexMono.variable} ${specialElite.variable}`}
     >
       <body className="flex min-h-dvh flex-col">

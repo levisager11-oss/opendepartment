@@ -38,6 +38,10 @@ export const dictionary = {
     "nav.signout": "Sign out",
     "nav.signedInAs": "Signed in as",
     "nav.language": "Language",
+    "theme.label": "Appearance",
+    "theme.system": "Match system",
+    "theme.light": "Light",
+    "theme.dark": "Dark",
     "nav.home": "Home",
     "nav.menu": "Menu",
     "nav.signin": "Sign in",
@@ -882,8 +886,9 @@ export const dictionary = {
     "cookies.title": "About the cookies here",
     "cookies.body":
       "This site sets only the cookies it needs to work: one that keeps you " +
-      "signed in, one that remembers your language, and one that remembers " +
-      "you have read this. Optional setup uses short-lived authorization cookies. " +
+      "signed in, one that remembers your language, one that remembers " +
+      "you have read this, and one for light or dark mode if you pick one. " +
+      "Optional setup uses short-lived authorization cookies. " +
       "The privacy notice explains hosting, analytics and optional external services.",
     "cookies.more": "Read the privacy notice",
     "cookies.ok": "Understood",
@@ -948,6 +953,10 @@ export const dictionary = {
     "nav.signout": "Abmelden",
     "nav.signedInAs": "Angemeldet als",
     "nav.language": "Sprache",
+    "theme.label": "Darstellung",
+    "theme.system": "Wie im System",
+    "theme.light": "Hell",
+    "theme.dark": "Dunkel",
     "nav.home": "Startseite",
     "nav.menu": "Menü",
     "nav.signin": "Anmelden",
@@ -1794,7 +1803,8 @@ export const dictionary = {
     "cookies.body":
       "Diese Seite setzt nur die Cookies, die für den Betrieb nötig sind: " +
       "eines hält Sie angemeldet, eines merkt sich Ihre Sprache, eines merkt " +
-      "sich, dass Sie diesen Hinweis gelesen haben. Die optionale Einrichtung nutzt kurzlebige Autorisierungs-Cookies. " +
+      "sich, dass Sie diesen Hinweis gelesen haben, und eines die helle oder dunkle " +
+      "Darstellung, falls Sie eine wählen. Die optionale Einrichtung nutzt kurzlebige Autorisierungs-Cookies. " +
       "Die Datenschutzerklärung erläutert Hosting, Statistiken und optionale externe Dienste.",
     "cookies.more": "Zur Datenschutzerklärung",
     "cookies.ok": "Verstanden",
