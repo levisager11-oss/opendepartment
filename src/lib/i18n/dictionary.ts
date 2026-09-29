@@ -53,6 +53,9 @@ export const dictionary = {
     "upload.needs.accept": "the confirmation above",
     "admin.reports.showClosed": "Show resolved and dismissed reports",
     "member.mySubmissions": "See everything you have filed",
+    "file.print": "Print",
+    "file.printOmitted":
+      "The exhibit itself is not reproduced in print -- download the original to print it.",
     "common.and": "and",
     "setup.tooMany":
       "You have reached the maximum of 3 departments for one account. Remove one under Your departments first.",
@@ -875,6 +878,9 @@ export const dictionary = {
     "upload.needs.accept": "die Bestätigung oben",
     "admin.reports.showClosed": "Erledigte und verworfene Meldungen anzeigen",
     "member.mySubmissions": "Alles ansehen, was Sie abgelegt haben",
+    "file.print": "Drucken",
+    "file.printOmitted":
+      "Das Beweisstück selbst wird im Druck nicht wiedergegeben -- laden Sie das Original herunter, um es zu drucken.",
     "common.and": "und",
     "setup.tooMany":
       "Sie haben das Maximum von 3 Departementen pro Konto erreicht. Entfernen Sie zuerst eines unter «Ihre Departemente».",

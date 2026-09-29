@@ -21,7 +21,7 @@ export function DeptBanner() {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="gov-banner">
+    <div className="gov-banner print:hidden">
       {/*
         Three items that fit one 1280px row and never fit a 375px one. Left to
         wrap on their own they stacked into three separate lines and the

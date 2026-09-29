@@ -32,7 +32,7 @@ export function VaultBackLink() {
   return (
     <Link
       href={target}
-      className="docket mb-4 inline-flex items-center gap-1 text-2xs text-ink-500 hover:text-gov-800"
+      className="docket mb-4 inline-flex items-center gap-1 text-2xs text-ink-500 hover:text-gov-800 print:hidden"
     >
       <span aria-hidden>←</span> {t("file.back")}
     </Link>

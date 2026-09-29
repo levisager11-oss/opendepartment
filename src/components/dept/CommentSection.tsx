@@ -78,7 +78,9 @@ export function CommentSection({
   }
 
   return (
-    <section className="mt-8">
+    // Printed, a file with no notes should not end on an empty "no notes"
+    // panel; with notes, they are part of the case file.
+    <section className={`mt-8 ${comments.length === 0 ? "print:hidden" : ""}`}>
       <div className="paper-tab ml-6 inline-block px-4 py-1">
         <span className="docket text-ink-700 text-2xs">
           {t("comments.title")}
@@ -120,7 +122,7 @@ export function CommentSection({
                             remove(comment.id);
                           }
                         }}
-                        className="ml-auto cursor-pointer text-xs text-ink-400 underline hover:text-stamp-red"
+                        className="ml-auto cursor-pointer text-xs text-ink-400 underline hover:text-stamp-red print:hidden"
                       >
                         {t("comments.delete")}
                       </button>
@@ -135,7 +137,7 @@ export function CommentSection({
           </ul>
         )}
 
-        <form onSubmit={post} className="mt-5 border-t border-paper-300 pt-5">
+        <form onSubmit={post} className="mt-5 border-t border-paper-300 pt-5 print:hidden">
           <textarea
             className="field min-h-20 resize-y"
             placeholder={t("comments.placeholder")}

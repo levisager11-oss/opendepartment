@@ -31,7 +31,7 @@ export function SchemaNotice({
   const { t } = useI18n();
 
   return (
-    <div className="border-b border-gold-500/40 bg-gold-500/15">
+    <div className="border-b border-gold-500/40 bg-gold-500/15 print:hidden">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 text-xs">
         <span className="stamp stamp-sm shrink-0 border-gold-600 text-gold-700">
           {t("schema.badge")}

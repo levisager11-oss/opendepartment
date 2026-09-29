@@ -35,7 +35,7 @@ function MediaFrame({
 }) {
   return (
     <div
-      className={`flex h-viewer items-center justify-center overflow-hidden rounded-card border border-paper-400 shadow-md ${
+      className={`flex h-viewer items-center justify-center overflow-hidden rounded-card border border-paper-400 shadow-md print:h-auto print:border-0 print:shadow-none ${
         dark ? "bg-black" : "bg-white"
       }`}
     >
@@ -244,7 +244,7 @@ function PdfFrame({
 }
 
 function ViewerActions({ children }: { children: React.ReactNode }) {
-  return <div className="mt-2 flex justify-end gap-2">{children}</div>;
+  return <div className="mt-2 flex justify-end gap-2 print:hidden">{children}</div>;
 }
 
 /**

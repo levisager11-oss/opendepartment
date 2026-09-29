@@ -92,7 +92,7 @@ export function DeptHeader({
   // for their own settings looks at their own name first.
 
   return (
-    <header className="masthead gov-rule sticky top-0 z-40 shadow-lg">
+    <header className="masthead gov-rule sticky top-0 z-40 shadow-lg print:hidden">
       <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:gap-4">
         <Link
           href={signedIn ? href("vault") : href()}
