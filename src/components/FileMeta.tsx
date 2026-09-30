@@ -29,14 +29,13 @@ export function FileMeta({
   ];
 
   return (
-    <dl className="grid grid-cols-1 gap-x-8 gap-y-2.5 border-b border-paper-300 p-4 sm:grid-cols-2 sm:gap-y-3 sm:p-5">
+    <dl className="divide-y divide-paper-300 text-sm">
       {rows.map(([label, value]) => (
-        // Label and value side by side at every width. Stacked on a phone,
-        // eight facts took sixteen lines and pushed Download and Report a
-        // full screen below the document they belong to.
-        <div key={label} className="flex items-baseline gap-3">
-          <dt className="docket w-24 shrink-0 text-3xs text-ink-500 sm:w-32">{label}</dt>
-          <dd className="typewriter min-w-0 truncate text-sm text-ink-900">
+        // Label and value side by side at every width. Stacked, eight facts
+        // took sixteen lines.
+        <div key={label} className="flex items-baseline justify-between gap-4 px-5 py-2.5">
+          <dt className="shrink-0 text-ink-500">{label}</dt>
+          <dd className="min-w-0 truncate text-right font-medium text-ink-900">
             {value}
           </dd>
         </div>
@@ -46,11 +45,11 @@ export function FileMeta({
           reveal -- so an admin does not flash a classmate's address at
           whoever happens to be looking at their screen. */}
       {ownerEmail && (
-        <div className="flex items-baseline gap-3 sm:col-span-2">
-          <dt className="docket w-24 shrink-0 text-3xs text-stamp-red sm:w-32">
+        <div className="flex items-baseline justify-between gap-4 px-5 py-2.5">
+          <dt className="shrink-0 text-stamp-red">
             {t("file.uploaderEmail")}
           </dt>
-          <dd className="min-w-0 break-all">
+          <dd className="min-w-0 break-all text-right">
             <span
               tabIndex={0}
               className="redact redact-reveal typewriter px-1 text-sm"

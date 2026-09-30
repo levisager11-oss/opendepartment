@@ -164,7 +164,7 @@ export function AdminReports({ reports }: { reports: AdminReport[] }) {
                   {report.file_id ? (
                     <Link
                       href={href(`file/${report.file_id}`)}
-                      className="font-serif font-bold text-gov-800 hover:underline"
+                      className="font-display font-bold text-gov-800 hover:underline"
                     >
                       {report.file_title ?? report.file_id}
                     </Link>

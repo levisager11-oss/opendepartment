@@ -155,12 +155,20 @@ export function AdminDanger({ departmentName }: { departmentName: string }) {
           </p>
         )}
 
-        <p className="mt-4 font-serif text-sm font-bold text-ink-900">
+        <p className="mt-4 font-display text-sm font-bold text-ink-900">
           {t("danger.nextTitle")}
         </p>
         <p className="mt-1 text-sm leading-relaxed text-ink-700">
           {t("danger.nextBody")}
         </p>
+        {/* A pinned department on somebody's own server has no Supabase
+            dashboard to link to. Its address still has to be said, or the
+            one place the leftover data lives goes unnamed. */}
+        {!dashboard && (
+          <p className="notice mt-3 text-sm break-all text-ink-700">
+            {t("danger.nextSelfHosted", { url: supabaseUrl })}
+          </p>
+        )}
         <div className="mt-3 flex flex-wrap gap-3">
           {dashboard && (
             <a

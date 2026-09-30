@@ -88,12 +88,12 @@ export function AdminUsers({
                     {user.username ?? "—"}
                   </span>
                   {user.is_admin && (
-                    <span className="ml-2 rounded-card bg-gov-800 px-1.5 py-0.5 text-3xs font-bold tracking-wider text-white">
+                    <span className="ml-2 rounded-card bg-gov-800 px-1.5 py-0.5 text-3xs font-bold tracking-wider text-on-fill">
                       {t("admin.users.admin").toUpperCase()}
                     </span>
                   )}
                   {user.is_banned && (
-                    <span className="ml-2 rounded-card bg-stamp-red px-1.5 py-0.5 text-3xs font-bold tracking-wider text-white">
+                    <span className="ml-2 rounded-card bg-stamp-red px-1.5 py-0.5 text-3xs font-bold tracking-wider text-on-fill">
                       SUSPENDED
                     </span>
                   )}

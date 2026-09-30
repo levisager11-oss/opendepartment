@@ -28,6 +28,15 @@ import {
 // knew it as the vault's, still find it.
 export { prefixSearchQuery } from "@/lib/tenant/vault-query";
 
+/** Remembered per browser: how somebody likes to look at an archive. */
+const VIEW_KEY = "od-vault-view";
+type View = "grid" | "list";
+
+const VIEW_ICONS: Record<View, string> = {
+  grid: "M4 4h7v7H4z M13 4h7v7h-7z M4 13h7v7H4z M13 13h7v7h-7z",
+  list: "M4 6h16 M4 12h16 M4 18h16",
+};
+
 const KIND_KEYS = {
   image: "vault.kind.image",
   pdf: "vault.kind.pdf",
@@ -70,6 +79,25 @@ export function VaultBrowser({
   // that page and keep the cards already on screen, not start over.
   const [failedPage, setFailedPage] = useState(0);
   const [filtersReady, setFiltersReady] = useState(false);
+  const [view, setViewState] = useState<View>("grid");
+
+  // Read after hydration, like the filters: the server cannot know it, and
+  // guessing would render one layout and then jump to the other.
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(VIEW_KEY) === "list") setViewState("list");
+    } catch {
+      // Storage disabled: the grid it is.
+    }
+  }, []);
+  function setView(next: View) {
+    setViewState(next);
+    try {
+      localStorage.setItem(VIEW_KEY, next);
+    } catch {
+      // Remembered for this visit only.
+    }
+  }
 
   // Read after hydration so the server and first client render agree. Native
   // history keeps the current filters shareable without refetching the route.
@@ -283,26 +311,30 @@ export function VaultBrowser({
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 sm:py-8">
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:py-10">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <span className="docket text-2xs text-ink-500">
             {branding.subjectLabel.toUpperCase()} FILE INDEX
           </span>
-          <h1 className="font-serif text-2xl font-black break-words text-gov-900 sm:text-3xl">
+          <h1 className="mt-1 font-display text-3xl font-extrabold tracking-tight break-words text-ink-900 sm:text-4xl">
             {t("vault.title")}
           </h1>
-          <p className="typewriter mt-1 text-sm text-ink-500">
+          <p className="mt-1.5 text-sm text-ink-500">
             {plural("vault.count", total)}
           </p>
         </div>
 
-        <Link href={href("upload")} className="btn btn-primary">
-          <span aria-hidden>+</span> {t("nav.upload")}
+        {/* From lg up the header carries this button on every page. */}
+        <Link href={href("upload")} className="btn btn-accent lg:hidden">
+          <svg aria-hidden width="16" height="16" viewBox="0 0 20 20">
+            <path d="M10 4v12M4 10h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          {t("nav.upload")}
         </Link>
       </div>
 
-      <div className="paper mb-6 p-3">
+      <div className="paper mb-6 p-3 sm:p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <div className="relative flex-1">
             <svg
@@ -391,13 +423,12 @@ export function VaultBrowser({
           </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-4 border-t border-paper-300 pt-3">
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-paper-300 pt-3">
           <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-700">
             <input
               type="checkbox"
               checked={mineOnly}
               onChange={(e) => setMineOnly(e.target.checked)}
-              className="accent-gov-800"
             />
             {t("vault.filter.mine")}
           </label>
@@ -406,11 +437,35 @@ export function VaultBrowser({
             <button
               type="button"
               onClick={clearFilters}
-              className="cursor-pointer text-xs text-gov-800 underline underline-offset-2 hover:text-gov-600"
+              className="cursor-pointer rounded-control text-sm font-medium text-gov-800 hover:underline"
             >
               {t("vault.clear")}
             </button>
           )}
+
+          <div
+            role="group"
+            aria-label={t("vault.view")}
+            className="ml-auto flex items-center rounded-control border border-paper-300 bg-paper-100 p-0.5"
+          >
+            {(["grid", "list"] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setView(v)}
+                aria-pressed={view === v}
+                title={t(v === "grid" ? "vault.view.grid" : "vault.view.list")}
+                className={`flex cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                  view === v ? "bg-paper-50 text-ink-900 shadow-sm" : "text-ink-500 hover:text-ink-900"
+                }`}
+              >
+                <svg aria-hidden width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d={VIEW_ICONS[v]} />
+                </svg>
+                {t(v === "grid" ? "vault.view.grid" : "vault.view.list")}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -423,7 +478,7 @@ export function VaultBrowser({
           <SkeletonCardGrid />
         </div>
       ) : error && files.length === 0 ? (
-        <div className="paper px-6 py-10 text-center">
+        <div className="paper px-6 py-12 text-center">
           <p className="text-ink-700">{t("common.error")}</p>
           <button
             type="button"
@@ -436,7 +491,7 @@ export function VaultBrowser({
       ) : files.length === 0 ? (
         <div className="paper px-6 py-16 text-center">
           <span className="stamp stamp-red text-sm">NO RECORDS</span>
-          <p className="mt-5 text-ink-500">
+          <p className="mx-auto mt-5 max-w-md text-ink-500">
             {hasFilters ? t("vault.empty") : t("vault.emptyAll")}
           </p>
           {/* Each empty state offers its own way out: a filtered view that
@@ -447,7 +502,7 @@ export function VaultBrowser({
               {t("vault.clear")}
             </button>
           ) : (
-            <Link href={href("upload")} className="btn btn-primary mt-6">
+            <Link href={href("upload")} className="btn btn-accent mt-6">
               {t("vault.firstUpload")}
             </Link>
           )}
@@ -455,12 +510,20 @@ export function VaultBrowser({
       ) : (
         <>
           {loading && !appending && <p role="status" className="mb-3 text-sm text-ink-500">{t("vault.loading")}</p>}
-          <div aria-busy={loading} className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div
+            aria-busy={loading}
+            className={
+              view === "list"
+                ? "paper divide-y divide-paper-300 overflow-hidden"
+                : "grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+            }
+          >
             {files.map((file) => (
               <FileCard
                 key={file.id}
                 file={file}
                 thumbnail={thumbs[file.storage_path]}
+                view={view}
               />
             ))}
           </div>

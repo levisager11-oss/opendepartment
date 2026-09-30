@@ -16,8 +16,9 @@ export const COOKIE_NOTICE_COOKIE = "od_cookie_notice";
  *
  * Every cookie this app sets is one it cannot work without or one the reader
  * asked for by clicking something: the control-plane session, a department's
- * own `od-<slug>` session, the language cookie the toggle writes, and this
- * one. Those are exempt from prior consent under the ePrivacy rules that a
+ * own `od-<slug>` session, the language cookie the toggle writes, the theme
+ * cookie the appearance switch writes (only once somebody picks light or
+ * dark -- "match system" stores nothing), and this one. Those are exempt from prior consent under the ePrivacy rules that a
  * banner exists to satisfy, and there is nothing else to ask about -- no
  * advertising, no third-party analytics tag, no profile. Vercel's analytics
  * script is cookieless.
@@ -72,7 +73,7 @@ export function CookieNotice() {
     >
       <div className="paper mx-auto flex max-w-3xl flex-col gap-3 p-4 shadow-lg sm:flex-row sm:items-center sm:gap-5">
         <div className="min-w-0 flex-1">
-          <p className="font-serif text-sm font-bold text-ink-900">
+          <p className="font-display text-sm font-bold text-ink-900">
             {t("cookies.title")}
           </p>
           <p className="mt-1 max-w-prose text-xs leading-relaxed text-ink-700">

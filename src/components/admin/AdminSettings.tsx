@@ -276,8 +276,8 @@ export function AdminSettings({ settings }: { settings: DepartmentSettings }) {
           id="set-accent"
           label={t("settings.accent")}
           // 3:1 is WCAG's floor for large or bold text, which is what the
-          // masthead sets in the accent. A warning, not a refusal: it is the
-          // department's colour to choose.
+          // seal sets in the accent over its navy face. A warning, not a
+          // refusal: it is the department's colour to choose.
           hint={
             HEX.test(form.accent.trim()) &&
             contrastRatio(form.accent.trim(), MASTHEAD_NAVY) < 3

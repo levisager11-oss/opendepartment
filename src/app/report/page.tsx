@@ -29,7 +29,7 @@ export default async function ReportPage({
 
   return (
     <MarketingShell>
-      <h1 className="mb-2 font-serif text-2xl font-black break-words text-ink-900 sm:text-3xl">
+      <h1 className="mb-2 font-display text-2xl font-extrabold tracking-tight break-words text-ink-900 sm:text-3xl">
         <T k="abuse.title" />
       </h1>
       <p className="mb-8 text-sm leading-relaxed text-ink-700">

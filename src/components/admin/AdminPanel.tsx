@@ -157,25 +157,25 @@ export function AdminPanel({
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 sm:py-8">
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:py-10">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <span className="docket text-stamp-red text-2xs">
             RESTRICTED · CLEARANCE REQUIRED
           </span>
-          <h1 className="font-serif text-2xl font-black break-words text-gov-900 sm:text-3xl">
+          <h1 className="font-display text-3xl font-extrabold tracking-tight break-words text-ink-900 sm:text-4xl">
             {t("admin.title")}
           </h1>
-          <p className="typewriter mt-1 text-sm text-ink-500">
+          <p className="mt-1.5 text-sm text-ink-500">
             {t("admin.subtitle")}
           </p>
         </div>
 
         {/* storage meter */}
-        <div className="paper w-full min-w-64 px-4 py-3 sm:w-auto">
-          <div className="docket mb-2 flex flex-wrap items-baseline justify-between gap-x-3 text-2xs text-ink-500">
-            <span>{t("admin.storage")}</span>
-            <span className="typewriter text-xs normal-case tracking-normal text-ink-900">
+        <div className="paper w-full min-w-72 px-4 py-3.5 sm:w-auto">
+          <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 text-xs text-ink-500">
+            <span className="font-medium">{t("admin.storage")}</span>
+            <span className="font-semibold text-ink-900 tabular-nums">
               {formatBytes(totalBytes)}{" "}
               {t("admin.storageOf", { total: "1 GB" })}
             </span>
@@ -196,7 +196,7 @@ export function AdminPanel({
       </div>
 
       {/* tabs */}
-      <div ref={stripRef} className="scroll-x mb-5 border-b-2 border-paper-400">
+      <div ref={stripRef} className="scroll-x mb-6 border-b border-paper-300">
         <div
           role="tablist"
           aria-label={t("admin.title")}
@@ -223,15 +223,15 @@ export function AdminPanel({
                   tabRefs.current[entry.id] = node;
                 }}
                 onClick={() => setTab(entry.id)}
-                className={`relative -mb-0.5 cursor-pointer border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors ${
+                className={`relative -mb-px cursor-pointer border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
                   active
-                    ? "border-gov-800 text-gov-900"
-                    : "border-transparent text-ink-500 hover:text-gov-800"
+                    ? "border-gov-800 text-ink-900"
+                    : "border-transparent text-ink-500 hover:border-paper-400 hover:text-ink-900"
                 }`}
               >
                 {t(entry.key)}
                 {badge && (
-                  <span className="ml-2 rounded-full bg-stamp-red px-1.5 py-0.5 text-3xs font-bold text-white">
+                  <span className="ml-2 rounded-full bg-stamp-red px-1.5 py-0.5 text-3xs font-bold text-on-fill">
                     {badge}
                   </span>
                 )}

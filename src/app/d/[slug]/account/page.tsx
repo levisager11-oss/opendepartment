@@ -31,7 +31,7 @@ export default async function MemberAccountPage({
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 sm:py-8">
-      <h1 className="mb-2 font-serif text-2xl font-black break-words text-ink-900">
+      <h1 className="mb-2 font-display text-2xl font-extrabold tracking-tight break-words text-ink-900">
         <T k="member.title" />
       </h1>
       <p className="mb-8 text-sm leading-relaxed text-ink-700">

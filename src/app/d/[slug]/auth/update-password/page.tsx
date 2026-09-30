@@ -42,7 +42,7 @@ export default async function UpdatePasswordPage({
           accent={branding.accent}
           idPrefix="reset"
         />
-        <h1 className="font-serif text-2xl font-black break-words text-ink-900">
+        <h1 className="font-display text-2xl font-extrabold tracking-tight break-words text-ink-900">
           <T k={user ? "auth.updateTitle" : "auth.linkExpired"} />
         </h1>
       </div>

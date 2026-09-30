@@ -1,34 +1,48 @@
 import type { Metadata, Viewport } from "next";
-import { Merriweather, Source_Sans_3, Special_Elite } from "next/font/google";
+import { Bricolage_Grotesque, IBM_Plex_Mono, Public_Sans, Special_Elite } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { I18nProvider } from "@/lib/i18n/provider";
 import { CookieNotice } from "@/components/CookieNotice";
 import { SkipLink } from "@/components/SkipLink";
+import { cookies } from "next/headers";
 import { detectLocale } from "@/lib/i18n/detect";
+import { THEME_COOKIE, themeAttribute } from "@/lib/theme";
 import { SITE_NAME, SITE_URL } from "@/lib/seo";
 
 /**
- * Three families, and the third earns its place: Special Elite is the
- * typewriter register the whole parody rests on -- dockets, stamps, usernames.
- * It ships one weight over the latin subset and only ever sets short strings.
+ * Four families, each chosen rather than defaulted to.
  *
- * The weight lists are the payload, and they are pruned to what actually
- * renders. Merriweather is used at 900 for page titles and 700 for card
- * headings and never at 400, so 400 is not requested; every `font-serif` call
- * site in the app carries an explicit bold or black.
+ *  - Public Sans sets everything a person reads or types. It is the typeface
+ *    of the U.S. Web Design System -- what real government sites are set in --
+ *    so the parody wears the actual uniform instead of a startup's.
+ *  - Bricolage Grotesque sets the headlines, and is the one place the product
+ *    is allowed some character.
+ *  - IBM Plex Mono sets docket numbers and other filing marks.
+ *  - Special Elite is kept for the rubber stamps, the last piece of typewriter
+ *    the parody still leans on. One weight, latin only, short strings.
+ *
+ * Public Sans and Bricolage are variable fonts, so leaving `weight` out fetches
+ * one file each that covers every weight the app uses -- naming weights would
+ * fetch one static file per weight instead. Plex Mono is not variable, and is
+ * only ever set at two weights.
  */
-const merriweather = Merriweather({
+const publicSans = Public_Sans({
   subsets: ["latin"],
-  weight: ["700", "900"],
-  variable: "--font-merriweather",
+  variable: "--font-public-sans",
   display: "swap",
 });
 
-const sourceSans = Source_Sans_3({
+const bricolage = Bricolage_Grotesque({
   subsets: ["latin"],
-  weight: ["400", "600", "700"],
-  variable: "--font-source-sans",
+  variable: "--font-bricolage",
+  display: "swap",
+});
+
+const plexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-plex-mono",
   display: "swap",
 });
 
@@ -40,9 +54,10 @@ const specialElite = Special_Elite({
 });
 
 const DESCRIPTION =
-  "Run your own parody document archive. Members upload exhibits, vote and " +
-  "argue in the comments, stored in a Supabase project you own, not ours. " +
-  "Free, invite-only by default, about five minutes to set up.";
+  "Run your own private archive, dressed up as a records office. Members " +
+  "upload files, vote and argue in the comments, stored in a Supabase project " +
+  "you own, hosted or on your own server. Free, invite-only by default, " +
+  "about five minutes to set up.";
 
 /**
  * Site-wide metadata. Two things here are load-bearing:
@@ -67,9 +82,10 @@ export const metadata: Metadata = {
   applicationName: SITE_NAME,
   keywords: [
     "parody document archive",
-    "mock government archive",
+    "private file archive",
     "self-hosted file archive",
     "Supabase",
+    "self-hosted Supabase",
     "classroom roleplay",
     "declassified document generator",
   ],
@@ -100,11 +116,27 @@ export const metadata: Metadata = {
   verification: { google: "SaTamI2kIpo5f0OCzfcUgvO0unoBJtge3sSRhG_iZnA" },
 };
 
-export const viewport: Viewport = {
-  themeColor: "#0b1c33",
-  width: "device-width",
-  initialScale: 1,
-};
+/**
+ * The browser's own chrome follows the page: the reader's explicit choice if
+ * the cookie holds one, otherwise whatever the system prefers. Every page
+ * already reads cookies (the language does), so this costs no static page.
+ */
+export async function generateViewport(): Promise<Viewport> {
+  const theme = themeAttribute((await cookies()).get(THEME_COOKIE)?.value);
+  return {
+    themeColor: theme
+      ? THEME_COLOR[theme]
+      : [
+          { media: "(prefers-color-scheme: light)", color: THEME_COLOR.light },
+          { media: "(prefers-color-scheme: dark)", color: THEME_COLOR.dark },
+        ],
+    width: "device-width",
+    initialScale: 1,
+  };
+}
+
+/** The header's surface in each theme (--color-paper-50). */
+const THEME_COLOR = { light: "#ffffff", dark: "#1f1e1b" } as const;
 
 /**
  * The root layout deliberately renders no header, no footer and no session.
@@ -119,11 +151,16 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const locale = await detectLocale();
+  const theme = themeAttribute((await cookies()).get(THEME_COOKIE)?.value);
 
   return (
     <html
       lang={locale}
-      className={`${merriweather.variable} ${sourceSans.variable} ${specialElite.variable}`}
+      data-theme={theme}
+      // globals.css scrolls smoothly for in-page anchors; this tells Next 16
+      // to switch that off for route changes, so navigating stays instant.
+      data-scroll-behavior="smooth"
+      className={`${publicSans.variable} ${bricolage.variable} ${plexMono.variable} ${specialElite.variable}`}
     >
       <body className="flex min-h-dvh flex-col">
         <I18nProvider initialLocale={locale}>
@@ -134,7 +171,12 @@ export default async function RootLayout({
               would miss most of the people reading anything. */}
           <CookieNotice />
         </I18nProvider>
-        <Analytics />
+        {/* Only where Vercel serves it. Everywhere else -- a self-hosted
+            deployment, `next start` on a laptop -- /_vercel/insights/script.js
+            does not exist, and the tag cost every page a 404 and two console
+            errors for analytics that could never have been collected. VERCEL
+            is set by the platform itself on its builds and functions. */}
+        {process.env.VERCEL === "1" && <Analytics />}
       </body>
     </html>
   );

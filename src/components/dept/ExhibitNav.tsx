@@ -117,7 +117,7 @@ export function ExhibitNav({
   return (
     <nav
       aria-label={t("exhibit.navLabel")}
-      className="mb-4 flex items-center gap-3 text-sm print:hidden"
+      className="flex min-w-0 items-center gap-3 text-sm sm:max-w-xl sm:flex-1 print:hidden"
     >
       <div className="min-w-0 flex-1">
         {prev && (
@@ -125,7 +125,7 @@ export function ExhibitNav({
             href={href(`file/${prev.id}`)}
             rel="prev"
             title={prev.title}
-            className="group inline-flex max-w-full items-center gap-2 text-gov-800 hover:text-gov-600"
+            className="group inline-flex max-w-full items-center gap-2 rounded-control text-ink-900 hover:text-gov-800"
           >
             <span aria-hidden>←</span>
             <span className="min-w-0">
@@ -144,7 +144,7 @@ export function ExhibitNav({
             href={href(`file/${next.id}`)}
             rel="next"
             title={next.title}
-            className="group inline-flex max-w-full items-center gap-2 text-gov-800 hover:text-gov-600"
+            className="group inline-flex max-w-full items-center gap-2 rounded-control text-ink-900 hover:text-gov-800"
           >
             <span className="min-w-0">
               <span className="docket block text-3xs text-ink-500">{t("exhibit.next")}</span>

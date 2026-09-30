@@ -128,9 +128,11 @@ export default async function FilePage({
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6 sm:py-8">
-      <VaultBackLink />
-      <ExhibitNav fileId={file.id} currentUserId={member.userId} />
+    <div className="mx-auto max-w-7xl px-4 py-6 sm:py-8">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <VaultBackLink />
+        <ExhibitNav fileId={file.id} currentUserId={member.userId} />
+      </div>
 
       {/* Print only. The banner that says PARODY is screen chrome and drops
           out of a printout with the rest of it -- and a printed page that
@@ -138,7 +140,7 @@ export default async function FilePage({
           product must never produce. So the label is restated here, with
           which archive the page came from. */}
       <div className="mb-4 hidden border-b-2 border-ink-900 pb-2 print:block">
-        <p className="font-serif text-lg font-bold text-ink-900">
+        <p className="font-display text-lg font-bold text-ink-900">
           {member.branding.departmentName}
         </p>
         <p className="text-xs text-ink-700">
@@ -146,120 +148,131 @@ export default async function FilePage({
         </p>
       </div>
 
-      <div className="paper-tab ml-6 inline-block px-4 py-1">
-        <span className="docket text-ink-700 text-2xs">
-          {caseLabel(file.case_number, member.branding.docketPrefix)} ·{" "}
-          {file.category}
-        </span>
-      </div>
+      {/*
+        Four blocks in reading order -- the record, the preview, its facts, its
+        notes -- which is how a phone and a printer show them. From lg up they
+        are placed on a grid instead: the preview large on the left with the
+        notes under it, the record and its facts in a column beside it, the
+        way every file viewer lays out a document and its details.
+      */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-6 print:block">
+        <article className="paper p-5 lg:col-start-2 lg:row-start-1 print:mb-4 print:p-0">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="docket text-2xs text-ink-500">
+              {caseLabel(file.case_number, member.branding.docketPrefix)}
+            </span>
+            <span className="stamp stamp-blue stamp-sm">{file.category}</span>
+            <span className="stamp stamp-red stamp-sm animate-stamp ml-auto">
+              {file.kind.toUpperCase()}
+            </span>
+          </div>
 
-      <article className="paper">
-        <header className="flex flex-wrap items-start gap-3 border-b border-paper-300 p-4 sm:gap-4 sm:p-5">
-          <div className="print:hidden">
+          <h1 className="font-display text-2xl leading-tight font-bold tracking-tight break-words text-ink-900">
+            {file.title}
+          </h1>
+          {file.description && (
+            <p className="mt-2 text-sm leading-relaxed whitespace-pre-wrap text-ink-700">
+              {file.description}
+            </p>
+          )}
+
+          {file.subjects.length > 0 && (
+            <div className="mt-4 flex flex-wrap items-center gap-1.5">
+              <span className="sr-only">
+                <T k="file.subjects" />:
+              </span>
+              {file.subjects.map((s) => (
+                <Link
+                  key={s.id}
+                  href={`/d/${slug}/vault?subject=${s.id}`}
+                  className="chip transition-colors hover:bg-gov-100 hover:text-gov-800"
+                >
+                  {s.name}
+                </Link>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-5 flex items-center justify-between gap-3 border-t border-paper-300 pt-4 print:hidden">
             <VoteButtons
               fileId={file.id}
               initialScore={file.score}
               initialVote={myVote?.value ?? 0}
+              layout="row"
             />
-          </div>
-
-          <div className="min-w-0 flex-1">
-            <h1 className="font-serif text-xl leading-tight font-black break-words text-gov-900 sm:text-2xl">
-              {file.title}
-            </h1>
-            {file.description && (
-              <p className="mt-2 leading-relaxed whitespace-pre-wrap text-ink-700">
-                {file.description}
-              </p>
-            )}
-
-            {file.subjects.length > 0 && (
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <span className="docket text-2xs text-ink-500">
-                  <T k="file.subjects" />:
-                </span>
-                {file.subjects.map((s) => (
-                  <Link
-                    key={s.id}
-                    href={`/d/${slug}/vault?subject=${s.id}`}
-                    className="typewriter rounded-card border border-paper-400 bg-paper-100 px-2 py-0.5 text-xs text-gov-800 hover:border-gov-600"
-                  >
-                    {s.name}
-                  </Link>
-                ))}
-              </div>
+            {download?.signedUrl && (
+              <a
+                href={download.signedUrl}
+                download={file.original_name}
+                className="btn btn-primary"
+              >
+                <svg aria-hidden width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 4v12 M7 11l5 5 5-5 M4 20h16" />
+                </svg>
+                <T k="file.download" />
+              </a>
             )}
           </div>
 
-          <div className="flex shrink-0 flex-col items-end gap-2">
-            <span className="stamp stamp-red animate-stamp text-2xs sm:text-xs">
-              {file.kind.toUpperCase()}
-            </span>
+          <div className="mt-3 flex flex-wrap items-center gap-2 print:hidden">
+            <PrintButton />
+
+            {isOwner && (
+              <EditFileDetails
+                fileId={file.id}
+                initial={{
+                  title: file.title,
+                  description: file.description,
+                  category: file.category,
+                  subjectIds: file.subjects.map((s) => s.id),
+                }}
+                subjects={allSubjects}
+              />
+            )}
+
+            <ReportButton fileId={file.id} />
+
+            {canDelete && (
+              <DeleteFileButton fileId={file.id} isOwner={isOwner} />
+            )}
           </div>
-        </header>
+        </article>
 
         <div
-          className={`border-b border-paper-300 bg-paper-200 p-2 sm:p-4 print:bg-transparent ${
+          className={`paper overflow-hidden lg:col-start-1 lg:row-span-2 lg:row-start-1 print:mb-4 ${
             file.kind === "image" ? "" : "print:hidden"
           }`}
         >
-          <FileViewer
-            kind={file.kind}
-            url={signed?.signedUrl ?? null}
-            title={file.title}
-          />
+          <div className="bg-paper-200 p-2 sm:p-4 print:bg-transparent print:p-0">
+            <FileViewer
+              kind={file.kind}
+              url={signed?.signedUrl ?? null}
+              title={file.title}
+            />
+          </div>
         </div>
         {/* A framed PDF, a video or a recording cannot be printed from the
             page around it; say so where it would have been. */}
         {file.kind !== "image" && (
-          <p className="hidden border-b border-paper-300 p-4 text-sm text-ink-700 print:block">
+          <p className="hidden p-4 text-sm text-ink-700 print:block">
             <T k="file.printOmitted" />
           </p>
         )}
 
-        <FileMeta file={file} ownerEmail={ownerEmail} />
-
-        <div className="flex flex-wrap items-center gap-3 border-t border-paper-300 p-4 sm:p-5 print:hidden">
-          {download?.signedUrl && (
-            <a
-              href={download.signedUrl}
-              download={file.original_name}
-              className="btn btn-primary"
-            >
-              <T k="file.download" />
-            </a>
-          )}
-
-          <PrintButton />
-
-          {isOwner && (
-            <EditFileDetails
-              fileId={file.id}
-              initial={{
-                title: file.title,
-                description: file.description,
-                category: file.category,
-                subjectIds: file.subjects.map((s) => s.id),
-              }}
-              subjects={allSubjects}
-            />
-          )}
-
-          <ReportButton fileId={file.id} />
-
-          {canDelete && (
-            <DeleteFileButton fileId={file.id} isOwner={isOwner} />
-          )}
+        <div className="paper overflow-hidden lg:col-start-2 lg:row-start-2">
+          <FileMeta file={file} ownerEmail={ownerEmail} />
         </div>
-      </article>
 
-      <CommentSection
-        fileId={file.id}
-        initialComments={comments}
-        currentUserId={member.userId}
-        currentUsername={member.profile.username}
-        isAdmin={member.profile.is_admin}
-      />
+        <div className="lg:col-start-1 lg:row-start-3">
+          <CommentSection
+            fileId={file.id}
+            initialComments={comments}
+            currentUserId={member.userId}
+            currentUsername={member.profile.username}
+            isAdmin={member.profile.is_admin}
+          />
+        </div>
+      </div>
     </div>
   );
 }

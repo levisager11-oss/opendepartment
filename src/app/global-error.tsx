@@ -25,7 +25,7 @@ export default function GlobalError({
   }, [error]);
 
   return (
-    <html lang="en">
+    <html lang="en" data-scroll-behavior="smooth">
       <body className="flex min-h-dvh flex-col">
         <div className="mx-auto flex max-w-lg flex-1 flex-col items-center justify-center px-4 py-24 text-center">
           <p className="stamp stamp-red mb-6 inline-block">
@@ -34,7 +34,7 @@ export default function GlobalError({
 
           <p className="mb-8 text-sm leading-relaxed text-ink-700">
             OpenDepartment failed to start this page. Reloading usually clears
-            it. No archive data is affected -- every department&rsquo;s files
+            it. No archive data is affected &ndash; every department&rsquo;s files
             live in that department&rsquo;s own Supabase project.
           </p>
 

@@ -98,7 +98,7 @@ export function getDeptLegalDoc(
           {
             heading: "Cookies",
             body: [
-              `${name} setzt nur technisch notwendige Cookies: eines hält Sie in diesem Departement angemeldet und wird ausschliesslich an dessen Adresse gesendet, eines merkt sich die gewählte Sprache, eines den gelesenen Cookie-Hinweis.`,
+              `${name} setzt nur technisch notwendige Cookies: eines hält Sie in diesem Departement angemeldet und wird ausschliesslich an dessen Adresse gesendet, eines merkt sich die gewählte Sprache, eines die gewählte helle oder dunkle Darstellung, eines den gelesenen Cookie-Hinweis.`,
               "Es gibt keine Werbe-, Profiling- oder Drittanbieter-Tracking-Cookies.",
             ],
           },
@@ -202,7 +202,7 @@ export function getDeptLegalDoc(
         {
           heading: "Cookies",
           body: [
-            `${name} sets only the cookies it needs to work: one keeps you signed in to this department and is sent to this department's address alone, one remembers your chosen language, one remembers that you have read the cookie notice.`,
+            `${name} sets only the cookies it needs to work: one keeps you signed in to this department and is sent to this department's address alone, one remembers your chosen language, one remembers light or dark mode if you chose one, one remembers that you have read the cookie notice.`,
             "There are no advertising, profiling or third-party tracking cookies.",
           ],
         },
