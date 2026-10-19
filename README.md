@@ -11,9 +11,7 @@ Live at **https://opendepartment.vercel.app**.
 
 ## Try the demo
 
-A public demo department is planned. See [the demo notes](docs/DEMO.md).
-
-<!-- TODO(Levi): link the public demo department once it exists, see docs/DEMO.md -->
+Try [The Open Files](https://opendepartment.vercel.app/d/the-open-files), the live public demo department. Demo content is disposable and may be reset. Operators: see [the demo notes](docs/DEMO.md).
 
 ## Create your department in 5 minutes
 

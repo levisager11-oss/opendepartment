@@ -367,6 +367,7 @@ export const dictionary = {
       "Your archive uses your own Supabase project. Storage limits and hosting charges depend on your plan and usage. Check them in your Supabase dashboard – there is no OpenDepartment subscription to buy.",
     "od.create": "Create a department",
     "od.browse": "Browse public departments",
+    "od.tryDemo": "Try the demo",
     "od.needSupabase":
       "Free. You will need a Supabase project, hosted or on your own server. Setup takes about five minutes.",
     "od.directory": "Public departments",
@@ -1319,6 +1320,7 @@ export const dictionary = {
       "Ihr Archiv nutzt Ihr eigenes Supabase-Projekt. Speichergrenzen und Hosting-Kosten hängen von Ihrem Tarif und Ihrer Nutzung ab. Prüfen Sie diese im Supabase-Dashboard – ein OpenDepartment-Abonnement gibt es nicht.",
     "od.create": "Departement erstellen",
     "od.browse": "Öffentliche Departemente ansehen",
+    "od.tryDemo": "Demo ansehen",
     "od.needSupabase":
       "Kostenlos. Sie brauchen ein Supabase-Projekt, gehostet oder auf Ihrem eigenen Server. Die Einrichtung dauert etwa fünf Minuten.",
     "od.directory": "Öffentliche Departemente",
