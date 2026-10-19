@@ -24,14 +24,14 @@ begin
     '33333333-3333-4333-8333-333333333333'::uuid);
   select count(*) into removed_files from public.files;
   select count(*) into removed_members from public.profiles where not (id = any(keep_ids));
-  delete from public.reports;
-  delete from public.comments;
-  delete from public.votes;
-  delete from public.file_subjects;
-  delete from public.file_views;
-  delete from public.files;
-  delete from public.subjects;
-  delete from public.invites;
+  delete from public.reports where true;
+  delete from public.comments where true;
+  delete from public.votes where true;
+  delete from public.file_subjects where true;
+  delete from public.file_views where true;
+  delete from public.files where true;
+  delete from public.subjects where true;
+  delete from public.invites where true;
   delete from public.user_emails where not (user_id = any(keep_ids));
   delete from public.profiles where not (id = any(keep_ids));
   -- Auth is owned by supabase_auth_admin; retain the row reset if permissions
