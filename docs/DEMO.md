@@ -184,10 +184,62 @@ and tenant directly. Do not rely on suspension as a storage cleanup.
 
 ### Resets
 
-Re-running the seed clears its own exhibit rows (the `demo-seed/` storage-path
-markers) and subjects marked `demo seed`, with dependent engagement/report
-rows, then recreates the demo content. It leaves other manually created
-content alone. It does not clear strangers' uploads or reset the whole demo.
+The public demo can opt in to an automatic daily reset at 04:00 UTC
+(Vercel Hobby runs within the scheduled hour, once per day). Vercel Cron calls
+a server route that resets rows and uploads the committed fixtures, then
+removes unreferenced objects through the Storage API. We use this instead of
+pg_cron because Supabase blocks direct SQL deletion from storage.objects;
+a database-only reset would leave uploaded objects behind.
+
+This is a deliberate exception to OpenDepartment holding no key to anybody's
+project: the operator supplies a privileged key for their **own demo project
+only**. It lives solely in server-side Vercel environment variables, never
+in NEXT_PUBLIC_ variables, client code, logs or the repository. Other
+departments and deployments are unaffected unless explicitly configured.
+
+To enable, in the dedicated demo project/deployment only:
+
+1. Run db/seed-demo.sql again once in the demo project's SQL editor to move
+   existing seed rows to stable fixture paths.
+2. Apply db/demo-reset.sql in that same project.
+3. In Vercel, set these environment variables in **Production scope only**;
+   mark secrets **Sensitive**:
+   - DEMO_RESET_SUPABASE_URL: the demo project's Supabase URL.
+   - DEMO_RESET_SERVICE_KEY: that project's service_role JWT or sb_secret_
+     secret key. Mark Sensitive.
+   - CRON_SECRET: a random secret of at least 32 characters. Mark Sensitive.
+4. Redeploy so the environment and vercel.json cron take effect.
+5. Trigger once manually, using shell environment variables for the URL and
+   secret (do not paste secrets into source files):
+
+   ```sh
+   curl --fail-with-body -H "Authorization: Bearer $CRON_SECRET" \
+     "https://YOUR-DEPLOYMENT/api/demo/reset"
+   ```
+
+6. Check Vercel Cron logs and the JSON counts. Check that exhibits, thumbnails
+   and playback load. Failed runs can safely be triggered again.
+
+The reset deletes all visitor files, subjects, engagement, reports, invites
+and view records, removes non-admin accounts except the three shared demo
+accounts, and recreates the seed content. It keeps all admins, settings and
+audit history, adds a demo.reset audit entry, and restores shared usernames
+without lifting bans. Auth deletion is attempted; if project permissions
+prevent it, profile/content deletion still completes (inspect the returned
+account count and Supabase Auth). Storage cleanup removes every unreferenced
+object in department-files, including old random seed paths. Fixture uploads
+use stable paths and upsert, and sizes are synced from Storage metadata.
+The endpoint is 404 unless all three environment variables are present and
+requires the cron bearer secret.
+
+To disable, remove the demo reset environment variables and redeploy; apply
+db/demo-reset-undo.sql to remove its three service-only RPCs. This leaves the
+seed helper in place for manual use.
+
+Manual reset steps remain valid. Re-running db/seed-demo.sql alone clears
+only its own marked exhibits and subjects and recreates demo content; it
+preserves manually created rows and does not upload fixture bytes or remove
+storage objects.
 
 For a full demo content reset:
 
@@ -209,10 +261,6 @@ For a full demo content reset:
    without member profiles.
 5. Re-enable **Anyone can join**, verify public visibility, caps and operator
    details, and repeat the shared-account decision and signup check.
-
-Suggested cadence: inspect daily while public and reset weekly or after a
-demo session, sooner if abuse or storage requires it. Reset is manual; the
-repo has no automatic reset mechanism or reset cron.
 
 ### Storage and availability
 
