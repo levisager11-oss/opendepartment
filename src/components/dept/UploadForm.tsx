@@ -428,9 +428,15 @@ export function UploadForm({
         ? t("upload.savedNeedsSubjects")
         : write
           ? t("upload.confirmSave")
-          : message.includes("QUOTA_EXCEEDED")
-            ? t("upload.errorQuota")
-            : t("upload.errorGeneric");
+          : message.includes("DEMO_UPLOADS_DISABLED")
+            ? t("upload.demoDisabled")
+            : message.includes("DEMO_STORAGE_FULL")
+              ? t("upload.demoFull")
+              : message.includes("RATE_LIMITED")
+                ? t("common.rateLimited")
+                : message.includes("QUOTA_EXCEEDED")
+                  ? t("upload.errorQuota")
+                  : t("upload.errorGeneric");
       patchItem(item.key, { error: text, progress: null });
       return { ok: false, message: text };
     }

@@ -48,8 +48,10 @@ export function CommentSection({
       if (insertError || !data) throw insertError ?? new Error("Comment not saved");
       setComments((prev) => [...prev, { ...data, author_username: currentUsername }]);
       setBody("");
-    } catch {
-      setError(t("common.actionFailed"));
+    } catch (error) {
+      const message = typeof error === "object" && error !== null && "message" in error
+        ? String(error.message) : "";
+      setError(t(message.includes("RATE_LIMITED") ? "common.rateLimited" : "common.actionFailed"));
     } finally {
       setBusy(false);
     }

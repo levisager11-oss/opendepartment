@@ -837,6 +837,9 @@ export const dictionary = {
     "upload.submitting": "Transmitting...",
     "upload.errorSize": "File exceeds the {mb} MB limit.",
     "upload.errorType": "That file type is not accepted.",
+    "common.rateLimited": "Too many attempts. Please try again later.",
+    "upload.demoDisabled": "Uploads are disabled for shared demo accounts. Create your own account to upload.",
+    "upload.demoFull": "The demo storage limit has been reached. Please try again after cleanup.",
     "upload.errorQuota":
       "You have reached the storage limit for this department. Delete something you filed earlier, or ask an administrator to raise the limit.",
     "upload.metadataDocument":
@@ -1787,6 +1790,9 @@ export const dictionary = {
     "upload.submitting": "Wird übermittelt...",
     "upload.errorSize": "Die Datei überschreitet das Limit von {mb} MB.",
     "upload.errorType": "Dieser Dateityp wird nicht akzeptiert.",
+    "common.rateLimited": "Zu viele Versuche. Bitte versuchen Sie es später erneut.",
+    "upload.demoDisabled": "Uploads sind für gemeinsame Demokonten deaktiviert. Erstellen Sie ein eigenes Konto.",
+    "upload.demoFull": "Das Speicherlimit der Demo ist erreicht. Bitte versuchen Sie es nach einer Bereinigung erneut.",
     "upload.errorQuota":
       "Sie haben das Speicherlimit dieses Departements erreicht. Löschen Sie etwas Früheres oder bitten Sie eine Administratorin, das Limit zu erhöhen.",
     "upload.metadataDocument":
