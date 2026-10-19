@@ -26,6 +26,8 @@ import { DeptLeaveForm } from "@/components/dept/DeptLeaveForm";
 import { ReportForm } from "@/components/ReportForm";
 import { SubjectIndex } from "@/components/dept/SubjectIndex";
 import { ExhibitNav } from "@/components/dept/ExhibitNav";
+import { MarketingFooter } from "@/components/MarketingShell";
+import { DeptFooter } from "@/components/dept/DeptFooter";
 import { EditFileDetails } from "@/components/dept/EditFileDetails";
 
 const runtime = vi.hoisted(() => ({
@@ -1224,5 +1226,20 @@ describe("navigation and form guidance", () => {
     fireEvent.click(screen.getByRole("button", { name: tr("common.save") }));
     expect((await screen.findByRole("alert")).textContent).toBe(tr("file.editSubjectsFailed"));
     expect(runtime.router.refresh).not.toHaveBeenCalled();
+  });
+});
+
+describe("footer feedback links", () => {
+  it.each([
+    ["marketing", MarketingFooter, "feedback.link"],
+    ["department", DeptFooter, "feedback.platform"],
+  ] as const)("renders the %s footer feedback link with a new-tab hint", (_name, Footer, label) => {
+    render(<Footer />);
+    // JSDOM trims the leading space inside the hint span when computing the name.
+    const link = screen.getByRole("link", { name: `${tr(label)}${tr("feedback.newTab")}` });
+    expect(link.firstChild?.textContent).toBe(tr(label));
+    expect(link.getAttribute("href")).toBe("https://github.com/levisager11-oss/opendepartment/discussions");
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(link.getAttribute("rel")).toBe("noopener noreferrer");
   });
 });

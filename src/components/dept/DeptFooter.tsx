@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { FEEDBACK_URL } from "@/lib/links";
 import { Seal } from "@/components/Seal";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useI18n } from "@/lib/i18n/provider";
@@ -65,6 +66,10 @@ export function DeptFooter() {
           <Link href={`/report?slug=${encodeURIComponent(slug)}`} className={LINK}>
             {t("abuse.link")}
           </Link>
+          <a href={FEEDBACK_URL} target="_blank" rel="noopener noreferrer" className={LINK}>
+            {t("feedback.platform")}
+            <span className="sr-only"> {t("feedback.newTab")}</span>
+          </a>
         </nav>
       </div>
 

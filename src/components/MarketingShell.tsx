@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FEEDBACK_URL } from "@/lib/links";
 import { Wordmark } from "@/components/Logo";
 import { T } from "@/components/T";
 import { LanguageToggle } from "@/components/LanguageToggle";
@@ -106,6 +107,12 @@ export function MarketingFooter() {
               <Link href="/account" className={FOOTER_LINK}>
                 <T k="account.title" />
               </Link>
+            </li>
+            <li>
+              <a href={FEEDBACK_URL} target="_blank" rel="noopener noreferrer" className={FOOTER_LINK}>
+                <T k="feedback.link" />
+                <span className="sr-only"> <T k="feedback.newTab" /></span>
+              </a>
             </li>
           </ul>
         </nav>
