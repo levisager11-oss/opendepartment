@@ -147,6 +147,9 @@ export default async function LandingPage() {
                 <Link href="/directory" className="btn btn-lg btn-ghost">
                   <T k="od.browse" />
                 </Link>
+                <Link href="/d/the-open-files" className="btn btn-lg btn-ghost">
+                  <T k="od.tryDemo" />
+                </Link>
               </div>
               <p className="mt-5 max-w-xl text-sm text-ink-500">
                 <T k="od.needSupabase" />
