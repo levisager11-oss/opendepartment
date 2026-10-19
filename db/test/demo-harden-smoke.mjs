@@ -126,7 +126,10 @@ try {
   const undo = await sql('../demo-harden-undo.sql');
   await db.exec(undo);
   await db.exec(undo);
-  assert.equal(await scalar(`select count(*)::int as v from pg_proc where pronamespace='public'::regnamespace and proname like 'demo_%'`),0);
+  assert.equal(await scalar(`select count(*)::int as v from pg_proc where pronamespace='public'::regnamespace
+    and proname in ('demo_limits','demo_shared_account','demo_upload_allowed','demo_file_allowed',
+      'demo_comment_limit','demo_account_limit','demo_credential_guard')`),0);
+  assert.equal(await scalar(`select to_regprocedure('public.demo_seed_content()') is not null as v`),true);
   assert.equal(await scalar(`select count(*)::int as v from pg_policy where polname like 'demo%'`),0);
   assert.equal(await scalar(`select max_upload_mb as v from public.settings`),25);
   await user(shared);

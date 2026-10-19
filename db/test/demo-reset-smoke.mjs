@@ -35,6 +35,8 @@ try {
       ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','founder@example.test',
        jsonb_build_object('bootstrap_secret',repeat('a',64)));
   `);
+  // Seed and repeated resets must also work with the comment/account guards installed.
+  await db.exec(await sql("../demo-harden.sql"));
   await db.exec(seed);
   await db.exec(seed);
   await db.exec(reset);
