@@ -7,6 +7,7 @@ import {
 import { HeroMockup } from "@/components/marketing/HeroMockup";
 import { T } from "@/components/T";
 import { KofiButton } from "@/components/KofiButton";
+import { ItchEmbed } from "@/components/ItchEmbed";
 import type { TranslationKey } from "@/lib/i18n/dictionary";
 import { SITE_NAME, SITE_URL, absolute } from "@/lib/seo";
 
@@ -291,6 +292,13 @@ export default async function LandingPage() {
               <T k="od.supportBody" />
             </p>
             <KofiButton />
+          </div>
+
+          <div className="mx-auto flex max-w-7xl flex-col gap-4 border-t border-paper-300 px-4 py-8">
+            <h2 className="font-display text-lg font-bold text-ink-900">
+              <T k="od.itchTitle" />
+            </h2>
+            <ItchEmbed />
           </div>
         </section>
       </main>

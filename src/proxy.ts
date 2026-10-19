@@ -103,7 +103,7 @@ function backendOrigins(): string[] {
   return [...extra];
 }
 
-function contentSecurityPolicy(nonce: string): string {
+function contentSecurityPolicy(nonce: string, pathname: string): string {
   const selfHosted = backendOrigins();
   const SUPABASE = [SUPABASE_CLOUD, ...selfHosted].join(" ");
   // upgrade-insecure-requests would rewrite a loopback http:// project to
@@ -124,7 +124,9 @@ function contentSecurityPolicy(nonce: string): string {
     // blob: and nothing remote. A PDF is fetched and re-wrapped as an
     // application/pdf blob before it is framed, so no storage URL is ever
     // loaded into a frame with whatever Content-Type its uploader chose.
-    `frame-src 'self' blob:`,
+    // itch.io only on the landing page, for the click-to-load game widget
+    // (ItchEmbed). Department pages keep the frame list closed.
+    `frame-src 'self' blob:${pathname === "/" ? " https://itch.io" : ""}`,
     `connect-src 'self' ${SUPABASE}`,
     `font-src 'self' data:`,
     `form-action 'self'`,
@@ -143,7 +145,7 @@ function controlConfigured() {
 
 export async function proxy(request: NextRequest) {
   const nonce = btoa(crypto.randomUUID());
-  const csp = contentSecurityPolicy(nonce);
+  const csp = contentSecurityPolicy(nonce, request.nextUrl.pathname);
 
   // Forwarded to the render. Next looks for the nonce here, and x-nonce is for
   // any component that has to stamp one on a tag itself.
