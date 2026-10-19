@@ -350,6 +350,9 @@ export const dictionary = {
     "od.directoryOpen": "Open",
     "od.footerBlurb":
       "A private archive for groups that keep receipts. Every department runs on a database its own administrators control.",
+    "feedback.link": "Feedback",
+    "feedback.platform": "Feedback on OpenDepartment",
+    "feedback.newTab": "(opens GitHub Discussions in a new tab)",
     "od.footerProduct": "Product",
     "od.footerLegal": "Legal",
     "od.mock.dept": "The Staff Room Files",
@@ -1273,6 +1276,9 @@ export const dictionary = {
     "od.directoryOpen": "Öffnen",
     "od.footerBlurb":
       "Ein privates Archiv für Gruppen, die alles festhalten. Jedes Departement läuft auf einer Datenbank, die seine eigene Administration kontrolliert.",
+    "feedback.link": "Feedback",
+    "feedback.platform": "Feedback zu OpenDepartment",
+    "feedback.newTab": "(öffnet GitHub Discussions in einem neuen Tab)",
     "od.footerProduct": "Produkt",
     "od.footerLegal": "Rechtliches",
     "od.mock.dept": "Die Lehrerzimmer-Akten",
