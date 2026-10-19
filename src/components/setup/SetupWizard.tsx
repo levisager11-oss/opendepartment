@@ -1,5 +1,6 @@
 "use client";
 
+import { WaitlistForm } from "@/components/WaitlistForm";
 import { useCallback, useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n/provider";
@@ -1030,6 +1031,12 @@ export function SetupWizard({
           >
             {t("setup.openSupabase")} ↗
           </a>
+          {CONTROL_READY && (
+            <details className="space-y-3 text-sm text-ink-700">
+              <summary className="cursor-pointer">{t("waitlist.disclosure")}</summary>
+              <WaitlistForm />
+            </details>
+          )}
           <Nav onBack={() => setStep(1)} onNext={() => setStep(3)} />
         </div>
       )}

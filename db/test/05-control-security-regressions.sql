@@ -125,6 +125,78 @@ select odtest.equals('a suspended department stops resolving for visitors',
 select odtest.equals('suspension records why, for whoever reads the row later',
   $$select suspended_note from public.departments where slug='audit-staff'$$,'Reported');
 
+-- Waitlist tables are closed to both API roles; RPC assertions run as callers.
+select odtest.as_owner();
+create or replace function odtest.waitlist_error(name text, stmt text, expected text)
+returns void language plpgsql as $$
+begin
+  execute stmt;
+  raise sqlstate 'P9001' using message = 'unexpected success';
+exception when others then
+  perform odtest.record(name, sqlstate = 'P0001' and sqlerrm = expected, sqlstate || ': ' || sqlerrm);
+end; $$;
+grant execute on function odtest.waitlist_error(text, text, text) to anon, authenticated;
+select odtest.as_anon();
+select odtest.denied('anon cannot select waitlist', $$select * from public.waitlist$$);
+select odtest.denied('anon cannot insert waitlist', $$insert into public.waitlist (email,group_size,expected_storage,willingness_to_pay) values ('direct@example.test',2,'under_1gb',3)$$);
+select odtest.denied('anon cannot update waitlist', $$update public.waitlist set email='changed@example.test'$$);
+select odtest.denied('anon cannot delete waitlist', $$delete from public.waitlist$$);
+select odtest.denied('anon cannot select waitlist_throttle', $$select * from public.waitlist_throttle$$);
+select odtest.denied('anon cannot insert waitlist_throttle', $$insert into public.waitlist_throttle (sender) values ('clear')$$);
+select odtest.denied('anon cannot update waitlist_throttle', $$update public.waitlist_throttle set sender='changed'$$);
+select odtest.denied('anon cannot delete waitlist_throttle', $$delete from public.waitlist_throttle$$);
+select odtest.denied('anon cannot call the cap helper', $$select public.max_waitlist_rows()$$);
+select odtest.as_user('b1000000-0000-0000-0000-000000000004');
+select odtest.denied('authenticated cannot select waitlist', $$select * from public.waitlist$$);
+select odtest.denied('authenticated cannot insert waitlist', $$insert into public.waitlist (email,group_size,expected_storage,willingness_to_pay) values ('direct@example.test',2,'under_1gb',3)$$);
+select odtest.denied('authenticated cannot update waitlist', $$update public.waitlist set email='changed@example.test'$$);
+select odtest.denied('authenticated cannot delete waitlist', $$delete from public.waitlist$$);
+select odtest.denied('authenticated cannot select waitlist_throttle', $$select * from public.waitlist_throttle$$);
+select odtest.denied('authenticated cannot insert waitlist_throttle', $$insert into public.waitlist_throttle (sender) values ('clear')$$);
+select odtest.denied('authenticated cannot update waitlist_throttle', $$update public.waitlist_throttle set sender='changed'$$);
+select odtest.denied('authenticated cannot delete waitlist_throttle', $$delete from public.waitlist_throttle$$);
+select odtest.denied('authenticated cannot call the cap helper', $$select public.max_waitlist_rows()$$);
+select odtest.as_anon();
+select set_config('request.headers', '{"cf-connecting-ip":"203.0.113.40","x-real-ip":"192.0.2.1"}', false);
+select odtest.allowed('anon joins waitlist', $$select public.join_waitlist(' Waitlist@Example.test ',2,'under_1gb',3)$$);
+select odtest.allowed('duplicate email quietly succeeds', $$select public.join_waitlist('WAITLIST@example.test',8,'over_100gb',10)$$);
+select odtest.as_owner();
+select odtest.equals('waitlist email normalized and deduplicated', $$select count(*)::text from public.waitlist where email='waitlist@example.test'$$,'1');
+select odtest.equals('both accepted calls counted by hashed preferred IP',
+  $$select count(*)::text from public.waitlist_throttle where sender=encode(sha256(convert_to('ip:203.0.113.40','UTF8')),'hex')$$,'2');
+select odtest.as_anon();
+select odtest.waitlist_error('INVALID_EMAIL: bad,1,under_1gb,0', $$select public.join_waitlist('bad',1,'under_1gb',0)$$, 'INVALID_EMAIL');
+select odtest.waitlist_error('INVALID_EMAIL: null,1,under_1gb,0', $$select public.join_waitlist(null,1,'under_1gb',0)$$, 'INVALID_EMAIL');
+select odtest.waitlist_error('INVALID_EMAIL: repeat(a,250)||@x.test,1,under_1gb,0', $$select public.join_waitlist(repeat('a',250)||'@x.test',1,'under_1gb',0)$$, 'INVALID_EMAIL');
+select odtest.waitlist_error('INVALID_GROUP_SIZE: a@b.test,0,under_1gb,0', $$select public.join_waitlist('a@b.test',0,'under_1gb',0)$$, 'INVALID_GROUP_SIZE');
+select odtest.waitlist_error('INVALID_GROUP_SIZE: a@b.test,10001,under_1gb,0', $$select public.join_waitlist('a@b.test',10001,'under_1gb',0)$$, 'INVALID_GROUP_SIZE');
+select odtest.waitlist_error('INVALID_GROUP_SIZE: a@b.test,null,under_1gb,0', $$select public.join_waitlist('a@b.test',null,'under_1gb',0)$$, 'INVALID_GROUP_SIZE');
+select odtest.waitlist_error('INVALID_STORAGE: a@b.test,1,bad,0', $$select public.join_waitlist('a@b.test',1,'bad',0)$$, 'INVALID_STORAGE');
+select odtest.waitlist_error('INVALID_STORAGE: a@b.test,1,null,0', $$select public.join_waitlist('a@b.test',1,null,0)$$, 'INVALID_STORAGE');
+select odtest.waitlist_error('INVALID_PRICE: a@b.test,1,under_1gb,4', $$select public.join_waitlist('a@b.test',1,'under_1gb',4)$$, 'INVALID_PRICE');
+select odtest.waitlist_error('INVALID_PRICE: a@b.test,1,under_1gb,null', $$select public.join_waitlist('a@b.test',1,'under_1gb',null)$$, 'INVALID_PRICE');
+select odtest.allowed('five accepted calls including duplicates', $$
+  select public.join_waitlist('waitlist@example.test',2,'under_1gb',0) from generate_series(1,3)
+$$);
+select odtest.waitlist_error('sixth call is rate limited', $$select public.join_waitlist('sixth@example.test',1,'under_1gb',0)$$, 'RATE_LIMITED');
+select odtest.as_owner();
+insert into public.waitlist_throttle (sender, at) values ('expired', now() - interval '2 days');
+select odtest.as_user('b1000000-0000-0000-0000-000000000004');
+select set_config('request.headers', '{"x-real-ip":"192.0.2.40"}', false);
+select odtest.allowed('authenticated caller can join from another sender', $$select public.join_waitlist('signedin@example.test',10000,'10_100gb',5)$$);
+select odtest.as_owner();
+select odtest.equals('expired throttle purged', $$select count(*)::text from public.waitlist_throttle where sender='expired'$$, '0');
+-- Fixture rows fill the real cap, avoiding replacement of a production helper.
+insert into public.waitlist (email, group_size, expected_storage, willingness_to_pay)
+  select 'cap-' || i || '@example.test', 1, '1_10gb', 10
+    from generate_series(1, public.max_waitlist_rows() - (select count(*)::integer from public.waitlist)) i;
+select odtest.as_anon();
+select odtest.waitlist_error('full waitlist refuses a new address', $$select public.join_waitlist('full@example.test',1,'under_1gb',0)$$, 'WAITLIST_FULL');
+select odtest.waitlist_error('full waitlist does not expose duplicate membership', $$select public.join_waitlist('waitlist@example.test',1,'under_1gb',0)$$, 'WAITLIST_FULL');
+select set_config('request.headers', '{"cf-connecting-ip":"203.0.113.40"}', false);
+select odtest.waitlist_error('rate limit precedes full cap', $$select public.join_waitlist('full@example.test',1,'under_1gb',0)$$, 'RATE_LIMITED');
+select set_config('request.headers', '', false);
+
 select odtest.as_owner();
 \o
 select * from odtest.report() where outcome='FAIL';
