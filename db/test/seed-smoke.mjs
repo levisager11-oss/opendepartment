@@ -50,6 +50,14 @@ try {
       (select count(*)::int from auth.users where raw_user_meta_data ? 'invite_code') as leaked_invites,
       (select count(*)::int from public.votes) as votes`);
     assert.deepEqual(state, { admins: 1, door_closed: true, exhibits: 12, passwords: 3, leaked_invites: 0, votes: 27 });
+    const exhibits = (await db.query("select storage_path, original_name, thumb_path, kind from public.files where storage_path like '%/demo-seed/%' order by original_name")).rows;
+    exhibits.forEach((f, offset) => {
+      const n = String(offset + 1).padStart(3, "0");
+      const ext = n === "004" ? "mp3" : ["008", "009"].includes(n) ? "jpg" : "pdf";
+      assert.equal(f.original_name, `exhibit-${n}.${ext}`);
+      assert.ok(f.storage_path.endsWith(`/demo-seed/${n}-exhibit-${n}.${ext}`));
+      assert.equal(f.thumb_path, ext === "jpg" ? f.storage_path.replace(/\.[^.]+$/, "-thumb.webp") : null);
+    });
     console.log(`seed run ${run}: founder + 3 members, 12 exhibits, 5 subjects, 8 comments, 27 votes, 1 report; manual rows preserved`);
   }
 } catch (error) {

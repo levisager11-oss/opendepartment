@@ -95,6 +95,11 @@ begin
   raise notice 'demo members ready (password: demopass123)';
 end $demo$;
 
+-- One source of truth for manual seeding and the opt-in daily reset.
+create or replace function public.demo_seed_content()
+returns void language plpgsql security definer
+set search_path = public, extensions as $content$
+begin
 -- ---------------------------------------------------------------------------
 -- 1. Clear previous demo content, identified by the marker in storage_path.
 -- ---------------------------------------------------------------------------
@@ -116,11 +121,8 @@ on conflict (name) do nothing;
 -- ---------------------------------------------------------------------------
 -- 3. Exhibits, attributed only to the three demo members.
 --
--- Mostly non-image kinds on purpose: these rows point at storage objects that
--- were never uploaded, and a pdf or audio card renders its icon happily while
--- an image card would show a broken thumbnail.
+-- The reset route uploads the matching committed fixtures and thumbnails.
 -- ---------------------------------------------------------------------------
-do $files$
 declare
   owners uuid[];
   titles text[] := array[
@@ -148,6 +150,8 @@ declare
   new_id uuid;
   subject_ids uuid[];
   i int;
+  stem text;
+  ext text;
 begin
   owners := array['11111111-1111-4111-8111-111111111111'::uuid,
                   '22222222-2222-4222-8222-222222222222'::uuid,
@@ -157,20 +161,24 @@ begin
     from public.subjects where description = 'demo seed';
 
   for i in 1..array_length(titles, 1) loop
+    ext := case mimes[i] when 'image/jpeg' then 'jpg' when 'audio/mpeg' then 'mp3' else 'pdf' end;
+    stem := owners[1 + (i % array_length(owners, 1))]::text || '/demo-seed/' ||
+      lpad(i::text, 3, '0') || '-exhibit-' || lpad(i::text, 3, '0');
     insert into public.files (
       owner_id, title, description, category, storage_path, original_name,
-      mime_type, size_bytes, kind, created_at
+      mime_type, size_bytes, kind, created_at, thumb_path
     ) values (
       owners[1 + (i % array_length(owners, 1))],
       titles[i],
       'Seeded demo record number ' || i || '. Not a real document.',
       cats[1 + (i % array_length(cats, 1))],
-      owners[1 + (i % array_length(owners, 1))]::text || '/demo-seed/' || i || '-' || gen_random_uuid(),
-      'exhibit-' || lpad(i::text, 3, '0'),
+      stem || '.' || ext,
+      'exhibit-' || lpad(i::text, 3, '0') || '.' || ext,
       mimes[i],
       40000 + (i * 91733) % 4000000,
       kinds[i],
-      now() - (i * 7 || ' hours')::interval
+      now() - (i * 7 || ' hours')::interval,
+      case when kinds[i] = 'image' then stem || '-thumb.webp' end
     )
     returning id into new_id;
 
@@ -181,12 +189,11 @@ begin
       on conflict do nothing;
     end if;
   end loop;
-end $files$;
+end;
 
 -- ---------------------------------------------------------------------------
 -- 4. Votes and comments, so scores and sort orders are not all zero.
 -- ---------------------------------------------------------------------------
-do $engagement$
 declare
   f record;
   owners uuid[];
@@ -231,7 +238,7 @@ begin
 
   update public.files set view_count = 3 + (abs(hashtext(id::text)::bigint) % 240)
    where storage_path like owner_id::text || '/demo-seed/%';
-end $engagement$;
+end;
 
 -- ---------------------------------------------------------------------------
 -- 5. One open report, so the admin queue is not empty.
@@ -242,6 +249,11 @@ select f.id, '11111111-1111-4111-8111-111111111111'::uuid, 'other', 'Seeded demo
  where f.storage_path like f.owner_id::text || '/demo-seed/%'
  order by f.created_at
  limit 1;
+
+end;
+$content$;
+revoke execute on function public.demo_seed_content() from public, anon, authenticated;
+select public.demo_seed_content();
 
 commit;
 

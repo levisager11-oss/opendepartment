@@ -19,6 +19,7 @@ import type { NextConfig } from "next";
  */
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  outputFileTracingIncludes: { "/api/demo/reset": ["./db/demo-fixtures/**/*"] },
   outputFileTracingRoot: process.cwd(),
   async headers() {
     return [
