@@ -31,6 +31,7 @@ and removes only its own temporary cluster.
 | `04-tenant-security-regressions.sql` | Anonymous deletion, protected columns, reports, founder proof and orphan cleanup regressions. |
 | `05-control-security-regressions.sql` | Operator cascade, registration serialization, project binding and the staff takedown queue. |
 | `06-tenant-isolated.sql` | Its own database. For assertions about TOTALS or about who holds a role. |
+| `demo-harden-smoke.mjs` | Optional demo hardening: restrictive policies, storage/rate caps, shared credentials, seed, upgrade and undo (`npm run test:demo`). |
 | `run.mjs` | Portable PGlite runner. |
 | `run.sh` | Native cluster runner. |
 

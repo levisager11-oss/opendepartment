@@ -115,6 +115,55 @@ administrator rights or reuse their password for the founder. Re-running the
 seed preserves existing accounts/passwords and bans; it does not reset them
 to fresh login credentials, though it restores their demo usernames.
 
+## Hardening the public demo
+
+Optionally run all of [db/demo-harden.sql](../db/demo-harden.sql) manually in
+**the dedicated The Open Files demo project's SQL editor**, after the tenant
+schema and demo seed. It runs in one transaction and is safe to repeat. It is
+never part of the ordinary tenant schema or wizard SQL and affects only the
+project where you apply it. **Re-run it after re-applying tenant-schema.sql for
+an upgrade.**
+
+The database enforces these limits (MB here means 1024 × 1024 bytes):
+
+- Largest upload: **2 MB**, using the existing bucket limit; member storage
+  setting: **20 MB**.
+- All objects in `department-files`, including objects without file rows:
+  **300 MB** department total, **20 MB** per member (owned by them or in their
+  UUID folder), and **20 objects per member per rolling 24 hours**.
+- Comments: **10 per author per 10 minutes**, **50 per author per day**, and
+  **30 per hashed IP per hour**. Only SHA-256 address hashes are stored, pruned
+  after a day when comments are submitted. Missing IP headers leave the author
+  limits in effect.
+- New accounts: **20 department-wide per hour**, **100 per day**, counted from
+  profile creation. A rejected signup rolls back. GoTrue's database connection
+  has no request headers; Supabase Auth's built-in IP rate limits supply the
+  per-IP layer.
+- The three shared demo accounts cannot upload objects or create file rows.
+  They can still comment and vote within the limits. Their password, email,
+  phone and pending email/phone changes are preserved on Auth updates, so
+  visitors cannot change those shared credentials. Check the SQL editor for
+  a notice if Auth table permissions prevent installing this guard; an Auth
+  table owner must install it in that case.
+
+Upload checks inspect existing objects before insertion; the incoming object's
+size is unavailable then. The 2 MB bucket ceiling bounds overshoot per in-flight
+upload, rather than reserving exact bytes across concurrent uploads. These are
+small demo safeguards, not a substitute for monitoring or cleanup. Deleted
+objects/comments/accounts no longer count toward their corresponding limits.
+
+In the Supabase dashboard, open **Authentication → Rate Limits** and lower
+sign-ups/sign-ins per IP. Keep **Confirm email** off for immediate demo signup,
+or configure working custom SMTP if keeping confirmation on. Enable
+**leaked-password protection** in the Authentication password settings where
+available; verify the shared demo credentials still work before launch.
+
+To undo, run all of [db/demo-harden-undo.sql](../db/demo-harden-undo.sql) in the
+same SQL editor with the same privileges. It removes only the demo policies,
+triggers, helper functions and private throttle/backup tables, restores the
+settings caps saved on first application, and keeps all content and accounts.
+Neither script deletes storage objects; use the Storage API or dashboard.
+
 ## What to watch for
 
 ### Abuse

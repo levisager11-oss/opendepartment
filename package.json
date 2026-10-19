@@ -10,10 +10,11 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "npm run build:schema && next typegen && tsc --noEmit",
-    "test": "vitest run && npm run test:rls && npm run test:seed",
+    "test": "vitest run && npm run test:rls && npm run test:seed && npm run test:demo",
     "test:unit": "vitest run",
     "test:rls": "node db/test/run.mjs",
     "test:rls:native": "bash db/test/run.sh",
+    "test:demo": "node db/test/demo-harden-smoke.mjs",
     "test:seed": "node db/test/seed-smoke.mjs",
     "test:smoke": "node tests/http-smoke.mjs"
   },
