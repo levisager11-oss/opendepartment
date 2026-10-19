@@ -1,4 +1,4 @@
-import type { Locale } from "./i18n/dictionary";
+import { translate, type Locale } from "./i18n/dictionary";
 
 export type LegalDoc = "terms" | "privacy" | "imprint";
 
@@ -137,6 +137,7 @@ export function getLegalDoc(
           body: [
             "Für ein registriertes Departement: die gewählte Adresse (Slug), die URL Ihres Supabase-Projekts, dessen öffentlichen anon-Key, den Anzeigenamen und die Angabe, ob es gelistet ist.",
             "Für ein OpenDepartment-Konto: Ihre E-Mail-Adresse und Ihr Passwort-Hash, verwaltet durch Supabase Auth.",
+            translate(locale, "waitlist.privacyBody"),
             "Wir speichern auch eingereichte Missbrauchsmeldungen mit den freiwillig angegebenen Kontaktdaten. Wir fragen keinen service_role-Key ab. Zur Seitendarstellung verarbeitet der Server Mitgliedssitzungen, autorisierte Metadaten und zeitlich begrenzte Datei-Links. Bei optionaler Supabase-Verbindung verarbeitet er vorübergehend einen verschlüsselt gespeicherten Management-API-Token.",
           ],
         },
@@ -243,6 +244,7 @@ export function getLegalDoc(
         body: [
           "For a registered department: the chosen address (slug), your Supabase project URL, its public anon key, the display name, and whether it is listed.",
           "For an OpenDepartment account: your e-mail address and password hash, handled by Supabase Auth.",
+          translate(locale, "waitlist.privacyBody"),
           "We also store submitted abuse reports and any contact details you choose to include. We do not request a service_role key. To render pages, our server processes member sessions, authorized metadata and temporary file links. Optional Supabase connection temporarily uses an encrypted Management API token.",
         ],
       },

@@ -7,6 +7,7 @@ import {
 import { HeroMockup } from "@/components/marketing/HeroMockup";
 import { T } from "@/components/T";
 import { KofiButton } from "@/components/KofiButton";
+import { WaitlistSection } from "@/components/WaitlistForm";
 import { ItchEmbed } from "@/components/ItchEmbed";
 import type { TranslationKey } from "@/lib/i18n/dictionary";
 import { SITE_NAME, SITE_URL, absolute } from "@/lib/seo";
@@ -301,6 +302,7 @@ export default async function LandingPage() {
             <ItchEmbed />
           </div>
         </section>
+        <WaitlistSection />
       </main>
 
       <MarketingFooter />
