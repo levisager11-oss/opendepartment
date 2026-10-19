@@ -285,6 +285,11 @@ export const dictionary = {
     // --- support --------------------------------------------------------
     "od.supportBody":
       "OpenDepartment is free to use. If it is useful to you, you can buy me a coffee.",
+    "od.itchTitle": "More from the developer",
+    "od.itchBody": "a game I made, on itch.io.",
+    "od.itchNotice":
+      "Loading the preview connects your browser to itch.io, which then sees your IP address.",
+    "od.itchLoad": "Show itch.io preview",
 
     // --- department chrome (OpenDepartment additions) -------------------
     "dept.hostedNotice":
@@ -1203,6 +1208,11 @@ export const dictionary = {
     // --- Unterstützung -------------------------------------------------
     "od.supportBody":
       "OpenDepartment ist kostenlos nutzbar. Wenn es Ihnen nützt, können Sie mir einen Kaffee ausgeben.",
+    "od.itchTitle": "Mehr vom Entwickler",
+    "od.itchBody": "ein Spiel von mir, auf itch.io.",
+    "od.itchNotice":
+      "Beim Laden der Vorschau verbindet sich Ihr Browser mit itch.io, das dabei Ihre IP-Adresse erfährt.",
+    "od.itchLoad": "itch.io-Vorschau anzeigen",
 
     // --- department chrome (OpenDepartment additions) -------------------
     "dept.hostedNotice":

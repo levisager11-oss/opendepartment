@@ -57,3 +57,8 @@ it("tells shared caches that a page depends on language and session", async () =
   const sitemap = await proxy(new NextRequest("https://archive.test/sitemap.xml"));
   expect(sitemap.headers.get("vary") ?? "").not.toContain("Accept-Language");
 });
+it("allows the itch.io frame on the landing page only", async () => {
+  const frameSrc = (r: Response) => r.headers.get("content-security-policy")!.split("; ").find((d) => d.startsWith("frame-src"));
+  expect(frameSrc(await proxy(new NextRequest("https://archive.test/")))).toContain("https://itch.io");
+  expect(frameSrc(await proxy(new NextRequest("https://archive.test/d/pinned/vault")))).not.toContain("itch.io");
+});
