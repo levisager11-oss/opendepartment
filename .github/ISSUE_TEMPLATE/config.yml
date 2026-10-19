@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions & feedback (GitHub Discussions)
+    url: https://github.com/levisager11-oss/opendepartment/discussions
+    about: Ask questions, share feedback and ideas.
+  - name: Abuse / takedown reports
+    url: https://opendepartment.vercel.app/report
+    about: Submit abuse or takedown reports here. Do not report abuse in public issues.
